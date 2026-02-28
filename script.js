@@ -270,6 +270,9 @@ let currentUserKey = null;
 let myActivityChart = null;
 let myBlockChart = null;
 let myComputeChart = null;
+let myBlock3DChart = null;
+let myLessonChart = null;
+let myPythonQuizChart = null;
 let statsPageLoading = false;
 let statsPageQueued = false;
 let lastTaskXP = 0;
@@ -292,6 +295,7 @@ let blockAssignmentProgressUnsub = null;
 let blockAssignmentProgressMap = new Map();
 let blockTeacherProgressUnsub = null;
 let blockTeacherCompletedCountMap = new Map();
+let blockTeacherProgressRowsByAssignment = new Map();
 let activeBlockAssignmentId = null;
 let editingBlockHomeworkId = null;
 let currentBlockAssignType = "block2d";
@@ -301,6 +305,7 @@ let computeAssignmentProgressUnsub = null;
 let computeAssignmentProgressMap = new Map();
 let computeTeacherProgressUnsub = null;
 let computeTeacherCompletedCountMap = new Map();
+let computeTeacherProgressRowsByAssignment = new Map();
 let computeStateUnsub = null;
 let studentComputeStateCompletedLevels = 0;
 let computeReportLevelsUnsub = null;
@@ -853,8 +858,65 @@ window.addEventListener('message', async function(e){
   }
   const isComputeSource = data.source === "compute-it";
   const isBlock3DSource = data.source === "block-3d";
+  const isSilentTeacherSource = data.source === "silent-teacher";
+  const isLightbotSource = data.source === "lightbot";
   // Save/Update game state in Firestore
   if(data.type === 'GAME_UPDATE'){
+    if (isLightbotSource) {
+      try {
+        const uid = activeBlockRunnerUserId || currentUserId || "guest";
+        if (userRole === "teacher") {
+          await setDoc(doc(db, "lightbotLevels", "default"), {
+            updatedAt: serverTimestamp(),
+            updatedBy: currentUserId || null,
+            payload: {
+              levels: Array.isArray(data.levels) ? data.levels : [],
+              currentLevelIndex: Number(data.currentLevelIndex || 0)
+            }
+          }, { merge: true });
+        } else {
+          await setDoc(doc(db, "lightbotStates", String(uid)), {
+            updatedAt: serverTimestamp(),
+            payload: {
+              levels: Array.isArray(data.levels) ? data.levels : [],
+              currentLevelIndex: Number(data.currentLevelIndex || 0),
+              progressPercent: Math.max(0, Number(data.progressPercent || 0))
+            }
+          }, { merge: true });
+        }
+      } catch (err) {
+        console.warn("LIGHTBOT GAME_UPDATE save error", err);
+      }
+      return;
+    }
+    if (isSilentTeacherSource) {
+      try {
+        const uid = activeBlockRunnerUserId || currentUserId || "guest";
+        if (userRole === "teacher") {
+          await setDoc(doc(db, "silentTeacherLevels", "default"), {
+            updatedAt: serverTimestamp(),
+            updatedBy: currentUserId || null,
+            payload: {
+              levels: Array.isArray(data.levels) ? data.levels : [],
+              currentLevelIndex: Number(data.currentLevelIndex || 0)
+            }
+          }, { merge: true });
+        } else {
+          await setDoc(doc(db, "silentTeacherStates", String(uid)), {
+            updatedAt: serverTimestamp(),
+            payload: {
+              levels: Array.isArray(data.levels) ? data.levels : [],
+              currentLevelIndex: Number(data.currentLevelIndex || 0),
+              progressPercent: Math.max(0, Number(data.progressPercent || 0)),
+              score: Math.max(0, Number(data.score || 0))
+            }
+          }, { merge: true });
+        }
+      } catch (err) {
+        console.warn("SILENT GAME_UPDATE save error", err);
+      }
+      return;
+    }
     if (isComputeSource) {
       try {
         const uid = activeComputeRunnerUserId || currentUserId || 'guest';
@@ -972,6 +1034,157 @@ window.addEventListener('message', async function(e){
   else if(data.type === 'LEVEL_COMPLETED'){
     if (userRole === "teacher") return;
     try{
+      if (isLightbotSource) {
+        const uid = activeBlockRunnerUserId || currentUserId || "guest";
+        const assignmentId = String(data.assignmentId || activeBlockAssignmentId || "");
+        const levelNo = Math.max(1, Number(data.levelNo || data.levelId || 1));
+        const completedIds = Array.isArray(data.completedLevelIds)
+          ? data.completedLevelIds.map((v) => Number(v)).filter((v) => Number.isFinite(v))
+          : [levelNo];
+        const currentLevelIndex = Math.max(0, Number(data.currentLevelIndex || 0));
+        const fallbackPercent = Math.max(0, Number(data.percent || data.progressPercent || 0));
+        const levelRef = doc(db, "studentReports", String(uid), "levelCompletions", `lightbot_${levelNo}`);
+        const levelSnap = await getDoc(levelRef);
+        const xpPerLevel = 20;
+        await setDoc(doc(db, "lightbotStates", String(uid)), {
+          updatedAt: serverTimestamp(),
+          payload: {
+            levels: Array.isArray(data.levels) ? data.levels : [],
+            currentLevelIndex,
+            progressPercent: fallbackPercent
+          }
+        }, { merge: true });
+        await setDoc(levelRef, {
+          levelId: String(data.levelId || `lightbot_${levelNo}`),
+          levelNo,
+          xp: xpPerLevel,
+          percent: 100,
+          durationMs: Number(data.duration || 0),
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+        if (!levelSnap.exists()) {
+          try { await updateDoc(doc(db, "users", uid), { xp: increment(xpPerLevel) }); } catch {}
+          await setDoc(doc(db, "studentReports", String(uid)), {
+            totalXP: increment(xpPerLevel),
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+        }
+        if (assignmentId) {
+          let levelStart = Math.max(1, Number(data.levelStart || 1));
+          let levelEnd = Math.max(levelStart, Number(data.levelEnd || levelStart));
+          try {
+            const assignmentSnap = await getDoc(doc(db, "blockAssignments", assignmentId));
+            if (assignmentSnap.exists()) {
+              const assignment = assignmentSnap.data() || {};
+              levelStart = Math.max(1, Number(assignment.levelStart || levelStart));
+              levelEnd = Math.max(levelStart, Number(assignment.levelEnd || levelEnd));
+            }
+          } catch {}
+          const totalLevels = Math.max(1, levelEnd - levelStart + 1);
+          const doneInRange = completedIds.filter((id) => id >= levelStart && id <= levelEnd).length;
+          const percent = Math.max(fallbackPercent, Math.min(100, Math.round((doneInRange / totalLevels) * 100)));
+          const completed = doneInRange >= totalLevels;
+          await setDoc(doc(db, "blockAssignmentProgress", `${assignmentId}_${uid}`), {
+            assignmentId,
+            assignmentType: "lightbot",
+            assignmentTitle: String(data.assignmentTitle || "Code Robot Lab Ödevi"),
+            userId: uid,
+            levelStart,
+            levelEnd,
+            completedLevelIds: completedIds,
+            completedLevels: doneInRange,
+            totalLevels,
+            percent,
+            completed,
+            totalXP: doneInRange * xpPerLevel,
+            lastSessionSeconds: Math.max(0, Number(data.elapsedSeconds || 0)),
+            currentLevelIndex,
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+          if (completed) {
+            try { await updateDoc(doc(db, "blockAssignments", assignmentId), { updatedAt: serverTimestamp() }); } catch {}
+          }
+        }
+        if (uid === currentUserId) updateUserXPDisplay();
+        return;
+      }
+      if (isSilentTeacherSource) {
+        const uid = activeBlockRunnerUserId || currentUserId || "guest";
+        const assignmentId = String(data.assignmentId || activeBlockAssignmentId || "");
+        const levelNo = Math.max(1, Number(data.levelNo || data.levelId || 1));
+        const completedIds = Array.isArray(data.completedSectionIds)
+          ? data.completedSectionIds.map((v) => Number(v)).filter((v) => Number.isFinite(v))
+          : [levelNo];
+        const currentLevelIndex = Math.max(0, Number(data.currentLevelIndex || 0));
+        const fallbackPercent = Math.max(0, Number(data.percent || data.progressPercent || 0));
+        const levelRef = doc(db, "studentReports", String(uid), "levelCompletions", `silent_${levelNo}`);
+        const levelSnap = await getDoc(levelRef);
+        const xpPerLevel = 30;
+        await setDoc(doc(db, "silentTeacherStates", String(uid)), {
+          updatedAt: serverTimestamp(),
+          payload: {
+            levels: Array.isArray(data.levels) ? data.levels : [],
+            currentLevelIndex,
+            progressPercent: fallbackPercent,
+            score: Math.max(0, Number(data.score || 0))
+          }
+        }, { merge: true });
+        await setDoc(levelRef, {
+          levelId: String(data.levelId || `section_${levelNo}`),
+          levelNo,
+          xp: xpPerLevel,
+          percent: 100,
+          durationMs: Number(data.duration || 0),
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+        if (!levelSnap.exists()) {
+          try { await updateDoc(doc(db, "users", uid), { xp: increment(xpPerLevel) }); } catch {}
+          await setDoc(doc(db, "studentReports", String(uid)), {
+            totalXP: increment(xpPerLevel),
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+        }
+        if (assignmentId) {
+          let levelStart = Math.max(1, Number(data.levelStart || 1));
+          let levelEnd = Math.max(levelStart, Number(data.levelEnd || levelStart));
+          try {
+            const assignmentSnap = await getDoc(doc(db, "blockAssignments", assignmentId));
+            if (assignmentSnap.exists()) {
+              const assignment = assignmentSnap.data() || {};
+              levelStart = Math.max(1, Number(assignment.levelStart || levelStart));
+              levelEnd = Math.max(levelStart, Number(assignment.levelEnd || levelEnd));
+            }
+          } catch {}
+          const totalLevels = Math.max(1, levelEnd - levelStart + 1);
+          const doneInRange = completedIds.filter((id) => id >= levelStart && id <= levelEnd).length;
+          const percent = Math.max(fallbackPercent, Math.min(100, Math.round((doneInRange / totalLevels) * 100)));
+          const completed = doneInRange >= totalLevels;
+          await setDoc(doc(db, "blockAssignmentProgress", `${assignmentId}_${uid}`), {
+            assignmentId,
+            assignmentType: "silentteacher",
+            assignmentTitle: String(data.assignmentTitle || "Python Quiz Lab Ödevi"),
+            userId: uid,
+            levelStart,
+            levelEnd,
+            completedLevelIds: completedIds,
+            completedLevels: doneInRange,
+            totalLevels,
+            percent,
+            completed,
+            totalXP: doneInRange * xpPerLevel,
+            lastSessionSeconds: Math.max(0, Number(data.elapsedSeconds || 0)),
+            currentLevelIndex,
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+          if (completed) {
+            try {
+              await updateDoc(doc(db, "blockAssignments", assignmentId), { updatedAt: serverTimestamp() });
+            } catch {}
+          }
+        }
+        if (uid === currentUserId) updateUserXPDisplay();
+        return;
+      }
       if (isComputeSource) {
         const uid = activeComputeRunnerUserId || currentUserId || 'guest';
         const levelKey = String(data.levelId ?? "unknown");
@@ -1208,6 +1421,34 @@ window.addEventListener('message', async function(e){
   }
   else if (data.type === "ASSIGNMENT_RANGE_COMPLETED") {
     const source = String(data.source || "");
+    if (source === "lightbot") {
+      if (userRole !== "student") return;
+      showCompletionCelebration({
+        title: "Code Robot Lab Tamamlandi!",
+        message: "Verilen seviye araligini basariyla tamamladin.",
+        accent: "#f59e0b",
+        xp: Math.max(0, Number(data.xp || 0)),
+        durationSeconds: Math.max(0, Number(data.elapsedSeconds || 0)),
+        requireAction: true,
+        actionText: "Kaydet ve Cik",
+        onAction: async () => await saveAndExitCompletedRunner()
+      });
+      return;
+    }
+    if (source === "silent-teacher") {
+      if (userRole !== "student") return;
+      showCompletionCelebration({
+        title: "Python Quiz Lab Tamamlandi!",
+        message: "Verilen bolum araligini basariyla tamamladin.",
+        accent: "#fb923c",
+        xp: Math.max(0, Number(data.xp || 0)),
+        durationSeconds: Math.max(0, Number(data.elapsedSeconds || 0)),
+        requireAction: true,
+        actionText: "Kaydet ve Cik",
+        onAction: async () => await saveAndExitCompletedRunner()
+      });
+      return;
+    }
     if (source === "block-3d") {
       if (userRole !== "student") return;
       if (block3DRunnerSession) {
@@ -1363,6 +1604,28 @@ document.addEventListener('DOMContentLoaded', function(){
     hubLineTraceBtn.addEventListener('click', () => {
       closeAppsHubModal();
       openLineTraceRunner();
+    });
+  }
+  const hubSilentTeacherBtn = document.getElementById('btn-apps-hub-open-silent-teacher');
+  if (hubSilentTeacherBtn) {
+    hubSilentTeacherBtn.addEventListener('click', () => {
+      closeAppsHubModal();
+      openSilentTeacherRunner();
+    });
+  }
+  const hubLightbotBtn = document.getElementById('btn-apps-hub-open-lightbot');
+  if (hubLightbotBtn) {
+    hubLightbotBtn.addEventListener('click', () => {
+      closeAppsHubModal();
+      openLightbotRunner();
+    });
+  }
+  const hubLiveQuizBtn = document.getElementById('btn-apps-hub-open-live-quiz');
+  if (hubLiveQuizBtn) {
+    hubLiveQuizBtn.addEventListener('click', () => {
+      if (userRole !== "teacher") return;
+      closeAppsHubModal();
+      openLiveQuizModal();
     });
   }
 });
@@ -2428,7 +2691,10 @@ function openTeacherQuizResultsReport() {
 }
 
 function startTeacherHomeQuizListener() {
-  const list = document.getElementById("quiz-list");
+  const list = document.getElementById("quiz-list-pending") || document.getElementById("quiz-list");
+  const completedList = document.getElementById("quiz-list-completed");
+  const noPendingEl = document.getElementById("no-quiz-pending");
+  const noCompletedEl = document.getElementById("no-quiz-completed");
   const countEl = document.getElementById("teacher-quiz-count");
   const resultsList = document.getElementById("teacher-quiz-results-list");
   const resultsMeta = document.getElementById("teacher-quiz-results-meta");
@@ -2438,39 +2704,21 @@ function startTeacherHomeQuizListener() {
   const clearResultsBtnModal = document.getElementById("btn-clear-teacher-quiz-results-modal");
   if (!list || !countEl) return;
   stopTeacherHomeQuizListener();
-  if (userRole !== "teacher" || !currentUserId) {
-    countEl.innerText = "0";
-    list.innerHTML = "";
-    if (resultsList) resultsList.innerHTML = "";
-    if (resultsListModal) resultsListModal.innerHTML = "";
-    if (resultsMeta) resultsMeta.innerText = "";
-    if (resultsMetaModal) resultsMetaModal.innerText = "";
-    teacherHomeDisplayedResultsSessionId = null;
-    teacherHomeLatestRankingRows = [];
-    teacherHomeLatestResultsMeta = "";
-    teacherQuizResultSessions = [];
-    teacherSelectedQuizSessionId = "";
-    renderTeacherQuizSessionSelector();
-    return;
-  }
-  list.innerHTML = `<div class="loading">Quizler yükleniyor...</div>`;
-  if (resultsList) resultsList.innerHTML = `<div class="loading">Sonuçlar yükleniyor...</div>`;
-  if (resultsListModal) resultsListModal.innerHTML = `<div class="loading">Sonuçlar yükleniyor...</div>`;
-  if (resultsMeta) resultsMeta.innerText = "Sonuçlar yükleniyor...";
-  if (resultsMetaModal) resultsMetaModal.innerText = "Sonuçlar yükleniyor...";
-  const qx = query(collection(db, "liveQuizzes"), where("teacherId", "==", currentUserId));
-  liveQuizHomeUnsub = onSnapshot(qx, (snap) => {
-    const rows = [];
-    snap.forEach((d) => rows.push({ id: d.id, ...d.data() }));
+  let quizRowsCache = [];
+  let completedQuizIds = new Set();
+  const renderQuizCards = () => {
+    const rows = quizRowsCache.slice();
     rows.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
     const visibleRows = rows.filter((qz) => !qz?.isDeleted);
     countEl.innerText = String(visibleRows.length);
     if (!visibleRows.length) {
       list.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🧠</div>Henüz quiz eklenmedi.</div>`;
+      if (completedList) completedList.innerHTML = "";
+      if (noPendingEl) noPendingEl.style.display = "none";
+      if (noCompletedEl) noCompletedEl.style.display = "none";
       return;
     }
-    list.innerHTML = "";
-    visibleRows.slice(0, 8).forEach((qz) => {
+    const createQuizCard = (qz) => {
       const created = qz.createdAt?.toDate ? qz.createdAt.toDate().toLocaleDateString("tr-TR") : "-";
       const div = document.createElement("div");
       div.className = "list-item";
@@ -2510,10 +2758,46 @@ function startTeacherHomeQuizListener() {
           deleteLiveQuizById(qz.id, qz.title || "Quiz");
         };
       }
-      list.appendChild(div);
-    });
+      return div;
+    };
+    list.innerHTML = "";
+    if (completedList) completedList.innerHTML = "";
+    visibleRows.slice(0, 8).forEach((qz) => list.appendChild(createQuizCard(qz)));
+    if (noPendingEl) noPendingEl.style.display = visibleRows.length ? "none" : "block";
+    if (noCompletedEl) noCompletedEl.style.display = "none";
+  };
+  if (userRole !== "teacher" || !currentUserId) {
+    countEl.innerText = "0";
+    list.innerHTML = "";
+    if (completedList) completedList.innerHTML = "";
+    if (noPendingEl) noPendingEl.style.display = "none";
+    if (noCompletedEl) noCompletedEl.style.display = "none";
+    if (resultsList) resultsList.innerHTML = "";
+    if (resultsListModal) resultsListModal.innerHTML = "";
+    if (resultsMeta) resultsMeta.innerText = "";
+    if (resultsMetaModal) resultsMetaModal.innerText = "";
+    teacherHomeDisplayedResultsSessionId = null;
+    teacherHomeLatestRankingRows = [];
+    teacherHomeLatestResultsMeta = "";
+    teacherQuizResultSessions = [];
+    teacherSelectedQuizSessionId = "";
+    renderTeacherQuizSessionSelector();
+    return;
+  }
+  list.innerHTML = `<div class="loading">Quizler yükleniyor...</div>`;
+  if (completedList) completedList.innerHTML = `<div class="loading">Quizler yükleniyor...</div>`;
+  if (resultsList) resultsList.innerHTML = `<div class="loading">Sonuçlar yükleniyor...</div>`;
+  if (resultsListModal) resultsListModal.innerHTML = `<div class="loading">Sonuçlar yükleniyor...</div>`;
+  if (resultsMeta) resultsMeta.innerText = "Sonuçlar yükleniyor...";
+  if (resultsMetaModal) resultsMetaModal.innerText = "Sonuçlar yükleniyor...";
+  const qx = query(collection(db, "liveQuizzes"), where("teacherId", "==", currentUserId));
+  liveQuizHomeUnsub = onSnapshot(qx, (snap) => {
+    quizRowsCache = [];
+    snap.forEach((d) => quizRowsCache.push({ id: d.id, ...d.data() }));
+    renderQuizCards();
   }, () => {
     list.innerHTML = `<div style="color:#b91c1c;">Quiz listesi yüklenemedi.</div>`;
+    if (completedList) completedList.innerHTML = "";
   });
 
   const qResults = query(collection(db, "studentQuizResults"), where("teacherId", "==", currentUserId));
@@ -2521,6 +2805,12 @@ function startTeacherHomeQuizListener() {
     const rows = [];
     snap.forEach((d) => rows.push({ id: d.id, ...d.data() }));
     rows.sort((a, b) => Number(b.finishedAtMs || 0) - Number(a.finishedAtMs || 0));
+    completedQuizIds = new Set(
+      rows
+        .map((r) => String(r?.quizId || "").trim())
+        .filter((quizId) => !!quizId)
+    );
+    renderQuizCards();
     const clearHandler = () => {
       teacherSelectedQuizSessionId = "";
       teacherHomeQuizResultsClosedSessionId = null;
@@ -2857,6 +3147,8 @@ function getBlockHomeworkType(typeRaw) {
   const t = String(typeRaw || "block2d").toLowerCase();
   if (t === "block3d") return "block3d";
   if (t === "flowchart") return "flowchart";
+  if (t === "silentteacher") return "silentteacher";
+  if (t === "lightbot") return "lightbot";
   return "block2d";
 }
 
@@ -2864,7 +3156,35 @@ function getBlockHomeworkTypeLabel(typeRaw) {
   const t = getBlockHomeworkType(typeRaw);
   if (t === "block3d") return "3D Blok Kodlama";
   if (t === "flowchart") return "Flowchart";
+  if (t === "silentteacher") return "Python Quiz Lab";
+  if (t === "lightbot") return "Code Robot Lab";
   return "Blok Kodlama";
+}
+
+function getSilentTeacherSectionCatalog() {
+  return [
+    { id: "easy_1", name: "Kolay - Degiskenler" },
+    { id: "easy_2", name: "Kolay - Dizi ve Indeks" },
+    { id: "easy_3", name: "Kolay - Karsilastirma" },
+    { id: "mid_1", name: "Orta - if / else" },
+    { id: "mid_2", name: "Orta - else if Zinciri" },
+    { id: "mid_3", name: "Orta - Fonksiyon Giris" },
+    { id: "hard_1", name: "Zor - Ic Ice Kosul" },
+    { id: "hard_2", name: "Zor - Dizi ve Hesaplama" },
+    { id: "hard_3", name: "Zor - Fonksiyon + Kosul" }
+  ];
+}
+
+function getLightbotLevelCatalog() {
+  const out = [];
+  let idx = 1;
+  ["Kolay", "Orta", "Zor"].forEach((band) => {
+    for (let i = 1; i <= 12; i++) {
+      out.push({ id: `${band.toLowerCase()}_${i}`, name: `${band} - ${i}`, order: idx });
+      idx += 1;
+    }
+  });
+  return out;
 }
 
 function getBaseBlock3DLevels() {
@@ -2921,12 +3241,34 @@ function getAvailableBlockLevelCountByType(typeRaw) {
   const t = getBlockHomeworkType(typeRaw);
   if (t === "block3d") return Math.max(1, getAvailableBlock3DLevels().length);
   if (t === "flowchart") return 1;
+  if (t === "silentteacher") return Math.max(1, getSilentTeacherSectionCatalog().length);
+  if (t === "lightbot") return Math.max(1, getLightbotLevelCatalog().length);
   return getAvailableBlockLevelCount();
 }
 
 function getBlockLevelNamesByTypeAndRange(typeRaw, start, end) {
   const t = getBlockHomeworkType(typeRaw);
   if (t === "flowchart") return ["Flowchart Soru"];
+  if (t === "silentteacher") {
+    const sections = getSilentTeacherSectionCatalog();
+    const s = Math.max(1, Number(start || 1));
+    const e = Math.max(s, Number(end || s));
+    const out = [];
+    for (let i = s - 1; i <= e - 1 && i < sections.length; i++) {
+      out.push(String(sections[i]?.name || `Bolum ${i + 1}`));
+    }
+    return out;
+  }
+  if (t === "lightbot") {
+    const levels = getLightbotLevelCatalog();
+    const s = Math.max(1, Number(start || 1));
+    const e = Math.max(s, Number(end || s));
+    const out = [];
+    for (let i = s - 1; i <= e - 1 && i < levels.length; i++) {
+      out.push(String(levels[i]?.name || `Seviye ${i + 1}`));
+    }
+    return out;
+  }
   if (t === "block3d") {
     const levels = getAvailableBlock3DLevels();
     if (!levels.length) return [];
@@ -5153,6 +5495,8 @@ function matchesTeacherBlockAssignType(item) {
   const type = getBlockHomeworkType(item?.assignmentType);
   const activeType = getBlockHomeworkType(currentBlockAssignType || "block2d");
   if (activeType === "block3d") return type === "block3d";
+  if (activeType === "silentteacher") return type === "silentteacher";
+  if (activeType === "lightbot") return type === "lightbot";
   return type === "block2d";
 }
 
@@ -5917,6 +6261,122 @@ window.openLineTraceRunner = function(options = {}) {
   }
 };
 
+window.openSilentTeacherRunner = function(options = {}) {
+  currentRunnerType = "silent-teacher";
+  activeBlockAssignmentId = options?.assignmentId || null;
+  activeBlockRunnerUserId = null;
+  activeComputeRunnerUserId = null;
+  const modal = document.getElementById("activity-modal");
+  const iframe = document.getElementById("activity-iframe");
+  if (!modal || !iframe) return;
+  const sideMenu = document.getElementById("side-menu");
+  if (sideMenu) sideMenu.style.width = "0";
+  setSidebarSubmenuState("submenu-add", "btn-toggle-add-menu", false);
+  setSidebarSubmenuState("submenu-tasks", "btn-toggle-tasks-menu", false);
+  setSidebarSubmenuState("submenu-apps", "btn-toggle-apps-menu", false);
+  setSidebarSubmenuState("submenu-student-data", "btn-toggle-student-data-menu", false);
+  if (activityTimerInterval) clearInterval(activityTimerInterval);
+  activityTimerInterval = null;
+  activitySession = null;
+  setActivityStartButtons(false);
+  setActivityPausedUI(false);
+  setComputeTeacherHeaderMode(false);
+  setBlockRunnerHeaderByRole();
+  modal.classList.remove("teacher-block-runner");
+  modal.classList.remove("block-runner-mode");
+  modal.classList.remove("block-3d-mode");
+  modal.classList.add("fullscreen");
+  modal.style.display = "flex";
+  const params = new URLSearchParams();
+  if (userRole === "teacher") params.set("role", "teacher");
+  if (options?.assignmentId) params.set("assignmentId", String(options.assignmentId));
+  if (options?.title) params.set("assignmentTitle", String(options.title));
+  if (options?.levelStart) params.set("levelStart", String(options.levelStart));
+  if (options?.levelEnd) params.set("levelEnd", String(options.levelEnd));
+  const query = params.toString();
+  iframe.src = query ? `/silent-teacher-runner/index.html?${query}` : "/silent-teacher-runner/index.html";
+  const titleEl = document.getElementById("activity-title");
+  const linkEl = document.getElementById("activity-link");
+  if (titleEl) titleEl.innerText = options?.title || "Python Quiz Lab";
+  if (linkEl) linkEl.innerText = "/silent-teacher-runner/index.html";
+  const closeBtn = document.getElementById("btn-close-activity");
+  if (closeBtn) closeBtn.innerText = "Çık";
+  const topTitle = document.querySelector("#activity-modal .modal-header h2");
+  if (topTitle) topTitle.innerText = "Python Quiz Lab";
+  const fullBar = document.getElementById("activity-fullbar");
+  const fullTitle = document.getElementById("activity-full-title");
+  const fullStartBtn = document.getElementById("btn-activity-full-start");
+  const fullSaveBtn = document.getElementById("btn-activity-full-save");
+  const fullExitBtn = document.getElementById("btn-activity-full-exit");
+  if (fullBar) fullBar.style.display = "flex";
+  if (fullTitle) fullTitle.innerText = options?.title || "Python Quiz Lab";
+  if (fullStartBtn) fullStartBtn.style.display = "none";
+  if (fullSaveBtn) fullSaveBtn.style.display = "none";
+  if (fullExitBtn) {
+    fullExitBtn.innerText = "✕";
+    fullExitBtn.title = "Çık";
+    fullExitBtn.classList.add("line-trace-close-btn");
+  }
+};
+
+window.openLightbotRunner = function(options = {}) {
+  currentRunnerType = "lightbot";
+  activeBlockAssignmentId = options?.assignmentId || null;
+  activeBlockRunnerUserId = null;
+  activeComputeRunnerUserId = null;
+  const modal = document.getElementById("activity-modal");
+  const iframe = document.getElementById("activity-iframe");
+  if (!modal || !iframe) return;
+  const sideMenu = document.getElementById("side-menu");
+  if (sideMenu) sideMenu.style.width = "0";
+  setSidebarSubmenuState("submenu-add", "btn-toggle-add-menu", false);
+  setSidebarSubmenuState("submenu-tasks", "btn-toggle-tasks-menu", false);
+  setSidebarSubmenuState("submenu-apps", "btn-toggle-apps-menu", false);
+  setSidebarSubmenuState("submenu-student-data", "btn-toggle-student-data-menu", false);
+  if (activityTimerInterval) clearInterval(activityTimerInterval);
+  activityTimerInterval = null;
+  activitySession = null;
+  setActivityStartButtons(false);
+  setActivityPausedUI(false);
+  setComputeTeacherHeaderMode(false);
+  setBlockRunnerHeaderByRole();
+  modal.classList.remove("teacher-block-runner");
+  modal.classList.remove("block-runner-mode");
+  modal.classList.remove("block-3d-mode");
+  modal.classList.add("fullscreen");
+  modal.style.display = "flex";
+  const params = new URLSearchParams();
+  if (userRole === "teacher") params.set("role", "teacher");
+  if (options?.assignmentId) params.set("assignmentId", String(options.assignmentId));
+  if (options?.title) params.set("assignmentTitle", String(options.title));
+  if (options?.levelStart) params.set("levelStart", String(options.levelStart));
+  if (options?.levelEnd) params.set("levelEnd", String(options.levelEnd));
+  const query = params.toString();
+  iframe.src = query ? `/lightbot-runner/index.html?${query}` : "/lightbot-runner/index.html";
+  const titleEl = document.getElementById("activity-title");
+  const linkEl = document.getElementById("activity-link");
+  if (titleEl) titleEl.innerText = options?.title || "Code Robot Lab";
+  if (linkEl) linkEl.innerText = "/lightbot-runner/index.html";
+  const closeBtn = document.getElementById("btn-close-activity");
+  if (closeBtn) closeBtn.innerText = "Çık";
+  const topTitle = document.querySelector("#activity-modal .modal-header h2");
+  if (topTitle) topTitle.innerText = "Code Robot Lab";
+  const fullBar = document.getElementById("activity-fullbar");
+  const fullTitle = document.getElementById("activity-full-title");
+  const fullStartBtn = document.getElementById("btn-activity-full-start");
+  const fullSaveBtn = document.getElementById("btn-activity-full-save");
+  const fullExitBtn = document.getElementById("btn-activity-full-exit");
+  if (fullBar) fullBar.style.display = "flex";
+  if (fullTitle) fullTitle.innerText = options?.title || "Code Robot Lab";
+  if (fullStartBtn) fullStartBtn.style.display = "none";
+  if (fullSaveBtn) fullSaveBtn.style.display = "none";
+  if (fullExitBtn) {
+    fullExitBtn.innerText = "✕";
+    fullExitBtn.title = "Çık";
+    fullExitBtn.classList.add("line-trace-close-btn");
+  }
+};
+
 window.switchBlockHomeworkTab = function(tabName) {
   document.querySelectorAll('#block-homework-tabs .tab-btn').forEach(btn => {
     btn.classList.remove('active');
@@ -5931,25 +6391,109 @@ window.switchBlockHomeworkTab = function(tabName) {
 };
 
 function setBlockAssignCreateButton(typeRaw) {
-  const type = getBlockHomeworkType(typeRaw);
+  const raw = String(typeRaw || "block2d").toLowerCase();
+  const type = raw === "computeit" ? "computeit" : getBlockHomeworkType(raw);
   currentBlockAssignType = type;
   const createBtn = document.getElementById("btn-create-block-homework");
   if (createBtn) {
-    createBtn.innerText = "Ödev Ver";
+    if (type === "silentteacher") createBtn.innerText = "Python Quiz Ödevi Ver";
+    else if (type === "lightbot") createBtn.innerText = "Code Robot Ödevi Ver";
+    else if (type === "computeit") createBtn.innerText = "Compute It Ödevi Ver";
+    else createBtn.innerText = "Ödev Ver";
   }
 }
 
-window.switchBlockAssignTab = function(typeName) {
-  const type = getBlockHomeworkType(typeName);
-  document.querySelectorAll("#block-homework-assign-tabs .tab-btn").forEach((btn) => {
-    btn.classList.remove("active");
-    const txt = (btn.textContent || "").toLowerCase();
-    if ((type === "block3d" && txt.includes("3d")) || (type !== "block3d" && !txt.includes("3d"))) {
-      btn.classList.add("active");
-    }
+function ensureTeacherSectionsIntegratedIntoBlock() {
+  if (userRole !== "teacher") return;
+  const host = document.getElementById("teacher-home-sections-host");
+  if (!host) return;
+  const sectionIds = ["tasks-section", "activities-section", "lessons-section"];
+  sectionIds.forEach((id) => {
+    const el = document.getElementById(id);
+    if (!el || el.parentElement === host) return;
+    host.appendChild(el);
+    el.classList.add("embedded-home-card");
+    el.style.display = "none";
+    el.style.marginTop = "0";
   });
+}
+
+window.switchTeacherHomeTab = function(tabName) {
+  const type = String(tabName || "tasks").toLowerCase();
+  document.querySelectorAll("#teacher-home-tabs .tab-btn").forEach((btn) => {
+    const btnType = String(btn.dataset.homeTab || "").toLowerCase();
+    btn.classList.toggle("active", btnType === type);
+  });
+  const tasksSection = document.getElementById("tasks-section");
+  const activitiesSection = document.getElementById("activities-section");
+  const lessonsSection = document.getElementById("lessons-section");
+  if (tasksSection) tasksSection.style.display = type === "tasks" ? "flex" : "none";
+  if (activitiesSection) activitiesSection.style.display = type === "activities" ? "flex" : "none";
+  if (lessonsSection) lessonsSection.style.display = type === "lessons" ? "flex" : "none";
+};
+
+window.switchBlockAssignTab = function(typeName) {
+  const raw = String(typeName || "block2d").toLowerCase();
+  const type = raw === "computeit" ? "computeit" : getBlockHomeworkType(raw);
+  document.querySelectorAll("#block-homework-assign-tabs .tab-btn").forEach((btn) => {
+    const btnRaw = String(btn.dataset.assignType || "block2d").toLowerCase();
+    const btnType = btnRaw === "computeit" ? "computeit" : getBlockHomeworkType(btnRaw);
+    btn.classList.toggle("active", btnType === type);
+  });
+  const isTeacher = userRole === "teacher";
+  const blockTitle = document.getElementById("block-homework-title");
+  const blockTabs = document.getElementById("block-homework-tabs");
+  const blockTeacherStats = document.getElementById("block-homework-teacher-stats");
+  const blockFilters = document.getElementById("block-homework-filters");
+  const blockSplitHead = document.getElementById("block-homework-split-head");
+  const blockSplit = document.getElementById("block-homework-split");
+  const blockPending = document.getElementById("block-homework-pending");
+  const blockCompleted = document.getElementById("block-homework-completed");
+  const blockShowMore = document.getElementById("btn-show-all-block-homework");
+  const blockCreateBtn = document.getElementById("btn-create-block-homework");
+  const computeSection = document.getElementById("compute-homework-section");
+  const computeTabs = document.getElementById("compute-homework-tabs");
+  const computeTeacherStats = document.getElementById("compute-homework-teacher-stats");
+  const computeFilters = document.getElementById("compute-homework-filters");
+  const computeSplitHead = document.getElementById("compute-homework-split-head");
+  const computeSplit = document.getElementById("compute-homework-split");
+  const computeShowMore = document.getElementById("btn-show-all-compute-homework");
+  const computeCreateBtn = document.getElementById("btn-create-compute-homework");
+  if (isTeacher) {
+    const isComputeTab = type === "computeit";
+    if (blockTitle) {
+      blockTitle.innerText = "";
+      blockTitle.style.display = "none";
+    }
+    const teacherLabel = document.getElementById("teacher-block-homework-label");
+    const activeAssignBtn = document.querySelector('#block-homework-assign-tabs .tab-btn.active');
+    if (teacherLabel && activeAssignBtn) {
+      teacherLabel.innerText = activeAssignBtn.innerText + ' ödevi';
+    }
+    if (computeSection) computeSection.style.display = isComputeTab ? "block" : "none";
+    if (blockTabs) blockTabs.style.display = isComputeTab ? "none" : "flex";
+    if (blockTeacherStats) blockTeacherStats.style.display = isComputeTab ? "none" : "block";
+    if (blockFilters) blockFilters.style.display = "none";
+    if (blockSplitHead) blockSplitHead.style.display = "none";
+    if (blockSplit) blockSplit.style.display = isComputeTab ? "none" : "block";
+    if (blockPending) blockPending.style.display = "";
+    if (blockCompleted) blockCompleted.style.display = "";
+    if (blockShowMore) blockShowMore.style.display = isComputeTab ? "none" : blockShowMore.style.display;
+    if (blockCreateBtn) blockCreateBtn.style.display = "inline-flex";
+    if (computeTabs) computeTabs.style.display = isComputeTab ? "flex" : "none";
+    if (computeTeacherStats) computeTeacherStats.style.display = isComputeTab ? "block" : "none";
+    if (computeFilters) computeFilters.style.display = "none";
+    if (computeSplitHead) computeSplitHead.style.display = "none";
+    if (computeSplit) computeSplit.style.display = isComputeTab ? "block" : "none";
+    if (computeShowMore) computeShowMore.style.display = isComputeTab ? computeShowMore.style.display : "none";
+    if (computeCreateBtn) computeCreateBtn.style.display = "none";
+  }
   setBlockAssignCreateButton(type);
-  renderBlockHomeworkList();
+  if (type === "computeit") {
+    renderComputeHomeworkList();
+  } else {
+    renderBlockHomeworkList();
+  }
 };
 
 window.switchComputeHomeworkTab = function(tabName) {
@@ -8211,13 +8755,16 @@ document.getElementById("btn-close-live-player")?.addEventListener("click", clos
 const closeLessonBuilderBtn = document.getElementById("btn-close-lesson-builder");
 if (closeLessonBuilderBtn) closeLessonBuilderBtn.onclick = closeLessonBuilderModal;
 
-const themeToggleAppBtn = document.getElementById("theme-toggle-app");
-if (themeToggleAppBtn) {
-  themeToggleAppBtn.onclick = function () {
+const themeToggleButtons = [
+  document.getElementById("theme-toggle-app"),
+  document.getElementById("theme-toggle-login")
+].filter(Boolean);
+themeToggleButtons.forEach((btn) => {
+  btn.onclick = function () {
     const isDark = document.body.classList.contains("dark-mode");
     applyThemeMode(isDark ? "light" : "dark");
   };
-}
+});
 try {
   const savedTheme = localStorage.getItem(THEME_KEY) || "light";
   applyThemeMode(savedTheme);
@@ -8963,7 +9510,12 @@ function setBlockHomeworkModalType(typeRaw) {
   const typeInput = document.getElementById("block-hw-assignment-type");
   if (typeInput) typeInput.value = type;
   const titleEl = document.getElementById("block-homework-modal-title");
-  if (titleEl) titleEl.innerText = type === "block3d" ? "3D Blok Kodlama Ödevi Ver" : "Blok Kodlama Ödevi Ver";
+  if (titleEl) {
+    if (type === "block3d") titleEl.innerText = "3D Blok Kodlama Ödevi Ver";
+    else if (type === "silentteacher") titleEl.innerText = "Python Quiz Lab Ödevi Ver";
+    else if (type === "lightbot") titleEl.innerText = "Code Robot Lab Ödevi Ver";
+    else titleEl.innerText = "Blok Kodlama Ödevi Ver";
+  }
 }
 
 function openBlockHomeworkModalWithDefaults({
@@ -10482,30 +11034,41 @@ onAuthStateChanged(auth, (user) => {
 
     document.getElementById("teacher-panel").style.display = isTeacher ? "block" : "none";
     const studentHomeworkShell = document.getElementById("student-homework-shell");
-    if (studentHomeworkShell) studentHomeworkShell.style.display = isTeacher ? "" : "block";
+    if (studentHomeworkShell) studentHomeworkShell.style.display = "block";
     const studentAppsShell = document.getElementById("student-apps-shell");
     if (studentAppsShell) studentAppsShell.style.display = isTeacher ? "" : "block";
+    const teacherHomeTabs = document.getElementById("teacher-home-tabs");
+    if (teacherHomeTabs) teacherHomeTabs.style.display = isTeacher ? "flex" : "none";
+    const teacherHomeHost = document.getElementById("teacher-home-sections-host");
+    if (teacherHomeHost) teacherHomeHost.style.display = isTeacher ? "flex" : "none";
+    if (isTeacher) ensureTeacherSectionsIntegratedIntoBlock();
     document.getElementById("student-stats-bar").style.display = isTeacher ? "none" : "block";
-    document.getElementById("student-tabs").style.display = isTeacher ? "none" : "flex";
+    document.getElementById("student-tabs").style.display = "flex";
     document.getElementById("teacher-stats").style.display = isTeacher ? "block" : "none";
     document.getElementById("teacher-filters").style.display = "none";
     document.getElementById("tasks-title").innerText = isTeacher ? "📚 Verilen Ödevler" : "📚 Ödevlerim";
     document.getElementById("leaderboard-section").style.display = isTeacher ? "none" : "block";
     document.getElementById("activities-title").innerText = isTeacher ? "🎯 Verilen Etkinlikler" : "🎯 Etkinliklerim";
-    document.getElementById("activities-tabs").style.display = isTeacher ? "none" : "flex";
+    document.getElementById("activities-tabs").style.display = "flex";
     document.getElementById("activities-teacher-stats").style.display = isTeacher ? "block" : "none";
     const blockTitle = document.getElementById("block-homework-title");
-    if (blockTitle) blockTitle.innerText = isTeacher ? "🧩 3D & Blok Code Ödevleri" : "🧩 Blok Kodlama Ödevim";
+    if (blockTitle) {
+      blockTitle.innerText = isTeacher ? "" : "🧩 Blok Kodlama Ödevim";
+      blockTitle.style.display = isTeacher ? "none" : "";
+    }
     const blockAssignTabs = document.getElementById("block-homework-assign-tabs");
     if (blockAssignTabs) blockAssignTabs.style.display = isTeacher ? "flex" : "none";
     const blockTabs = document.getElementById("block-homework-tabs");
-    if (blockTabs) blockTabs.style.display = isTeacher ? "none" : "flex";
+    if (blockTabs) blockTabs.style.display = "flex";
     const blockTeacherStats = document.getElementById("block-homework-teacher-stats");
     if (blockTeacherStats) blockTeacherStats.style.display = isTeacher ? "block" : "none";
     const blockFilters = document.getElementById("block-homework-filters");
     if (blockFilters) blockFilters.style.display = "none";
     const blockCreateBtn = document.getElementById("btn-create-block-homework");
-    if (blockCreateBtn) blockCreateBtn.style.display = isTeacher ? "inline-flex" : "none";
+    if (blockCreateBtn) {
+      blockCreateBtn.style.display = 'none';
+      blockCreateBtn.innerText = "Ödev Ver";
+    }
     if (isTeacher) {
       switchBlockAssignTab(currentBlockAssignType);
     } else {
@@ -10514,13 +11077,34 @@ onAuthStateChanged(auth, (user) => {
     const computeTitle = document.getElementById("compute-homework-title");
     if (computeTitle) computeTitle.innerText = isTeacher ? "🧠 Verilen Compute It Ödevleri" : "🧠 Compute It Ödevim";
     const computeTabs = document.getElementById("compute-homework-tabs");
-    if (computeTabs) computeTabs.style.display = isTeacher ? "none" : "flex";
+    if (computeTabs) computeTabs.style.display = "flex";
     const computeTeacherStats = document.getElementById("compute-homework-teacher-stats");
     if (computeTeacherStats) computeTeacherStats.style.display = isTeacher ? "block" : "none";
     const computeFilters = document.getElementById("compute-homework-filters");
     if (computeFilters) computeFilters.style.display = "none";
     const computeCreateBtn = document.getElementById("btn-create-compute-homework");
-    if (computeCreateBtn) computeCreateBtn.style.display = isTeacher ? "inline-flex" : "none";
+    if (computeCreateBtn) {
+      computeCreateBtn.style.display = 'none';
+      computeCreateBtn.innerText = "Ödev Ver";
+    }
+    const inlineCreateBtn = document.getElementById('btn-create-block-homework-inline');
+    if (inlineCreateBtn) {
+      inlineCreateBtn.style.display = isTeacher ? 'inline-flex' : 'none';
+      inlineCreateBtn.innerText = 'Ödev Ver';
+      inlineCreateBtn.onclick = function () {
+        // open the block homework modal (same as createBtn click)
+        openBlockHomeworkModalWithDefaults({ type: getBlockHomeworkType(currentBlockAssignType || 'block2d'), title: '', levelStart: 1, levelEnd: getAvailableBlockLevelCountByType(getBlockHomeworkType(currentBlockAssignType || 'block2d')) });
+      };
+    }
+    const inlineComputeCreateBtn = document.getElementById('btn-create-compute-homework-inline');
+    if (inlineComputeCreateBtn) {
+      inlineComputeCreateBtn.style.display = isTeacher ? 'inline-flex' : 'none';
+      inlineComputeCreateBtn.innerText = 'Ödev Ver';
+      inlineComputeCreateBtn.onclick = function () {
+        const computeCreate = document.getElementById("btn-create-compute-homework");
+        if (computeCreate) computeCreate.click();
+      };
+    }
     const activityFilters = document.getElementById("activity-filters");
     if (activityFilters) activityFilters.style.display = "none";
     const createBtn = document.getElementById("btn-open-create");
@@ -10570,6 +11154,8 @@ onAuthStateChanged(auth, (user) => {
     if (avatarShopBtn) avatarShopBtn.style.display = isTeacher ? "none" : "block";
     const appsMenuToggleBtn = document.getElementById("btn-toggle-apps-menu");
     if (appsMenuToggleBtn) appsMenuToggleBtn.style.display = isTeacher ? "block" : "none";
+    const appsHubLiveQuizCard = document.getElementById("apps-hub-card-live-quiz");
+    if (appsHubLiveQuizCard) appsHubLiveQuizCard.style.display = isTeacher ? "flex" : "none";
     const lessonsListMenuBtn = document.getElementById("btn-open-lessons");
     if (lessonsListMenuBtn) lessonsListMenuBtn.style.display = isTeacher ? "block" : "none";
     const liveQuizMenuBtn = document.getElementById("btn-open-live-quiz");
@@ -10617,13 +11203,15 @@ onAuthStateChanged(auth, (user) => {
     const teacherAnalytics = document.getElementById("teacher-analytics");
     if (teacherAnalytics) teacherAnalytics.style.display = isTeacher ? "flex" : "none";
     const quizSection = document.getElementById("quiz-section");
-    if (quizSection) quizSection.style.display = isTeacher ? "flex" : "none";
+    if (quizSection) quizSection.style.display = "none";
+    const quizTabs = document.getElementById("quiz-tabs");
+    if (quizTabs) quizTabs.style.display = isTeacher ? "flex" : "none";
     const topStudentsCard = document.getElementById("top-students-card");
     if (topStudentsCard) topStudentsCard.style.display = isTeacher ? "block" : "none";
     const lessonsTitle = document.getElementById("lessons-title");
     if (lessonsTitle) lessonsTitle.innerText = isTeacher ? "📑 Verilen Dersler" : "📑 Derslerim";
     const lessonsTabs = document.getElementById("lessons-tabs");
-    if (lessonsTabs) lessonsTabs.style.display = isTeacher ? "none" : "flex";
+    if (lessonsTabs) lessonsTabs.style.display = "flex";
     const lessonsTeacherStats = document.getElementById("lessons-teacher-stats");
     if (lessonsTeacherStats) lessonsTeacherStats.style.display = isTeacher ? "block" : "none";
     baseSystemSeconds = userData?.totalTimeSeconds || 0;
@@ -10684,6 +11272,13 @@ onAuthStateChanged(auth, (user) => {
       filterActivities("all");
       filterBlockHomework("all");
       filterComputeHomework("all");
+      switchTab("pending");
+      switchActivityTab("pending");
+      switchLessonTab("pending");
+      switchBlockHomeworkTab("pending");
+      switchComputeHomeworkTab("pending");
+      switchTeacherQuizTab("pending");
+      switchTeacherHomeTab("tasks");
     }
 
     // sistemde kalma süresi sayacı
@@ -10844,8 +11439,18 @@ function updateTaskLists() {
     const li = createTaskElement(task, isCompleted, completion, manualProgress);
     
     if (userRole === "teacher") {
-      pendingRows.push(li);
-      pendingCount++;
+      const assignedStudents = allStudents.filter((s) => taskMatchesStudentFor(task, s)).length;
+      const teacherDoneCount = requiresTeacherApprovalTask(task)
+        ? Number(taskStats[task.id]?.completedCount || 0)
+        : new Set((completedTasks.get(task.id) || []).map((c) => c.userId)).size;
+      const teacherCompleted = assignedStudents > 0 && teacherDoneCount >= assignedStudents;
+      if (teacherCompleted) {
+        completedRows.push(li);
+        completedCount++;
+      } else {
+        pendingRows.push(li);
+        pendingCount++;
+      }
       console.log("  -> Öğretmen listesine eklendi");
     } else {
       if (isCompleted) {
@@ -10860,23 +11465,34 @@ function updateTaskLists() {
     }
   });
 
-  renderLimitedRows(pendingList, pendingRows, 3);
-  renderLimitedRows(completedList, completedRows, 3);
   homeListCache.tasks = {
     title: userRole === "teacher" ? "Verilen Ödevler" : "Ödevlerim",
     pending: pendingRows.slice(),
     completed: completedRows.slice()
   };
-  setShowMoreButton(
-    "btn-show-all-tasks",
-    pendingRows.length > 3 || completedRows.length > 3,
-    () => openAllItemsModal(homeListCache.tasks.title, homeListCache.tasks.pending, homeListCache.tasks.completed)
-  );
-  
+  if (userRole === "teacher") {
+    const allRows = [...pendingRows, ...completedRows];
+    renderLimitedRows(pendingList, allRows, 5);
+    if (completedList) completedList.innerHTML = "";
+    if (noPending) noPending.style.display = allRows.length === 0 ? "block" : "none";
+    if (noCompleted) noCompleted.style.display = "none";
+    setShowMoreButton(
+      "btn-show-all-tasks",
+      allRows.length > 5,
+      () => openAllItemsModal(homeListCache.tasks.title, homeListCache.tasks.pending, homeListCache.tasks.completed)
+    );
+  } else {
+    renderLimitedRows(pendingList, pendingRows, 3);
+    renderLimitedRows(completedList, completedRows, 3);
+    if (noPending) noPending.style.display = pendingCount === 0 ? "block" : "none";
+    if (noCompleted) noCompleted.style.display = completedCount === 0 ? "block" : "none";
+    setShowMoreButton(
+      "btn-show-all-tasks",
+      pendingRows.length > 3 || completedRows.length > 3,
+      () => openAllItemsModal(homeListCache.tasks.title, homeListCache.tasks.pending, homeListCache.tasks.completed)
+    );
+  }
   console.log(`Sonuç: Bekleyen ${pendingCount}, Tamamlanan ${completedCount}`);
-  
-  if (noPending) noPending.style.display = pendingCount === 0 ? "block" : "none";
-  if (noCompleted) noCompleted.style.display = completedCount === 0 ? "block" : "none";
   
   if (userRole !== "teacher") {
     const statCompleted = document.getElementById("stat-completed");
@@ -10960,14 +11576,12 @@ function createTaskElement(task, isCompleted, completionData, manualProgress) {
       ? `<span class="badge badge-danger">🟠 Kontrol Gerekli</span> `
       : "";
     const rewardXP = getTaskRewardXP(task);
+    const dateInline = deadline ? ` • 📅 ${deadline.toLocaleDateString('tr-TR')}` : "";
     const xpInfo = requiresTeacherApprovalTask(task)
-      ? `<small style="color:#7c2d12;display:block;margin-top:4px;">⭐ Onaylanınca +${rewardXP} XP</small>`
-      : `<small style="color:#1e40af;display:block;margin-top:4px;">⭐ Tamamlayınca +${rewardXP} XP</small>`;
-    badge = `${controlBadge}<span class="badge badge-info">${uniqueCount}${suffix} tamamlama</span>`;
-    if (deadline) {
-      const dateStr = deadline.toLocaleDateString('tr-TR');
-      deadlineInfo = `<small style="color:#666;display:block;margin-top:4px;">📅 ${dateStr}</small>`;
-    }
+      ? `<small style="color:#7c2d12;display:block;margin-top:4px;">⭐ Onaylanınca +${rewardXP} XP${dateInline}</small>`
+      : `<small style="color:#1e40af;display:block;margin-top:4px;">⭐ Tamamlayınca +${rewardXP} XP${dateInline}</small>`;
+    badge = `${controlBadge}<span class="badge badge-info" style="font-size:1.02rem; padding:8px 14px;">${uniqueCount}${suffix} tamamlama</span>`;
+    deadlineInfo = "";
     timeInfo = xpInfo;
   }
   
@@ -11663,7 +12277,8 @@ document.getElementById("btn-save-edit").onclick = async function() {
 document.getElementById("btn-delete-task").onclick = async function () {
   if (!currentTaskId) return;
   
-  if (!confirm("Bu ödevi silmek istediğinize emin misiniz?")) return;
+  const ok = await showConfirm("Bu ödevi silmek istediğinize emin misiniz?");
+  if (!ok) return;
   
   try {
     // Geçmiş raporlar ve öğrenci puanları korunur: fiziksel silme yerine arşivleme.
@@ -12013,7 +12628,7 @@ function renderLeaderboardPreview(rows = []) {
     list.innerHTML = `<li class="list-item" style="cursor:default;">Sıralama verisi bulunamadı.</li>`;
     return;
   }
-  const topRows = rows.slice(0, 6);
+  const topRows = rows.slice(0, 8);
   topRows.forEach((u) => {
     const li = document.createElement("li");
     li.className = `top-student-row rank-${Math.min(3, Number(u.rank || 99))}`;
@@ -14340,14 +14955,17 @@ function loadBlockAssignments() {
     });
     blockTeacherProgressUnsub = onSnapshot(collection(db, "blockAssignmentProgress"), (snap) => {
       blockTeacherCompletedCountMap.clear();
+      blockTeacherProgressRowsByAssignment.clear();
       snap.forEach((d) => {
         const v = d.data() || {};
         if (!v.assignmentId) return;
         const assignment = blockAssignments.find((a) => String(a.id) === String(v.assignmentId));
         if (!assignment || !recordBelongsToCurrentTeacher(assignment)) return;
+        const key = String(v.assignmentId);
+        if (!blockTeacherProgressRowsByAssignment.has(key)) blockTeacherProgressRowsByAssignment.set(key, []);
+        blockTeacherProgressRowsByAssignment.get(key).push(v);
         const isDone = !!v.completed || Number(v.percent || 0) > 0 || Number(v.completedLevels || 0) > 0;
         if (!isDone) return;
-        const key = String(v.assignmentId);
         blockTeacherCompletedCountMap.set(key, (blockTeacherCompletedCountMap.get(key) || 0) + 1);
       });
       renderBlockHomeworkList();
@@ -14416,11 +15034,25 @@ function renderBlockHomeworkList() {
     const assignmentType = getBlockHomeworkType(a.assignmentType);
     const isBlock3D = assignmentType === "block3d";
     const isFlowchart = assignmentType === "flowchart";
-    const appLabel = isFlowchart ? "Flowchart" : (isBlock3D ? "3D Blok Kodlama" : "Blok Kodlama");
+    const isSilentTeacher = assignmentType === "silentteacher";
+    const isLightbot = assignmentType === "lightbot";
+    const appLabel = isFlowchart
+      ? "Flowchart"
+      : isBlock3D
+      ? "3D Blok Kodlama"
+      : isSilentTeacher
+      ? "Python Quiz Lab"
+      : isLightbot
+      ? "Code Robot Lab"
+      : "Blok Kodlama";
     const appBadge = isFlowchart
       ? `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;background:#dcfce7;color:#166534;font-size:11px;font-weight:700;">Flowchart</span>`
       : isBlock3D
       ? `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;background:#ede9fe;color:#5b21b6;font-size:11px;font-weight:700;">3D</span>`
+      : isSilentTeacher
+      ? `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;background:#fff7ed;color:#9a3412;font-size:11px;font-weight:700;">Python</span>`
+      : isLightbot
+      ? `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;background:#fef3c7;color:#92400e;font-size:11px;font-weight:700;">Robot</span>`
       : `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-size:11px;font-weight:700;">2D</span>`;
     const deadlineDate = a.deadline ? new Date(`${a.deadline}T${a.deadlineTime || "23:59"}`) : null;
     const isExpired = deadlineDate && deadlineDate < now;
@@ -14428,14 +15060,16 @@ function renderBlockHomeworkList() {
     if (userRole === "teacher") {
       const assigned = allStudents.filter((s) => assignmentMatchesStudentFor(a, s)).length;
       const done = Number(blockTeacherCompletedCountMap.get(a.id) ?? a.completedCount ?? 0);
-      const rangeText = isFlowchart ? "Soru" : `${Math.max(1, Number(a.levelStart || 1))}-${Math.max(1, Number(a.levelEnd || a.levelStart || 1))}`;
+      const rangeText = isFlowchart
+        ? "Soru"
+        : `${Math.max(1, Number(a.levelStart || 1))}-${Math.max(1, Number(a.levelEnd || a.levelStart || 1))}`;
       li.innerHTML = `
         <div>
           <div style="font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${a.title || `${appLabel} Ödevi`} ${appBadge}</div>
-          <small style="color:#666;">📅 ${a.deadline || "-"} • ${isFlowchart ? "Flowchart" : `Seviye ${rangeText}`}</small>
+          <small style="color:#666;display:block;margin-top:4px;">📅 ${a.deadline || "-"} • ${isFlowchart ? "Flowchart" : (isSilentTeacher || isLightbot) ? `Bolum ${rangeText}` : `Seviye ${rangeText}`}</small>
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
-          <span class="completion-badge">${Math.min(assigned, done)}/${assigned} tamamlama</span>
+          <span class="badge badge-info" style="font-size:1.02rem; padding:8px 14px;">${Math.min(assigned, done)}/${assigned} tamamlama</span>
         </div>
       `;
       li.onclick = () => {
@@ -14489,19 +15123,27 @@ function renderBlockHomeworkList() {
         const modal = document.getElementById("block-homework-modal");
         if (modal) modal.style.display = "flex";
       };
-      pendingRows.push(li);
-      pendingCount++;
+      const teacherCompleted = assigned > 0 && Number(done || 0) >= Number(assigned || 0);
+      if (teacherCompleted) {
+        completedRows.push(li);
+        completedCount++;
+      } else {
+        pendingRows.push(li);
+        pendingCount++;
+      }
     } else {
       const p = blockAssignmentProgressMap.get(a.id) || {};
       const percent = Number(p.percent || 0);
       const xp = Number(p.totalXP || 0);
       const isCompleted = !!p.completed;
-      const rangeText = isFlowchart ? "Soru" : `${Math.max(1, Number(a.levelStart || 1))}-${Math.max(1, Number(a.levelEnd || a.levelStart || 1))}`;
+      const rangeText = isFlowchart
+        ? "Soru"
+        : `${Math.max(1, Number(a.levelStart || 1))}-${Math.max(1, Number(a.levelEnd || a.levelStart || 1))}`;
       li.classList.toggle("completed", isCompleted);
       li.innerHTML = `
         <div>
           <div style="font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${a.title || `${appLabel} Ödevi`} ${appBadge}</div>
-          <small style="color:#666;">📅 ${a.deadline || "-"} • ${isFlowchart ? "Flowchart Soru" : `Seviye ${rangeText}`}</small>
+          <small style="color:#666;">📅 ${a.deadline || "-"} • ${isFlowchart ? "Flowchart Soru" : (isSilentTeacher || isLightbot) ? `Bolum ${rangeText}` : `Seviye ${rangeText}`}</small>
           ${isFlowchart ? `<small style="color:#666;display:block;">🔀 ${a.flowQuestion || "Flowchart şemasını kur"}</small>` : ""}
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
@@ -14523,6 +15165,24 @@ function renderBlockHomeworkList() {
         }
         if (isFlowchart) {
           openFlowchartAssignmentForStudent(a);
+          return;
+        }
+        if (isSilentTeacher) {
+          openSilentTeacherRunner({
+            assignmentId: a.id,
+            title: a.title || "Python Quiz Lab Ödevi",
+            levelStart: Math.max(1, Number(a.levelStart || 1)),
+            levelEnd: Math.max(1, Number(a.levelEnd || a.levelStart || 1))
+          });
+          return;
+        }
+        if (isLightbot) {
+          openLightbotRunner({
+            assignmentId: a.id,
+            title: a.title || "Code Robot Lab Ödevi",
+            levelStart: Math.max(1, Number(a.levelStart || 1)),
+            levelEnd: Math.max(1, Number(a.levelEnd || a.levelStart || 1))
+          });
           return;
         }
         if (isBlock3D) {
@@ -14551,18 +15211,53 @@ function renderBlockHomeworkList() {
     }
   });
 
-  renderLimitedRows(pendingList, pendingRows, 3);
-  renderLimitedRows(completedList, completedRows, 3);
-  if (noPending) noPending.style.display = pendingCount === 0 ? "block" : "none";
-  if (noCompleted) noCompleted.style.display = completedCount === 0 ? "block" : "none";
   homeListCache.block = {
     title: userRole === "teacher" ? "Verilen Blok Kodlama Ödevleri" : "Blok Kodlama Ödevim",
     pending: pendingRows.slice(),
     completed: completedRows.slice()
   };
+  if (userRole === "teacher") {
+    const allRows = [...pendingRows, ...completedRows];
+    renderLimitedRows(pendingList, allRows, 5);
+    if (completedList) completedList.innerHTML = "";
+    if (noPending) noPending.style.display = allRows.length === 0 ? "block" : "none";
+    if (noCompleted) noCompleted.style.display = "none";
+  } else {
+    renderLimitedRows(pendingList, pendingRows, 3);
+    renderLimitedRows(completedList, completedRows, 3);
+    if (noPending) noPending.style.display = pendingCount === 0 ? "block" : "none";
+    if (noCompleted) noCompleted.style.display = completedCount === 0 ? "block" : "none";
+  }
   updateBlockHomeworkShowMoreButton();
   const teacherCount = document.getElementById("teacher-block-homework-count");
   if (teacherCount && userRole === "teacher") teacherCount.innerText = items.length;
+  if (userRole === "teacher") {
+    const completedStudentsEl = document.getElementById("teacher-block-homework-completed-students");
+    const avgProgressEl = document.getElementById("teacher-block-homework-avg-progress");
+    const totalXpEl = document.getElementById("teacher-block-homework-total-xp");
+    const visibleIds = new Set(items.map((a) => String(a.id)));
+    const progressRows = [];
+    blockTeacherProgressRowsByAssignment.forEach((rows, assignmentId) => {
+      if (!visibleIds.has(String(assignmentId))) return;
+      (Array.isArray(rows) ? rows : []).forEach((r) => progressRows.push(r));
+    });
+    const completedStudentIds = new Set();
+    let percentSum = 0;
+    let xpSum = 0;
+    progressRows.forEach((row) => {
+      const percent = Math.max(0, Math.min(100, Number(row?.percent || 0)));
+      const completedLevels = Math.max(0, Number(row?.completedLevels || 0));
+      const totalLevels = Math.max(0, Number(row?.totalLevels || 0));
+      const isCompleted = !!row?.completed || percent >= 100 || (totalLevels > 0 && completedLevels >= totalLevels);
+      if (isCompleted && row?.userId) completedStudentIds.add(String(row.userId));
+      percentSum += percent;
+      xpSum += Math.max(0, Number(row?.totalXP || 0));
+    });
+    const avgPercent = progressRows.length ? Math.round(percentSum / progressRows.length) : 0;
+    if (completedStudentsEl) completedStudentsEl.innerText = String(completedStudentIds.size);
+    if (avgProgressEl) avgProgressEl.innerText = `%${avgPercent}`;
+    if (totalXpEl) totalXpEl.innerText = String(Math.round(xpSum));
+  }
   if (userRole === "student") {
     const assignmentTypeById = new Map(
       items.map((a) => [String(a.id), getBlockHomeworkType(a.assignmentType)])
@@ -14667,14 +15362,17 @@ function loadComputeAssignments() {
     });
     computeTeacherProgressUnsub = onSnapshot(collection(db, "computeAssignmentProgress"), (snap) => {
       computeTeacherCompletedCountMap.clear();
+      computeTeacherProgressRowsByAssignment.clear();
       snap.forEach((d) => {
         const v = d.data() || {};
         if (!v.assignmentId) return;
         const assignment = computeAssignments.find((a) => String(a.id) === String(v.assignmentId));
         if (!assignment || !recordBelongsToCurrentTeacher(assignment)) return;
+        const key = String(v.assignmentId);
+        if (!computeTeacherProgressRowsByAssignment.has(key)) computeTeacherProgressRowsByAssignment.set(key, []);
+        computeTeacherProgressRowsByAssignment.get(key).push(v);
         const isDone = !!v.completed || Number(v.percent || 0) > 0 || Number(v.completedLevels || 0) > 0;
         if (!isDone) return;
-        const key = String(v.assignmentId);
         computeTeacherCompletedCountMap.set(key, (computeTeacherCompletedCountMap.get(key) || 0) + 1);
       });
       renderComputeHomeworkList();
@@ -14757,17 +15455,23 @@ function renderComputeHomeworkList() {
       const done = Number(computeTeacherCompletedCountMap.get(a.id) ?? a.completedCount ?? 0);
       const rangeText = `${Math.max(1, Number(a.levelStart || 1))}-${Math.max(1, Number(a.levelEnd || a.levelStart || 1))}`;
       li.innerHTML = `
-        <div>
-          <div style="font-weight:600;">${a.title || "Compute It Ödevi"}</div>
-          <small style="color:#666;">📅 ${a.deadline || "-"} • Seviye ${rangeText}</small>
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${a.title || "Compute It Ödevi"}</div>
+          <small style="color:#666;display:block;margin-top:4px;">📅 ${a.deadline || "-"} • Seviye ${rangeText}</small>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <span class="completion-badge">${Math.min(assigned, done)}/${assigned} tamamlama</span>
+        <div style="display:flex;align-items:center;gap:8px;padding-right:4px;">
+          <span class="badge badge-info" style="font-size:1.02rem; padding:8px 14px;">${Math.min(assigned, done)}/${assigned} tamamlama</span>
         </div>
       `;
       li.onclick = () => openComputeHomeworkModalForEdit(a);
-      pendingRows.push(li);
-      pendingCount++;
+      const teacherCompleted = assigned > 0 && Number(done || 0) >= Number(assigned || 0);
+      if (teacherCompleted) {
+        completedRows.push(li);
+        completedCount++;
+      } else {
+        pendingRows.push(li);
+        pendingCount++;
+      }
     } else {
       const p = computeAssignmentProgressMap.get(a.id) || {};
       const percent = Number(p.percent || 0);
@@ -14815,22 +15519,62 @@ function renderComputeHomeworkList() {
     }
   });
 
-  renderLimitedRows(pendingList, pendingRows, 3);
-  renderLimitedRows(completedList, completedRows, 3);
-  if (noPending) noPending.style.display = pendingCount === 0 ? "block" : "none";
-  if (noCompleted) noCompleted.style.display = completedCount === 0 ? "block" : "none";
   homeListCache.compute = {
     title: userRole === "teacher" ? "Verilen Compute It Ödevleri" : "Compute It Ödevim",
     pending: pendingRows.slice(),
     completed: completedRows.slice()
   };
-  setShowMoreButton(
-    "btn-show-all-compute-homework",
-    pendingRows.length > 3 || completedRows.length > 3,
-    () => openAllItemsModal(homeListCache.compute.title, homeListCache.compute.pending, homeListCache.compute.completed)
-  );
+  if (userRole === "teacher") {
+    const allRows = [...pendingRows, ...completedRows];
+    renderLimitedRows(pendingList, allRows, 5);
+    if (completedList) completedList.innerHTML = "";
+    if (noPending) noPending.style.display = allRows.length === 0 ? "block" : "none";
+    if (noCompleted) noCompleted.style.display = "none";
+    setShowMoreButton(
+      "btn-show-all-compute-homework",
+      allRows.length > 5,
+      () => openAllItemsModal(homeListCache.compute.title, homeListCache.compute.pending, homeListCache.compute.completed)
+    );
+  } else {
+    renderLimitedRows(pendingList, pendingRows, 3);
+    renderLimitedRows(completedList, completedRows, 3);
+    if (noPending) noPending.style.display = pendingCount === 0 ? "block" : "none";
+    if (noCompleted) noCompleted.style.display = completedCount === 0 ? "block" : "none";
+    setShowMoreButton(
+      "btn-show-all-compute-homework",
+      pendingRows.length > 3 || completedRows.length > 3,
+      () => openAllItemsModal(homeListCache.compute.title, homeListCache.compute.pending, homeListCache.compute.completed)
+    );
+  }
   const teacherCount = document.getElementById("teacher-compute-homework-count");
   if (teacherCount && userRole === "teacher") teacherCount.innerText = items.length;
+  if (userRole === "teacher") {
+    const completedStudentsEl = document.getElementById("teacher-compute-homework-completed-students");
+    const avgProgressEl = document.getElementById("teacher-compute-homework-avg-progress");
+    const totalXpEl = document.getElementById("teacher-compute-homework-total-xp");
+    const visibleIds = new Set(items.map((a) => String(a.id)));
+    const progressRows = [];
+    computeTeacherProgressRowsByAssignment.forEach((rows, assignmentId) => {
+      if (!visibleIds.has(String(assignmentId))) return;
+      (Array.isArray(rows) ? rows : []).forEach((r) => progressRows.push(r));
+    });
+    const completedStudentIds = new Set();
+    let percentSum = 0;
+    let xpSum = 0;
+    progressRows.forEach((row) => {
+      const percent = Math.max(0, Math.min(100, Number(row?.percent || 0)));
+      const completedLevels = Math.max(0, Number(row?.completedLevels || 0));
+      const totalLevels = Math.max(0, Number(row?.totalLevels || 0));
+      const isCompleted = !!row?.completed || percent >= 100 || (totalLevels > 0 && completedLevels >= totalLevels);
+      if (isCompleted && row?.userId) completedStudentIds.add(String(row.userId));
+      percentSum += percent;
+      xpSum += Math.max(0, Number(row?.totalXP || 0));
+    });
+    const avgPercent = progressRows.length ? Math.round(percentSum / progressRows.length) : 0;
+    if (completedStudentsEl) completedStudentsEl.innerText = String(completedStudentIds.size);
+    if (avgProgressEl) avgProgressEl.innerText = `%${avgPercent}`;
+    if (totalXpEl) totalXpEl.innerText = String(Math.round(xpSum));
+  }
   if (userRole === "student") {
     refreshStudentComputeCompletedStat();
   }
@@ -14847,6 +15591,19 @@ window.switchLessonTab = function(tabName) {
   });
   const pending = document.getElementById('lessons-pending');
   const completed = document.getElementById('lessons-completed');
+  if (pending) pending.classList.toggle('active', tabName === 'pending');
+  if (completed) completed.classList.toggle('active', tabName === 'completed');
+};
+
+window.switchTeacherQuizTab = function(tabName) {
+  document.querySelectorAll('#quiz-tabs .tab-btn').forEach(btn => {
+    btn.classList.remove('active');
+    if (btn.textContent.toLowerCase().includes(tabName === 'pending' ? 'bekleyen' : 'tamamlanan')) {
+      btn.classList.add('active');
+    }
+  });
+  const pending = document.getElementById('quiz-pending');
+  const completed = document.getElementById('quiz-completed');
   if (pending) pending.classList.toggle('active', tabName === 'pending');
   if (completed) completed.classList.toggle('active', tabName === 'completed');
 };
@@ -15102,20 +15859,33 @@ function renderLessonsList() {
     }
   });
 
-  renderLimitedRows(pendingList, pendingRows, 3);
-  renderLimitedRows(completedList, completedRows, 3);
-  if (noPending) noPending.style.display = pendingCount === 0 ? "block" : "none";
-  if (noCompleted) noCompleted.style.display = completedCount === 0 ? "block" : "none";
   homeListCache.lessons = {
     title: userRole === "teacher" ? "Dersler" : "Derslerim",
     pending: pendingRows.slice(),
     completed: completedRows.slice()
   };
-  setShowMoreButton(
-    "btn-show-all-lessons",
-    pendingRows.length > 3 || completedRows.length > 3,
-    () => openAllItemsModal(homeListCache.lessons.title, homeListCache.lessons.pending, homeListCache.lessons.completed)
-  );
+  if (userRole === "teacher") {
+    const allRows = [...pendingRows, ...completedRows];
+    renderLimitedRows(pendingList, allRows, 5);
+    if (completedList) completedList.innerHTML = "";
+    if (noPending) noPending.style.display = allRows.length === 0 ? "block" : "none";
+    if (noCompleted) noCompleted.style.display = "none";
+    setShowMoreButton(
+      "btn-show-all-lessons",
+      allRows.length > 5,
+      () => openAllItemsModal(homeListCache.lessons.title, homeListCache.lessons.pending, homeListCache.lessons.completed)
+    );
+  } else {
+    renderLimitedRows(pendingList, pendingRows, 3);
+    renderLimitedRows(completedList, completedRows, 3);
+    if (noPending) noPending.style.display = pendingCount === 0 ? "block" : "none";
+    if (noCompleted) noCompleted.style.display = completedCount === 0 ? "block" : "none";
+    setShowMoreButton(
+      "btn-show-all-lessons",
+      pendingRows.length > 3 || completedRows.length > 3,
+      () => openAllItemsModal(homeListCache.lessons.title, homeListCache.lessons.pending, homeListCache.lessons.completed)
+    );
+  }
   const countEl = document.getElementById("teacher-lesson-count");
   if (countEl && userRole === "teacher") countEl.innerText = items.length;
   if (userRole === "student") {
@@ -16101,7 +16871,9 @@ function updateBlockHomeworkShowMoreButton() {
   const completedLen = Array.isArray(cache.completed) ? cache.completed.length : 0;
   const completedTab = document.getElementById("block-homework-completed");
   const activeTab = completedTab?.classList.contains("active") ? "completed" : "pending";
-  const show = activeTab === "completed" ? completedLen > 3 : pendingLen > 3;
+  const show = userRole === "teacher"
+    ? (pendingLen + completedLen) > 3
+    : (activeTab === "completed" ? completedLen > 3 : pendingLen > 3);
   setShowMoreButton(
     "btn-show-all-block-homework",
     show,
@@ -16151,6 +16923,8 @@ function renderStudentCertificateCard() {
   setText("certificate-xp", `${xp} XP`);
   setText("certificate-completion", `%${summary.completionRate} (${summary.completed}/${summary.total})`);
   setText("certificate-date", issuedAt);
+  setText("certificate-principal-name", "Okul Müdürü");
+  setText("certificate-teacher-name", "Ders Öğretmeni");
   const awardText = document.getElementById("certificate-award-text");
   if (awardText) {
     awardText.innerText = `${fullName}, bu platformda gösterdiğin öğrenme başarısı, sorumluluk bilinci ve gelişim performansı için tebrik edilerek bu eğitim sertifikası ile ödüllendirilmiştir.`;
@@ -16207,6 +16981,8 @@ function setTeacherCertificateCard(student, summary) {
   setText("teacher-certificate-xp", `${xp} XP`);
   setText("teacher-certificate-completion", `%${completionRate} (${completed}/${total})`);
   setText("teacher-certificate-date", getTeacherCertificateIssuedDate());
+  setText("teacher-certificate-principal-name", "Okul Müdürü");
+  setText("teacher-certificate-teacher-name", "Ders Öğretmeni");
   const awardText = document.getElementById("teacher-certificate-award-text");
   if (awardText) {
     awardText.innerText = `${fullName}, bu platformda gösterdiğin öğrenme başarısı, sorumluluk bilinci ve gelişim performansı için tebrik edilerek bu eğitim sertifikası ile ödüllendirilmiştir.`;
@@ -16231,11 +17007,14 @@ function buildCertificatePageHtml(page) {
   const completed = Math.max(0, Number(page.completed || 0));
   const total = Math.max(0, Number(page.total || 0));
   const issuedAt = escapeHtml(page.issuedAt || getTeacherCertificateIssuedDate());
+  const principalName = escapeHtml(page.principalName || "Okul Müdürü");
+  const teacherName = escapeHtml(page.teacherName || "Ders Öğretmeni");
   const awardText = `${fullName}, bu platformda gösterdiğin öğrenme başarısı, sorumluluk bilinci ve gelişim performansı için tebrik edilerek bu eğitim sertifikası ile ödüllendirilmiştir.`;
   return `
     <section class="cert-page">
       <div class="cert-card">
         <div class="cert-frame">
+          <div class="cert-badge">🏅</div>
           <img src="logo.png" alt="Logo" class="cert-logo" />
           <div class="cert-kicker">RESMİ EĞİTİM BELGESİ</div>
           <h1 class="cert-title">BAŞARI SERTİFİKASI</h1>
@@ -16248,8 +17027,8 @@ function buildCertificatePageHtml(page) {
             <div class="cert-meta-item"><span class="k">Veriliş Tarihi</span><span class="v">${issuedAt}</span></div>
           </div>
           <div class="cert-signatures">
-            <div class="sig-box"><div class="line"></div><div class="label">Öğretmen Onayı</div></div>
-            <div class="sig-box"><div class="line"></div><div class="label">Kurum Onayı</div></div>
+            <div class="sig-box"><div class="line"></div><div class="label">Müdür</div><div class="name">${principalName}</div></div>
+            <div class="sig-box"><div class="line"></div><div class="label">Ders Öğretmeni</div><div class="name">${teacherName}</div></div>
           </div>
           <div class="cert-footer">Bu belge öğrenci gelişim sistemi üzerinden dijital olarak üretilmiştir.</div>
         </div>
@@ -16260,7 +17039,7 @@ function buildCertificatePageHtml(page) {
 
 function getCertificatePreviewStyles() {
   return `
-    :root { --ink:#1f2937; --muted:#6b7280; --violet:#7c3aed; --violet-soft:#faf5ff; --bg:#f5f7fb; }
+    :root { --ink:#1f2937; --muted:#6b7280; --violet:#7c3aed; --violet-soft:#f5f3ff; --bg:#f5f7fb; }
     * { box-sizing: border-box; }
     body { margin:0; padding:16px; background:var(--bg); font-family:"Montserrat","Segoe UI",Tahoma,Arial,sans-serif; color:var(--ink); }
     .toolbar { position: sticky; top: 0; z-index: 20; display:flex; justify-content:flex-end; gap:8px; margin:0 auto 12px; max-width:1200px; background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; padding:10px; box-shadow:0 8px 20px rgba(2,6,23,0.08); }
@@ -16268,20 +17047,21 @@ function getCertificatePreviewStyles() {
     .btn-primary { background:#6d28d9; color:#fff; }
     .btn-danger { background:#dc2626; color:#fff; }
     .cert-page { page-break-after: always; max-width:1200px; margin:0 auto 14px; }
-    .cert-card { background:#ffffff; border-radius:16px; border:1px solid #e5e7eb; box-shadow:0 12px 30px rgba(15,23,42,0.1); padding:14px; }
+    .cert-card { background:#ffffff; border-radius:16px; border:1px solid #ddd6fe; box-shadow:0 12px 30px rgba(76,29,149,0.1); padding:14px; }
     .cert-frame {
       min-height: 740px;
-      border-radius: 14px;
-      border: 8px double var(--violet);
+      border-radius: 26px;
+      border: 6px double var(--violet);
       background:
-        radial-gradient(circle at top right, rgba(168, 85, 247, 0.18), rgba(255,255,255,0) 44%),
-        radial-gradient(circle at bottom left, rgba(196, 181, 253, 0.22), rgba(255,255,255,0) 40%),
-        linear-gradient(165deg, #ffffff 0%, #ffffff 78%, #f3e8ff 100%);
+        radial-gradient(circle at top right, rgba(168, 85, 247, 0.2), rgba(255,255,255,0) 44%),
+        radial-gradient(circle at bottom left, rgba(196, 181, 253, 0.24), rgba(255,255,255,0) 40%),
+        repeating-linear-gradient(135deg, rgba(255,255,255,0.98) 0px, rgba(255,255,255,0.98) 16px, rgba(245,243,255,0.95) 16px, rgba(245,243,255,0.95) 32px);
       padding: 36px 34px;
       text-align: center;
       display:flex; flex-direction:column; justify-content:center; align-items:center;
       gap:10px;
     }
+    .cert-badge { width:94px; height:94px; border-radius:999px; border:4px solid #7c3aed; background:radial-gradient(circle at 30% 25%, #ffffff, #ede9fe 70%); display:grid; place-items:center; font-size:40px; color:#5b21b6; box-shadow:0 8px 20px rgba(109,40,217,0.22); }
     .cert-logo { width: 138px; height: auto; margin-bottom: 4px; }
     .cert-kicker { font-size: 12px; letter-spacing: 0.24em; font-weight: 700; color: #6d28d9; text-transform: uppercase; }
     .cert-title { margin: 2px 0 6px; font-family: "Times New Roman", Georgia, serif; font-size: 46px; letter-spacing: 0.06em; color: #4c1d95; font-weight: 700; }
@@ -16293,7 +17073,8 @@ function getCertificatePreviewStyles() {
     .cert-meta-item .v { font-size: 18px; font-weight: 800; color:#1f2937; }
     .cert-signatures { width: 100%; display:grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-top: 22px; }
     .sig-box .line { border-bottom: 1.6px solid #6b7280; height: 24px; }
-    .sig-box .label { margin-top: 6px; font-size: 13px; color:#6b7280; font-weight:600; text-transform: uppercase; letter-spacing:0.05em; }
+    .sig-box .label { margin-top: 6px; font-size: 12px; color:#6d28d9; font-weight:700; text-transform: uppercase; letter-spacing:0.05em; }
+    .sig-box .name { margin-top: 4px; font-size: 16px; color:#312e81; font-weight:700; }
     .cert-footer { margin-top: 16px; font-size: 13px; color: #6b7280; }
     @page { size: A4 landscape; margin: 10mm; }
     @media print {
@@ -16926,7 +17707,7 @@ function updateActivityLists() {
       }
       if (userRole === "teacher") {
         const count = activityProgressMap.get(assignment.contentId) || 0;
-        const totalStudents = allStudents?.length || 0;
+        const totalStudents = allStudents.filter((s) => assignmentMatchesStudentFor(assignment, s)).length;
         rightBadges = `
           <span class="badge ${isExpired ? "badge-danger" : "badge-info"}">
             ${count}${totalStudents ? "/" + totalStudents : ""} Tamamlama
@@ -16946,8 +17727,16 @@ function updateActivityLists() {
       }
 
       if (userRole === "teacher") {
-        pendingRows.push(li);
-        pendingCount++;
+        const assignedStudents = allStudents.filter((s) => assignmentMatchesStudentFor(assignment, s)).length;
+        const teacherDoneCount = activityProgressMap.get(assignment.contentId) || 0;
+        const teacherCompleted = assignedStudents > 0 && teacherDoneCount >= assignedStudents;
+        if (teacherCompleted) {
+          completedRows.push(li);
+          completedCount++;
+        } else {
+          pendingRows.push(li);
+          pendingCount++;
+        }
       } else {
         if (isCompleted) {
           completedRows.push(li);
@@ -16962,20 +17751,33 @@ function updateActivityLists() {
       }
   });
 
-  if (noPending) noPending.style.display = pendingCount === 0 ? "block" : "none";
-  if (noCompleted) noCompleted.style.display = completedCount === 0 ? "block" : "none";
-    renderLimitedRows(pendingList, pendingRows, 3);
-    renderLimitedRows(completedList, completedRows, 3);
-    homeListCache.activities = {
-      title: userRole === "teacher" ? "Verilen Etkinlikler" : "Etkinliklerim",
-      pending: pendingRows.slice(),
-      completed: completedRows.slice()
-    };
-    setShowMoreButton(
-      "btn-show-all-activities",
-      pendingRows.length > 3 || completedRows.length > 3,
-      () => openAllItemsModal(homeListCache.activities.title, homeListCache.activities.pending, homeListCache.activities.completed)
-    );
+  homeListCache.activities = {
+    title: userRole === "teacher" ? "Verilen Etkinlikler" : "Etkinliklerim",
+    pending: pendingRows.slice(),
+    completed: completedRows.slice()
+  };
+    if (userRole === "teacher") {
+      const allRows = [...pendingRows, ...completedRows];
+      if (noPending) noPending.style.display = allRows.length === 0 ? "block" : "none";
+      if (noCompleted) noCompleted.style.display = "none";
+      renderLimitedRows(pendingList, allRows, 5);
+      if (completedList) completedList.innerHTML = "";
+      setShowMoreButton(
+        "btn-show-all-activities",
+        allRows.length > 5,
+        () => openAllItemsModal(homeListCache.activities.title, homeListCache.activities.pending, homeListCache.activities.completed)
+      );
+    } else {
+      if (noPending) noPending.style.display = pendingCount === 0 ? "block" : "none";
+      if (noCompleted) noCompleted.style.display = completedCount === 0 ? "block" : "none";
+      renderLimitedRows(pendingList, pendingRows, 3);
+      renderLimitedRows(completedList, completedRows, 3);
+      setShowMoreButton(
+        "btn-show-all-activities",
+        pendingRows.length > 3 || completedRows.length > 3,
+        () => openAllItemsModal(homeListCache.activities.title, homeListCache.activities.pending, homeListCache.activities.completed)
+      );
+    }
     if (userRole === "teacher") {
       const el = document.getElementById("teacher-activity-count");
       if (el) el.innerText = assignments.length;
@@ -17539,7 +18341,7 @@ document.getElementById("btn-activity-exit").onclick = function () {
   stopActivitySession({ action: "exit", showMessage: true, allowContinue: true, askContinue: true });
 };
 document.getElementById("btn-activity-full-exit").onclick = function () {
-  if (currentRunnerType === "line-trace") {
+  if (currentRunnerType === "line-trace" || currentRunnerType === "silent-teacher" || currentRunnerType === "lightbot") {
     closeBlockRunnerView();
     return;
   }
@@ -18500,6 +19302,23 @@ function isAnswerCorrect(item, answer) {
 
 async function updateContentProgress(content, completedItemIds, answers = {}, appUsage = {}, prevTotalXP = 0) {
   if (!currentUserId) return;
+  // Eğer bu içerik bir ödev olarak verildiyse ve öğretmen tarafından silinmişse,
+  // öğrenci tarafından yapılan "boş" kayıtlar (hiç kullanım/ilerleme olmadan) öğretmenin
+  // bekleyen/kalan verisini kirletmemesi için kaydedilmemeli.
+  try {
+    const assignment = (contentAssignments || []).find(a => a.contentId === content.id);
+    if (assignment && assignment.isDeleted) {
+      const hasUsage = Object.values(appUsage || {}).some(u => Number(u?.seconds || 0) > 0 || Number(u?.percent || 0) > 0 || Number(u?.xp || 0) > 0);
+      const hasItems = Array.isArray(completedItemIds) && completedItemIds.length > 0;
+      if (!hasUsage && !hasItems) {
+        // Öğrenci ödevi yapmadan silmiş/kapamışsa gereksiz progress kaydı oluşturma.
+        return;
+      }
+    }
+  } catch (e) {
+    // Hata olsa da devam et; güvenlik nedeniyle işlem bozulmasın.
+    console.warn('updateContentProgress assignment check failed:', e);
+  }
   const ref = doc(db, "contentProgress", buildContentProgressKey(content.id));
   const totalItems = (content.items || []).length;
   const answerXP = Object.values(answers).reduce((sum, a) => sum + clampQuestionXP(a?.xp || 0), 0);
@@ -19800,11 +20619,11 @@ async function loadStatsPage() {
     if (topList) {
       topList.innerHTML = "";
       topCandidates.sort((a, b) => b.xp - a.xp);
-      const topFive = topCandidates.slice(0, 5);
-      if (topFive.length === 0) {
+      const topSix = topCandidates.slice(0, 6);
+      if (topSix.length === 0) {
         topList.innerHTML = "<div class='empty-state'>Veri yok.</div>";
       } else {
-        topFive.forEach((s, idx) => {
+        topSix.forEach((s, idx) => {
           const row = document.createElement("div");
           row.className = `top-student-row rank-${idx + 1}`;
           const rankNum = idx + 1;
@@ -20941,9 +21760,6 @@ async function loadMyStatsModal() {
       const el = document.getElementById(id);
       if (el) el.innerText = String(val);
     };
-    setText("my-total-tasks", totalTasks);
-    setText("my-completed-tasks", completedCount);
-    setText("my-total-xp", totalXP);
 
     const assignments = assignmentsAll.filter(a => assignmentMatchesStudent(a));
     const totalActivities = assignments.length;
@@ -20956,19 +21772,52 @@ async function loadMyStatsModal() {
 
     const blockStats = await fetchBlockRunStats(currentUserId);
     const computeStats = await fetchComputeRunStats(currentUserId);
-    const blockRate = Number(blockStats.progressPercent || 0);
-    const computeRate = Number(computeStats.progressPercent || 0);
-    const codeTotalLevels = Math.max(0, Number(blockStats.totalLevels || 0)) + Math.max(0, Number(computeStats.totalLevels || 0));
-    const codeCompletedLevels = Math.max(0, Number(blockStats.completedLevels || 0)) + Math.max(0, Number(computeStats.completedLevels || 0));
-    const codeRate = codeTotalLevels > 0 ? Math.round((codeCompletedLevels / codeTotalLevels) * 100) : 0;
+    const lessonsForStudent = lessonsAll.filter((l) => lessonMatchesStudent(l));
+    const lessonCompleted = lessonsForStudent.filter((lesson) => {
+      const p = lessonProgressMap.get(String(lesson.id)) || {};
+      return Number(p.percent || 0) >= 100;
+    }).length;
+    const lessonRate = lessonsForStudent.length > 0 ? Math.round((lessonCompleted / lessonsForStudent.length) * 100) : 0;
 
-    setText("my-total-activities", totalActivities);
-    setText("my-completed-activities", activityCompleted);
-    setText("my-task-rate", `${taskRate}%`);
-    setText("my-activity-rate", `${activityRate}%`);
-    setText("my-block-rate", `${blockRate}%`);
-    setText("my-compute-rate", `${computeRate}%`);
-    setText("my-code-rate", `${codeRate}%`);
+    const blockAssignmentsForStudent = (Array.isArray(blockAssignments) ? blockAssignments : [])
+      .filter((a) => !a?.isDeleted && blockAssignmentMatchesStudent(a));
+    const block2DAssignments = blockAssignmentsForStudent.filter((a) => {
+      const t = getBlockHomeworkType(a.assignmentType);
+      return t !== "block3d" && t !== "flowchart" && t !== "lightbot" && t !== "silentteacher";
+    });
+    const block3DAssignments = blockAssignmentsForStudent.filter((a) => getBlockHomeworkType(a.assignmentType) === "block3d");
+    const isBlockAssignmentDone = (assignment) => {
+      const p = blockAssignmentProgressMap.get(String(assignment?.id || "")) || {};
+      const completedLevels = Math.max(0, Number(p.completedLevels || 0));
+      const totalLevels = Math.max(0, Number(p.totalLevels || 0));
+      const percent = Math.max(0, Number(p.percent || 0));
+      return !!p.completed || percent >= 100 || (totalLevels > 0 && completedLevels >= totalLevels);
+    };
+    const block2DCompleted = block2DAssignments.filter((a) => isBlockAssignmentDone(a)).length;
+    const block3DCompleted = block3DAssignments.filter((a) => isBlockAssignmentDone(a)).length;
+    const block2DRate = block2DAssignments.length > 0 ? Math.round((block2DCompleted / block2DAssignments.length) * 100) : 0;
+    const block3DRate = block3DAssignments.length > 0 ? Math.round((block3DCompleted / block3DAssignments.length) * 100) : 0;
+
+    const computeAssignmentsForStudent = (Array.isArray(computeAssignments) ? computeAssignments : [])
+      .filter((a) => !a?.isDeleted && computeAssignmentMatchesStudent(a));
+    const computeCompleted = computeAssignmentsForStudent.filter((a) => {
+      const p = computeAssignmentProgressMap.get(String(a.id)) || {};
+      return isComputeProgressCompleted(p, a);
+    }).length;
+    const computeRate = computeAssignmentsForStudent.length > 0
+      ? Math.round((computeCompleted / computeAssignmentsForStudent.length) * 100)
+      : Math.max(0, Number(computeStats.progressPercent || 0));
+
+    const pythonQuizRate = Math.max(0, Math.min(100, Number(quizStats.avgSuccess || 0)));
+
+    setText("my-task-summary", `${completedCount}/${totalTasks} • %${taskRate}`);
+    setText("my-activity-summary", `${activityCompleted}/${totalActivities} • %${activityRate}`);
+    setText("my-lesson-summary", `${lessonCompleted}/${lessonsForStudent.length} • %${lessonRate}`);
+    setText("my-block2d-summary", `${block2DCompleted}/${block2DAssignments.length} • %${block2DRate}`);
+    setText("my-block3d-summary", `${block3DCompleted}/${block3DAssignments.length} • %${block3DRate}`);
+    setText("my-compute-summary", `${computeCompleted}/${computeAssignmentsForStudent.length} • %${computeRate}`);
+    setText("my-python-quiz-summary", `${quizStats.totalQuizzes || 0} • %${pythonQuizRate}`);
+    setText("my-total-xp", totalXP);
 
     const student = userData ? { ...userData, id: currentUserId } : { id: currentUserId };
     student.totalTimeSeconds = getLiveSystemSeconds();
@@ -20996,8 +21845,7 @@ async function loadMyStatsModal() {
       xp: Number(c.xpEarned || 0)
     }));
 
-    const lessonItems = lessonsAll.filter((l) => lessonMatchesStudent(l));
-    const lessonProgressItems = lessonItems.map((lesson) => {
+    const lessonProgressItems = lessonsForStudent.map((lesson) => {
       const p = lessonProgressMap.get(lesson.id) || {};
       return {
         title: `Ders: ${lesson.title || "Ders"}`,
@@ -21045,17 +21893,40 @@ async function loadMyStatsModal() {
       options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
     }, (c) => { myActivityChart = c; });
 
+    safeChart(myLessonChart, "myLessonChart", {
+      type: "bar",
+      data: { labels: ["Yapılan", "Bekleyen"], datasets: [{ label: "Dersler", data: [lessonCompleted, Math.max(0, lessonsForStudent.length - lessonCompleted)], backgroundColor: ["#14b8a6", "#e5e7eb"], borderRadius: 8 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+    }, (c) => { myLessonChart = c; });
+
     safeChart(myBlockChart, "myBlockChart", {
       type: "bar",
-      data: { labels: ["Yapılan", "Bekleyen"], datasets: [{ label: "Blok Kodlama", data: [Math.max(0, Number(blockStats.completedLevels || 0)), Math.max(0, Number(blockStats.totalLevels || 0) - Number(blockStats.completedLevels || 0))], backgroundColor: ["#f59e0b", "#e5e7eb"], borderRadius: 8 }] },
+      data: { labels: ["Yapılan", "Bekleyen"], datasets: [{ label: "Blok Kodlama (2D)", data: [block2DCompleted, Math.max(0, block2DAssignments.length - block2DCompleted)], backgroundColor: ["#f59e0b", "#e5e7eb"], borderRadius: 8 }] },
       options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
     }, (c) => { myBlockChart = c; });
 
+    safeChart(myBlock3DChart, "myBlock3DChart", {
+      type: "bar",
+      data: { labels: ["Yapılan", "Bekleyen"], datasets: [{ label: "3D Blok Kodlama", data: [block3DCompleted, Math.max(0, block3DAssignments.length - block3DCompleted)], backgroundColor: ["#f97316", "#e5e7eb"], borderRadius: 8 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+    }, (c) => { myBlock3DChart = c; });
+
     safeChart(myComputeChart, "myComputeChart", {
       type: "bar",
-      data: { labels: ["Yapılan", "Bekleyen"], datasets: [{ label: "Compute It", data: [Math.max(0, Number(computeStats.completedLevels || 0)), Math.max(0, Number(computeStats.totalLevels || 0) - Number(computeStats.completedLevels || 0))], backgroundColor: ["#8b5cf6", "#e5e7eb"], borderRadius: 8 }] },
+      data: { labels: ["Yapılan", "Bekleyen"], datasets: [{ label: "Compute It", data: [computeCompleted, Math.max(0, computeAssignmentsForStudent.length - computeCompleted)], backgroundColor: ["#8b5cf6", "#e5e7eb"], borderRadius: 8 }] },
       options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
     }, (c) => { myComputeChart = c; });
+
+    safeChart(myPythonQuizChart, "myPythonQuizChart", {
+      type: "bar",
+      data: { labels: ["Başarı", "Kalan"], datasets: [{ label: "Python Quiz", data: [pythonQuizRate, Math.max(0, 100 - pythonQuizRate)], backgroundColor: ["#6366f1", "#e5e7eb"], borderRadius: 8 }] },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, max: 100 } }
+      }
+    }, (c) => { myPythonQuizChart = c; });
 
     currentStudentDetail = {
       student,
@@ -21074,6 +21945,7 @@ async function loadMyStatsModal() {
     showNotice("İstatistikler yüklenemedi. Lütfen tekrar deneyin.", "#e74c3c");
   }
 }
+
 
 
 

@@ -719,10 +719,19 @@ function drawGoalMark() {
   ctx.lineWidth = 1;
 }
 
+function getDirScreenVector(dir) {
+  const d = ((Number(dir) % 4) + 4) % 4;
+  if (d === 0) return { x: 1, y: 1 };   // +x
+  if (d === 1) return { x: -1, y: 1 };  // +y
+  if (d === 2) return { x: -1, y: -1 }; // -x
+  return { x: 1, y: -1 };               // -y
+}
+
 function drawCharacter() {
   const p = isoToScreen(state.x, state.y);
   const bodyY = p.y - 17;
   const facing = state.dir;
+  const v = getDirScreenVector(facing);
 
   // New character: little robot explorer
   fillRoundedRect(p.x - 14, bodyY - 16, 28, 26, 8, "#22d3ee");
@@ -735,18 +744,42 @@ function drawCharacter() {
   ctx.arc(p.x, bodyY - 36, 4, 0, Math.PI * 2);
   ctx.fill();
 
-  const eyeOffset = facing === 0 ? 5 : facing === 2 ? -5 : 0;
+  const eyeOffsetX = v.x * 1.9;
+  const eyeOffsetY = v.y * 0.8;
   ctx.fillStyle = "#ffffff";
   ctx.beginPath();
-  ctx.arc(p.x - 5 + eyeOffset * 0.3, bodyY - 12, 3.2, 0, Math.PI * 2);
-  ctx.arc(p.x + 5 + eyeOffset * 0.3, bodyY - 12, 3.2, 0, Math.PI * 2);
+  ctx.arc(p.x - 5 + eyeOffsetX, bodyY - 12 + eyeOffsetY, 3.2, 0, Math.PI * 2);
+  ctx.arc(p.x + 5 + eyeOffsetX, bodyY - 12 + eyeOffsetY, 3.2, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.fillStyle = "#111827";
   ctx.beginPath();
-  ctx.arc(p.x - 5 + eyeOffset * 0.5, bodyY - 12, 1.5, 0, Math.PI * 2);
-  ctx.arc(p.x + 5 + eyeOffset * 0.5, bodyY - 12, 1.5, 0, Math.PI * 2);
+  ctx.arc(p.x - 5 + eyeOffsetX * 1.2, bodyY - 12 + eyeOffsetY, 1.5, 0, Math.PI * 2);
+  ctx.arc(p.x + 5 + eyeOffsetX * 1.2, bodyY - 12 + eyeOffsetY, 1.5, 0, Math.PI * 2);
   ctx.fill();
+
+  // Front visor to emphasize heading direction.
+  const visorCx = p.x + v.x * 7;
+  const visorCy = bodyY - 6 + v.y * 3;
+  fillRoundedRect(visorCx - 7, visorCy - 3, 14, 6, 2, "#0f172a");
+
+  // Bold direction arrow (character nose) so left/right turns are obvious.
+  const tipX = p.x + v.x * 20;
+  const tipY = bodyY - 7 + v.y * 10;
+  const baseX = p.x + v.x * 10;
+  const baseY = bodyY - 7 + v.y * 5;
+  const nx = -v.y;
+  const ny = v.x;
+  ctx.beginPath();
+  ctx.moveTo(tipX, tipY);
+  ctx.lineTo(baseX + nx * 4, baseY + ny * 4);
+  ctx.lineTo(baseX - nx * 4, baseY - ny * 4);
+  ctx.closePath();
+  ctx.fillStyle = "#f59e0b";
+  ctx.fill();
+  ctx.strokeStyle = "#b45309";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
 
   ctx.strokeStyle = "#0f172a";
   ctx.lineWidth = 2;
