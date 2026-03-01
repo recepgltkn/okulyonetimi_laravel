@@ -52,6 +52,22 @@ const functions = getFunctions(app);
 const deleteUserByAdmin = httpsCallable(functions, "deleteUserByAdmin");
 const setUserPasswordByAdmin = httpsCallable(functions, "setUserPasswordByAdmin");
 const isLocalDevHost = ["127.0.0.1", "localhost"].includes(String(window.location.hostname || "").toLowerCase());
+const APP_BASE_URL = String(
+  document.querySelector('meta[name="app-base-url"]')?.content || window.location.origin
+).replace(/\/+$/, "");
+
+function appUrl(path = "") {
+  const cleanPath = String(path || "").replace(/^\/+/, "");
+  return `${APP_BASE_URL}/${cleanPath}`;
+}
+
+function resolveAppLink(link = "") {
+  const raw = String(link || "").trim();
+  if (!raw) return "";
+  if (/^https?:\/\//i.test(raw)) return raw;
+  return appUrl(raw);
+}
+
 const DEFAULT_BLOCK_LEVEL_COUNT = 32;
 const DEFAULT_COMPUTE_LEVEL_COUNT = 60;
 const MAX_QUESTION_XP = 9;
@@ -629,10 +645,10 @@ window.openBlockRunner = async function(userId, options = {}){
   setBlockRunnerHeaderByRole();
   // set src to app path
   const runnerRole = userRole === "teacher" ? "teacher" : "student";
-  iframe.src = `/block-grid-runner/index.html?role=${runnerRole}`;
+  iframe.src = appUrl(`block-grid-runner/index.html?role=${runnerRole}`);
   modal.style.display = 'flex';
   document.getElementById('activity-title').innerText = options?.title || 'Blok Kodlama - Grid Runner';
-  document.getElementById('activity-link').innerText = '/block-grid-runner/index.html';
+  document.getElementById('activity-link').innerText = appUrl("block-grid-runner/index.html");
   const closeBtn = document.getElementById("btn-close-activity");
   if (closeBtn) closeBtn.innerText = "×";
   const topTitle = document.querySelector("#activity-modal .modal-header h2");
@@ -6063,9 +6079,9 @@ window.openComputeItRunner = async function(userId, options = {}){
   setComputeTeacherHeaderMode(userRole === "teacher");
   modal.classList.remove("fullscreen");
   modal.style.display = "flex";
-  iframe.src = `/compute-it-runner/index.html?role=${runnerRole}&uid=${encodeURIComponent(activeComputeRunnerUserId || "")}`;
+  iframe.src = appUrl(`compute-it-runner/index.html?role=${runnerRole}&uid=${encodeURIComponent(activeComputeRunnerUserId || "")}`);
   document.getElementById('activity-title').innerText = options?.title || 'Compute It';
-  document.getElementById('activity-link').innerText = '/compute-it-runner/index.html';
+  document.getElementById('activity-link').innerText = appUrl("compute-it-runner/index.html");
   const topTitle = document.querySelector("#activity-modal .modal-header h2");
   if (topTitle) topTitle.innerText = "Compute It";
   const closeBtn = document.getElementById("btn-close-activity");
@@ -6198,11 +6214,11 @@ window.openBlock3DRunner = function(options = {}) {
   if (Number.isFinite(rangeEnd) && rangeEnd > 0) params.set("levelEnd", String(Math.floor(rangeEnd)));
   if (options?.assignmentId) params.set("assignmentId", String(options.assignmentId));
   if (options?.title) params.set("assignmentTitle", String(options.title));
-  iframe.src = `/block-3d-runner/index.html?${params.toString()}`;
+  iframe.src = appUrl(`block-3d-runner/index.html?${params.toString()}`);
   const titleEl = document.getElementById("activity-title");
   const linkEl = document.getElementById("activity-link");
   if (titleEl) titleEl.innerText = options?.title || "3D Blok Kodlama";
-  if (linkEl) linkEl.innerText = `/block-3d-runner/index.html?${params.toString()}`;
+  if (linkEl) linkEl.innerText = appUrl(`block-3d-runner/index.html?${params.toString()}`);
   const closeBtn = document.getElementById("btn-close-activity");
   if (closeBtn) closeBtn.innerText = "Çık";
   const topTitle = document.querySelector("#activity-modal .modal-header h2");
@@ -6236,11 +6252,11 @@ window.openLineTraceRunner = function(options = {}) {
   modal.classList.remove("block-3d-mode");
   modal.classList.add("fullscreen");
   modal.style.display = "flex";
-  iframe.src = "/line-trace-runner/index.html";
+  iframe.src = appUrl("line-trace-runner/index.html");
   const titleEl = document.getElementById("activity-title");
   const linkEl = document.getElementById("activity-link");
   if (titleEl) titleEl.innerText = options?.title || "Çizgi Oyunu";
-  if (linkEl) linkEl.innerText = "/line-trace-runner/index.html";
+  if (linkEl) linkEl.innerText = appUrl("line-trace-runner/index.html");
   const closeBtn = document.getElementById("btn-close-activity");
   if (closeBtn) closeBtn.innerText = "Çık";
   const topTitle = document.querySelector("#activity-modal .modal-header h2");
@@ -6294,11 +6310,11 @@ window.openSilentTeacherRunner = function(options = {}) {
   if (options?.levelStart) params.set("levelStart", String(options.levelStart));
   if (options?.levelEnd) params.set("levelEnd", String(options.levelEnd));
   const query = params.toString();
-  iframe.src = query ? `/silent-teacher-runner/index.html?${query}` : "/silent-teacher-runner/index.html";
+  iframe.src = query ? appUrl(`silent-teacher-runner/index.html?${query}`) : appUrl("silent-teacher-runner/index.html");
   const titleEl = document.getElementById("activity-title");
   const linkEl = document.getElementById("activity-link");
   if (titleEl) titleEl.innerText = options?.title || "Python Quiz Lab";
-  if (linkEl) linkEl.innerText = "/silent-teacher-runner/index.html";
+  if (linkEl) linkEl.innerText = appUrl("silent-teacher-runner/index.html");
   const closeBtn = document.getElementById("btn-close-activity");
   if (closeBtn) closeBtn.innerText = "Çık";
   const topTitle = document.querySelector("#activity-modal .modal-header h2");
@@ -6352,11 +6368,11 @@ window.openLightbotRunner = function(options = {}) {
   if (options?.levelStart) params.set("levelStart", String(options.levelStart));
   if (options?.levelEnd) params.set("levelEnd", String(options.levelEnd));
   const query = params.toString();
-  iframe.src = query ? `/lightbot-runner/index.html?${query}` : "/lightbot-runner/index.html";
+  iframe.src = query ? appUrl(`lightbot-runner/index.html?${query}`) : appUrl("lightbot-runner/index.html");
   const titleEl = document.getElementById("activity-title");
   const linkEl = document.getElementById("activity-link");
   if (titleEl) titleEl.innerText = options?.title || "Code Robot Lab";
-  if (linkEl) linkEl.innerText = "/lightbot-runner/index.html";
+  if (linkEl) linkEl.innerText = appUrl("lightbot-runner/index.html");
   const closeBtn = document.getElementById("btn-close-activity");
   if (closeBtn) closeBtn.innerText = "Çık";
   const topTitle = document.querySelector("#activity-modal .modal-header h2");
@@ -10655,7 +10671,7 @@ document.getElementById("btn-add-line-trace-app").onclick = function () {
   contentItemsDraft.push({
     ...newContentItem("app"),
     appTitle: "Çizgi Oyunu",
-    appLink: "/line-trace-runner/index.html",
+    appLink: appUrl("line-trace-runner/index.html"),
     requiredMinutes: 2
   });
   renderContentItemsEditor();
@@ -18573,7 +18589,7 @@ if (externalOpenBtn) {
       showNotice("Uygulama linki yok!", "#e74c3c");
       return;
     }
-    const w = window.open(link, "_blank");
+    const w = window.open(resolveAppLink(link), "_blank");
     if (!w) {
       showNotice("Tarayıcı yeni sekmeyi engelledi. Pop-up izni verin.", "#e74c3c");
     }
@@ -18586,7 +18602,7 @@ if (activityOpenTabBtn) {
       showNotice("Uygulama linki yok!", "#e74c3c");
       return;
     }
-    window.open(activitySession.item.appLink, "_blank");
+    window.open(resolveAppLink(activitySession.item.appLink), "_blank");
     const overlay = document.getElementById("external-app-overlay");
     if (overlay) overlay.style.display = "flex";
   };
@@ -18598,7 +18614,7 @@ if (activityFullOpenTabBtn) {
       showNotice("Uygulama linki yok!", "#e74c3c");
       return;
     }
-    window.open(activitySession.item.appLink, "_blank");
+    window.open(resolveAppLink(activitySession.item.appLink), "_blank");
     const overlay = document.getElementById("external-app-overlay");
     if (overlay) overlay.style.display = "flex";
   };
@@ -21945,7 +21961,6 @@ async function loadMyStatsModal() {
     showNotice("İstatistikler yüklenemedi. Lütfen tekrar deneyin.", "#e74c3c");
   }
 }
-
 
 
 
