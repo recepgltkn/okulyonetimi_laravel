@@ -1,0 +1,377 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\DocumentRecord;
+use App\Models\GameState;
+use App\Models\StudentReport;
+use App\Models\User;
+use App\Models\UserProfile;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
+
+class ClientDataController extends Controller
+{
+    private const NATIVE = ['users', 'gameStates', 'studentReports'];
+
+    public function login(Request $request): JsonResponse
+    {
+        $identifier = trim((string) $request->input('identifier', $request->input('email', '')));
+        $password = (string) $request->input('password', '');
+        $user = User::query()->where('email', $identifier)->orWhere('name', $identifier)->first();
+        if (! $user || ! Hash::check($password, (string) $user->password)) {
+            return response()->json(['message' => 'invalid credentials'], 401);
+        }
+        return response()->json(['user' => ['uid' => (string) $user->id, 'id' => (string) $user->id, 'email' => $user->email, 'displayName' => $user->name]]);
+    }
+
+    public function register(Request $request): JsonResponse
+    {
+        $email = trim((string) $request->input('email', ''));
+        $password = (string) $request->input('password', '');
+        if ($email === '' || $password === '') {
+            return response()->json(['message' => 'email and password are required'], 422);
+        }
+        if (User::query()->where('email', $email)->exists()) {
+            return response()->json(['message' => 'email already exists'], 409);
+        }
+        $username = trim((string) $request->input('username', Str::before($email, '@') ?: 'user_'.Str::lower(Str::random(6))));
+        $user = User::query()->create(['name' => $username, 'email' => $email, 'password' => Hash::make($password)]);
+        UserProfile::query()->updateOrCreate(['user_id' => $user->id], ['username' => $username, 'role' => 'student', 'xp' => 0, 'meta' => []]);
+        return response()->json(['user' => ['uid' => (string) $user->id, 'id' => (string) $user->id, 'email' => $user->email, 'displayName' => $user->name]], 201);
+    }
+
+    public function updatePassword(Request $request): JsonResponse
+    {
+        $user = User::query()->find((string) $request->input('uid', ''));
+        $newPassword = (string) $request->input('newPassword', '');
+        if (! $user || $newPassword === '') {
+            return response()->json(['message' => 'invalid input'], 422);
+        }
+        $user->password = Hash::make($newPassword);
+        $user->save();
+        return response()->json(['ok' => true]);
+    }
+
+    public function deleteUser(Request $request): JsonResponse
+    {
+        $uid = (string) $request->input('uid', '');
+        User::query()->whereKey($uid)->delete();
+        UserProfile::query()->where('user_id', $uid)->delete();
+        GameState::query()->where('user_id', $uid)->delete();
+        StudentReport::query()->where('user_id', $uid)->delete();
+        DocumentRecord::query()->where('path', "users/{$uid}")->orWhere('path', 'like', "%/{$uid}")->delete();
+        return response()->json(['ok' => true]);
+    }
+
+    public function setDoc(Request $request): JsonResponse
+    {
+        $doc = $this->upsertDoc((string) $request->input('path', ''), (array) $request->input('data', []), (bool) $request->input('merge', false));
+        return response()->json(['doc' => $doc]);
+    }
+
+    public function updateDoc(Request $request): JsonResponse
+    {
+        $doc = $this->upsertDoc((string) $request->input('path', ''), (array) $request->input('data', []), true);
+        return response()->json(['doc' => $doc]);
+    }
+
+    public function getDoc(Request $request): JsonResponse
+    {
+        $doc = $this->findDoc((string) $request->query('path', ''));
+        return $doc ? response()->json(['exists' => true, 'doc' => $doc]) : response()->json(['exists' => false]);
+    }
+
+    public function deleteDoc(Request $request): JsonResponse
+    {
+        $path = trim((string) $request->input('path', ''), '/');
+        [$parent, $collection, $id] = $this->splitDocPath($path);
+        if ($parent === null && in_array($collection, self::NATIVE, true)) {
+            if ($collection === 'users') {
+                User::query()->whereKey($id)->delete();
+                UserProfile::query()->where('user_id', $id)->delete();
+            } elseif ($collection === 'gameStates') {
+                GameState::query()->where('user_id', $id)->delete();
+            } elseif ($collection === 'studentReports') {
+                StudentReport::query()->where('user_id', $id)->delete();
+            }
+            return response()->json(['ok' => true]);
+        }
+        DocumentRecord::query()->where('path', $path)->delete();
+        return response()->json(['ok' => true]);
+    }
+
+    public function addDoc(Request $request): JsonResponse
+    {
+        $collectionPath = trim((string) $request->input('collectionPath', ''), '/');
+        $id = Str::lower(Str::random(20));
+        $path = "{$collectionPath}/{$id}";
+        $doc = $this->upsertDoc($path, (array) $request->input('data', []), false);
+        return response()->json(['doc' => $doc], 201);
+    }
+
+    public function queryDocs(Request $request): JsonResponse
+    {
+        $source = (array) $request->input('source', []);
+        $constraints = (array) $request->input('constraints', []);
+        $type = (string) ($source['type'] ?? 'collection');
+        if ($type === 'collectionGroup') {
+            $name = (string) ($source['name'] ?? '');
+            $docs = DocumentRecord::query()->where('collection_name', $name)->get()->map(fn ($d) => $this->docPayload($d))->values()->all();
+            return response()->json(['docs' => $this->applyConstraints($docs, $constraints)]);
+        }
+
+        $collectionPath = trim((string) ($source['path'] ?? ''), '/');
+        [$parent, $collection] = $this->splitCollectionPath($collectionPath);
+        if ($parent === null && $collection === 'users') {
+            $rows = User::query()->leftJoin('user_profiles', 'users.id', '=', 'user_profiles.user_id')->select(['users.*', 'user_profiles.role', 'user_profiles.xp', 'user_profiles.meta', 'user_profiles.total_time_seconds', 'user_profiles.class_name', 'user_profiles.section', 'user_profiles.selected_avatar_id'])->get();
+            $docs = $rows->map(function ($r) {
+                $meta = [];
+                if (is_array($r->meta)) $meta = $r->meta;
+                elseif (is_string($r->meta) && $r->meta !== '') {
+                    $decoded = json_decode($r->meta, true);
+                    if (is_array($decoded)) $meta = $decoded;
+                }
+                $data = array_merge($meta, [
+                    'username' => $r->name, 'email' => $r->email, 'role' => $r->role ?: 'student', 'xp' => (int) ($r->xp ?? 0),
+                    'totalTimeSeconds' => (int) ($r->total_time_seconds ?? 0), 'class' => $r->class_name, 'section' => $r->section, 'selectedAvatarId' => $r->selected_avatar_id,
+                    'createdAt' => optional($r->created_at)?->toIso8601String(), 'updatedAt' => optional($r->updated_at)?->toIso8601String(),
+                ]);
+                return ['id' => (string) $r->id, 'path' => "users/{$r->id}", 'parentPath' => null, 'collection' => 'users', 'data' => $data, 'createdAt' => optional($r->created_at)?->toIso8601String(), 'updatedAt' => optional($r->updated_at)?->toIso8601String()];
+            })->values()->all();
+            return response()->json(['docs' => $this->applyConstraints($docs, $constraints)]);
+        }
+
+        $docs = DocumentRecord::query()->where('collection_name', $collection)->where('parent_path', $parent)->get()->map(fn ($d) => $this->docPayload($d))->values()->all();
+        return response()->json(['docs' => $this->applyConstraints($docs, $constraints)]);
+    }
+
+    public function batch(Request $request): JsonResponse
+    {
+        foreach ((array) $request->input('ops', []) as $op) {
+            $kind = (string) ($op['kind'] ?? '');
+            if ($kind === 'set') $this->upsertDoc((string) ($op['path'] ?? ''), (array) ($op['data'] ?? []), (bool) ($op['merge'] ?? false));
+            if ($kind === 'update') $this->upsertDoc((string) ($op['path'] ?? ''), (array) ($op['data'] ?? []), true);
+            if ($kind === 'delete') DocumentRecord::query()->where('path', trim((string) ($op['path'] ?? ''), '/'))->delete();
+        }
+        return response()->json(['ok' => true]);
+    }
+
+    public function callable(Request $request, string $name): JsonResponse
+    {
+        $data = (array) $request->input('data', []);
+        if ($name === 'deleteUserByAdmin') {
+            User::query()->whereKey((string) ($data['uid'] ?? $data['userId'] ?? ''))->delete();
+            return response()->json(['data' => ['ok' => true]]);
+        }
+        if ($name === 'setUserPasswordByAdmin') {
+            $uid = (string) ($data['uid'] ?? $data['userId'] ?? '');
+            $user = User::query()->find($uid);
+            if ($user && isset($data['newPassword'])) {
+                $user->password = Hash::make((string) $data['newPassword']);
+                $user->save();
+            }
+            return response()->json(['data' => ['ok' => true]]);
+        }
+        if ($name === 'studentAiAssistant') {
+            return response()->json(['data' => ['reply' => 'AI assistant is not configured on Laravel API yet.']]);
+        }
+        return response()->json(['data' => ['ok' => false, 'message' => "Unknown callable: {$name}"]], 404);
+    }
+
+    private function upsertDoc(string $rawPath, array $data, bool $merge): array
+    {
+        $path = trim($rawPath, '/');
+        [$parent, $collection, $id] = $this->splitDocPath($path);
+        if ($parent === null && in_array($collection, self::NATIVE, true)) {
+            if ($collection === 'users') return $this->upsertNativeUser($id, $data, $merge);
+            if ($collection === 'gameStates') return $this->upsertNativeGameState($id, $data, $merge);
+            if ($collection === 'studentReports') return $this->upsertNativeStudentReport($id, $data, $merge);
+        }
+
+        $doc = DocumentRecord::query()->where('path', $path)->first();
+        $base = (array) ($doc?->payload ?? []);
+        $payload = $merge ? $this->normalizePayload($data, $base) : $this->normalizePayload($data, []);
+        if (! $doc) $doc = new DocumentRecord(['path' => $path, 'parent_path' => $parent, 'collection_name' => $collection, 'document_id' => $id]);
+        $doc->payload = $payload;
+        $doc->save();
+        return $this->docPayload($doc);
+    }
+
+    private function findDoc(string $rawPath): ?array
+    {
+        $path = trim($rawPath, '/');
+        [$parent, $collection, $id] = $this->splitDocPath($path);
+        if ($parent === null && in_array($collection, self::NATIVE, true)) {
+            if ($collection === 'users') return $this->findNativeUser($id);
+            if ($collection === 'gameStates') return $this->findNativeGameState($id);
+            if ($collection === 'studentReports') return $this->findNativeStudentReport($id);
+        }
+        $doc = DocumentRecord::query()->where('path', $path)->first();
+        return $doc ? $this->docPayload($doc) : null;
+    }
+
+    private function upsertNativeUser(string $id, array $data, bool $merge): array
+    {
+        $user = User::query()->find($id) ?: new User(['id' => (int) $id, 'email' => (string) ($data['email'] ?? "user_{$id}@local.test"), 'password' => Hash::make((string) ($data['password'] ?? Str::random(16)))]);
+        $profile = UserProfile::query()->firstOrNew(['user_id' => (int) $id]);
+        $base = $this->nativeUserData($user, $profile);
+        $payload = $merge ? $this->normalizePayload($data, $base) : $this->normalizePayload($data, []);
+        $user->name = (string) ($payload['username'] ?? $payload['name'] ?? $user->name ?? "user_{$id}");
+        if (isset($payload['email'])) $user->email = (string) $payload['email'];
+        if (isset($payload['password']) && (string) $payload['password'] !== '') $user->password = Hash::make((string) $payload['password']);
+        $user->save();
+        $profile->username = (string) ($payload['username'] ?? $user->name);
+        $profile->role = (string) ($payload['role'] ?? $profile->role ?? 'student');
+        $profile->xp = (int) ($payload['xp'] ?? 0);
+        $profile->total_time_seconds = (int) ($payload['totalTimeSeconds'] ?? 0);
+        $profile->class_name = isset($payload['class']) ? (string) $payload['class'] : $profile->class_name;
+        $profile->section = isset($payload['section']) ? (string) $payload['section'] : $profile->section;
+        $profile->selected_avatar_id = isset($payload['selectedAvatarId']) ? (string) $payload['selectedAvatarId'] : $profile->selected_avatar_id;
+        $profile->meta = $this->extractMeta($payload, ['username', 'name', 'email', 'password', 'role', 'xp', 'totalTimeSeconds', 'class', 'section', 'selectedAvatarId', 'createdAt', 'updatedAt']);
+        $profile->save();
+        return $this->findNativeUser((string) $user->id);
+    }
+
+    private function findNativeUser(string $id): ?array
+    {
+        $user = User::query()->find($id);
+        if (! $user) return null;
+        $profile = UserProfile::query()->firstOrCreate(['user_id' => $user->id], ['username' => $user->name, 'role' => 'student', 'xp' => 0, 'meta' => []]);
+        $data = $this->nativeUserData($user, $profile);
+        return ['id' => (string) $user->id, 'path' => "users/{$user->id}", 'parentPath' => null, 'collection' => 'users', 'data' => $data, 'createdAt' => optional($user->created_at)?->toIso8601String(), 'updatedAt' => optional($user->updated_at)?->toIso8601String()];
+    }
+
+    private function upsertNativeGameState(string $id, array $data, bool $merge): array
+    {
+        $row = GameState::query()->firstOrNew(['user_id' => (int) $id]);
+        $base = (array) ($row->payload ?? []);
+        $row->payload = $merge ? $this->normalizePayload($data, $base) : $this->normalizePayload($data, []);
+        $row->save();
+        return $this->findNativeGameState($id);
+    }
+
+    private function findNativeGameState(string $id): ?array
+    {
+        $row = GameState::query()->where('user_id', $id)->first();
+        if (! $row) return null;
+        return ['id' => (string) $id, 'path' => "gameStates/{$id}", 'parentPath' => null, 'collection' => 'gameStates', 'data' => (array) ($row->payload ?? []), 'createdAt' => optional($row->created_at)?->toIso8601String(), 'updatedAt' => optional($row->updated_at)?->toIso8601String()];
+    }
+
+    private function upsertNativeStudentReport(string $id, array $data, bool $merge): array
+    {
+        $row = StudentReport::query()->firstOrNew(['user_id' => (int) $id]);
+        $base = $this->nativeStudentReportData($row);
+        $payload = $merge ? $this->normalizePayload($data, $base) : $this->normalizePayload($data, []);
+        $row->total_xp = (int) ($payload['totalXP'] ?? $payload['xp'] ?? 0);
+        $row->total_duration_ms = (int) ($payload['totalDurationMs'] ?? 0);
+        $row->completion_percent = (float) ($payload['completionPercent'] ?? 0);
+        $row->meta = $this->extractMeta($payload, ['totalXP', 'xp', 'totalDurationMs', 'completionPercent', 'createdAt', 'updatedAt']);
+        $row->save();
+        return $this->findNativeStudentReport($id);
+    }
+
+    private function findNativeStudentReport(string $id): ?array
+    {
+        $row = StudentReport::query()->where('user_id', $id)->first();
+        if (! $row) return null;
+        return ['id' => (string) $id, 'path' => "studentReports/{$id}", 'parentPath' => null, 'collection' => 'studentReports', 'data' => $this->nativeStudentReportData($row), 'createdAt' => optional($row->created_at)?->toIso8601String(), 'updatedAt' => optional($row->updated_at)?->toIso8601String()];
+    }
+
+    private function nativeUserData(User $user, UserProfile $profile): array
+    {
+        return array_merge((array) ($profile->meta ?? []), [
+            'username' => (string) ($profile->username ?: $user->name),
+            'email' => (string) $user->email,
+            'role' => (string) ($profile->role ?: 'student'),
+            'xp' => (int) ($profile->xp ?? 0),
+            'totalTimeSeconds' => (int) ($profile->total_time_seconds ?? 0),
+            'class' => $profile->class_name,
+            'section' => $profile->section,
+            'selectedAvatarId' => $profile->selected_avatar_id,
+            'createdAt' => optional($user->created_at)?->toIso8601String(),
+            'updatedAt' => optional($user->updated_at)?->toIso8601String(),
+        ]);
+    }
+
+    private function nativeStudentReportData(StudentReport $row): array
+    {
+        return array_merge((array) ($row->meta ?? []), [
+            'totalXP' => (int) ($row->total_xp ?? 0),
+            'totalDurationMs' => (int) ($row->total_duration_ms ?? 0),
+            'completionPercent' => (float) ($row->completion_percent ?? 0),
+            'createdAt' => optional($row->created_at)?->toIso8601String(),
+            'updatedAt' => optional($row->updated_at)?->toIso8601String(),
+        ]);
+    }
+
+    private function normalizePayload(array $incoming, array $base): array
+    {
+        foreach ($incoming as $k => $v) {
+            if (is_array($v) && (($v['__op'] ?? null) === 'increment')) $base[$k] = (float) ($base[$k] ?? 0) + (float) ($v['by'] ?? 0);
+            elseif (is_array($v) && (($v['__op'] ?? null) === 'serverTimestamp')) $base[$k] = now()->toIso8601String();
+            else $base[$k] = $v;
+        }
+        return $base;
+    }
+
+    private function docPayload(DocumentRecord $doc): array
+    {
+        return ['id' => (string) $doc->document_id, 'path' => (string) $doc->path, 'parentPath' => $doc->parent_path, 'collection' => (string) $doc->collection_name, 'data' => (array) ($doc->payload ?? []), 'createdAt' => optional($doc->created_at)?->toIso8601String(), 'updatedAt' => optional($doc->updated_at)?->toIso8601String()];
+    }
+
+    private function splitCollectionPath(string $path): array
+    {
+        $parts = array_values(array_filter(explode('/', trim($path, '/')), fn ($x) => $x !== ''));
+        $collection = (string) end($parts);
+        $parent = count($parts) > 1 ? implode('/', array_slice($parts, 0, -1)) : null;
+        return [$parent, $collection];
+    }
+
+    private function splitDocPath(string $path): array
+    {
+        $parts = array_values(array_filter(explode('/', trim($path, '/')), fn ($x) => $x !== ''));
+        $id = (string) end($parts);
+        $collection = count($parts) > 1 ? (string) $parts[count($parts) - 2] : '';
+        $parent = count($parts) > 2 ? implode('/', array_slice($parts, 0, -2)) : null;
+        return [$parent, $collection, $id];
+    }
+
+    private function applyConstraints(array $docs, array $constraints): array
+    {
+        $limit = null;
+        foreach ($constraints as $c) {
+            if (($c['type'] ?? '') === 'where') {
+                $f = (string) ($c['field'] ?? ''); $op = (string) ($c['op'] ?? '=='); $val = $c['value'] ?? null;
+                $docs = array_values(array_filter($docs, function ($d) use ($f, $op, $val) {
+                    $v = data_get($d['data'] ?? [], $f);
+                    if ($op === '==') return $v == $val;
+                    if ($op === 'in' && is_array($val)) return in_array($v, $val, true);
+                    if ($op === '!=') return $v != $val;
+                    if ($op === '>') return $v > $val;
+                    if ($op === '>=') return $v >= $val;
+                    if ($op === '<') return $v < $val;
+                    if ($op === '<=') return $v <= $val;
+                    return false;
+                }));
+            }
+        }
+        foreach (array_reverse($constraints) as $c) {
+            if (($c['type'] ?? '') === 'orderBy') {
+                $f = (string) ($c['field'] ?? ''); $dir = strtolower((string) ($c['direction'] ?? 'asc'));
+                usort($docs, function ($a, $b) use ($f, $dir) { $cmp = (data_get($a['data'] ?? [], $f) <=> data_get($b['data'] ?? [], $f)); return $dir === 'desc' ? -$cmp : $cmp; });
+            }
+            if (($c['type'] ?? '') === 'limit') $limit = (int) ($c['count'] ?? 0);
+        }
+        return ($limit && $limit > 0) ? array_slice($docs, 0, $limit) : $docs;
+    }
+
+    private function extractMeta(array $payload, array $reserved): array
+    {
+        $out = [];
+        foreach ($payload as $k => $v) if (! in_array((string) $k, $reserved, true)) $out[$k] = $v;
+        return $out;
+    }
+}

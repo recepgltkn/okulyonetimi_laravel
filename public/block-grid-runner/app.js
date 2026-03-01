@@ -117,7 +117,7 @@ function applyXpDefaults(){
 applyXpDefaults();
 
 // Preferred group ordering (easy -> hard)
-const groupOrder = ['Kolay','Orta','Zor','Ã–zel','Genel'];
+const groupOrder = ['Kolay','Orta','Zor','Özel','Genel'];
 
 function getGroupRank(name){
   const idx = groupOrder.indexOf(String(name || 'Genel'));
@@ -296,23 +296,23 @@ function initBlockly(){
       previousStatement: null,
       nextStatement: null,
       colour: 188,
-      tooltip: "Karakteri ileri gotur"
+      tooltip: "Karakteri ileri götür"
     },
     {
       type: "turn_left",
-      message0: "Sola don",
+      message0: "Sola dön",
       previousStatement: null,
       nextStatement: null,
       colour: 268,
-      tooltip: "Karakteri sola cevir"
+      tooltip: "Karakteri sola çevir"
     },
     {
       type: "turn_right",
-      message0: "Saga don",
+      message0: "Sağa dön",
       previousStatement: null,
       nextStatement: null,
       colour: 268,
-      tooltip: "Karakteri saga cevir"
+      tooltip: "Karakteri sağa çevir"
     }
   ]);
 
@@ -463,19 +463,19 @@ function generateCommands(){
 
 function loadLevel(idx){
   if(runnerRole !== 'teacher' && assignmentRangeLocked){
-    warnLockedLevel('Ã–dev aralÄ±ÄŸÄ± tamamlandÄ±. Uygulama kapanÄ±yor.');
+    warnLockedLevel('Ödev aralığı tamamlandı. Uygulama kapanıyor.');
     return;
   }
   if(runnerRole !== 'teacher' && levelRange){
     const startIdx = Math.max(0, Number(levelRange.startIdx || 0));
     const endIdx = Math.min(levels.length - 1, Math.max(startIdx, Number(levelRange.endIdx ?? (levels.length - 1))));
     if(idx < startIdx || idx > endIdx){
-      warnLockedLevel('Bu seviye bu Ã¶dev aralÄ±ÄŸÄ±nda deÄŸil.');
+      warnLockedLevel('Bu seviye bu ödev aralığında değil.');
       return;
     }
     const firstIncomplete = getFirstIncompleteRangeIndex();
     if(typeof firstIncomplete === 'number' && idx > firstIncomplete){
-      warnLockedLevel('Ä°lk bÃ¶lÃ¼mler tamamlanmadan sonraki bÃ¶lÃ¼mlere geÃ§ilemez.');
+      warnLockedLevel('İlk bölümler tamamlanmadan sonraki bölümlere geçilemez.');
       return;
     }
   }
@@ -589,7 +589,7 @@ function stepOnce(){
     if(state.dir===2) nx--;
     if(state.dir===3) ny--;
     // bounds
-    if(nx<0||nx>=gw||ny<0||ny>=gh) { state.running=false; setStatus('SÄ±nÄ±r!'); flashCanvas('#ff6b6b'); workspace.highlightBlock(null); return false; }
+    if(nx<0||nx>=gw||ny<0||ny>=gh) { state.running=false; setStatus('Sınır!'); flashCanvas('#ff6b6b'); workspace.highlightBlock(null); return false; }
     // collision
     const lvl = levels[state.levelIndex];
     for(const o of lvl.obstacles) if(o.x===nx && o.y===ny){ state.running=false; setStatus('Engel!'); flashCanvas('#ff6b6b'); workspace.highlightBlock(null); return false; }
@@ -650,7 +650,7 @@ function flashCanvas(color){
 function checkStar(){
   const lvl = levels[state.levelIndex];
   if(state.x === lvl.star.x && state.y === lvl.star.y){
-    state.running=false; setStatus('YÄ±ldÄ±z bulundu! BÃ¶lÃ¼m tamamlandÄ±.');
+    state.running=false; setStatus('Yıldız bulundu! Bölüm tamamlandı.');
     try{
       if(assignmentCompletedLevelIds instanceof Set){
         assignmentCompletedLevelIds.add(Number(lvl.id));
@@ -727,10 +727,10 @@ function showLevelModal(){
       if (!lv?.completed) return sum;
       return sum + normalizeLevelXp(lv?.xp);
     }, 0);
-  title.textContent = 'Harika! Seviye TamamlandÄ± ğŸ‰';
+  title.textContent = 'Harika! Seviye Tamamlandı 🎉';
   sub.textContent = isRangeEnd
-    ? `Toplam adim: ${cmdCount}. Toplam +${xpTotal} XP ile odevdeki tum seviyeler tamamlandi.`
-    : `Toplam adim: ${cmdCount}. Toplam +${xpTotal} XP birikti, bir sonraki seviyeye hazirsin.`;
+    ? `Toplam adım: ${cmdCount}. Toplam +${xpTotal} XP ile ödevdeki tüm seviyeler tamamlandı.`
+    : `Toplam adım: ${cmdCount}. Toplam +${xpTotal} XP birikti, bir sonraki seviyeye hazırsın.`;
   pre.textContent = generateExecutableJS();
   const nextBtn = document.getElementById('modalNextBtn');
   if (nextBtn) {
@@ -877,7 +877,7 @@ function moveCurrentLevel(direction){
   if(pos < 0) return;
   const targetPos = direction === 'up' ? pos - 1 : pos + 1;
   if(targetPos < 0 || targetPos >= same.length){
-    setStatus(direction === 'up' ? 'Daha yukarÄ± taÅŸÄ±namaz' : 'Daha aÅŸaÄŸÄ± taÅŸÄ±namaz');
+    setStatus(direction === 'up' ? 'Daha yukarı taşınamaz' : 'Daha aşağı taşınamaz');
     return;
   }
   const a = same[pos].l;
@@ -892,7 +892,7 @@ function moveCurrentLevel(direction){
   populateLevels();
   const nextIndex = levels.findIndex(l => Number(l?.id) === Number(keepId));
   loadLevel(nextIndex >= 0 ? nextIndex : 0);
-  setStatus(direction === 'up' ? 'Seviye yukarÄ± taÅŸÄ±ndÄ±' : 'Seviye aÅŸaÄŸÄ± taÅŸÄ±ndÄ±');
+  setStatus(direction === 'up' ? 'Seviye yukarı taşındı' : 'Seviye aşağı taşındı');
 }
 
 function moveCurrentLevelUp(){ moveCurrentLevel('up'); }
@@ -901,25 +901,25 @@ function moveCurrentLevelDown(){ moveCurrentLevel('down'); }
 
 function goToNextLevel(){
   if (runnerRole !== 'teacher' && assignmentRangeLocked) {
-    setStatus('Ã–dev aralÄ±ÄŸÄ± tamamlandÄ±');
+    setStatus('Ödev aralığı tamamlandı');
     return;
   }
   if (levelRange) {
     const endIdx = Math.min(levels.length - 1, Math.max(0, Number(levelRange.endIdx || (levels.length - 1))));
     if (state.levelIndex >= endIdx) {
-      setStatus('Ã–dev aralÄ±ÄŸÄ± tamamlandÄ±');
+      setStatus('Ödev aralığı tamamlandı');
       return;
     }
   }
   const next = state.levelIndex + 1;
-  if(!levels[next]){ setStatus('TÃ¼m seviyeler tamamlandÄ±'); return; }
-  setStatus('Seviye tamamlandÄ±! Sonraki seviyeye geÃ§iliyor...');
+  if(!levels[next]){ setStatus('Tüm seviyeler tamamlandı'); return; }
+  setStatus('Seviye tamamlandı! Sonraki seviyeye geçiliyor...');
   setTimeout(()=>{
     try{ if(window.workspace) workspace.clear(); else workspace.clear(); }catch(e){}
     loadLevel(next);
     populateLevels();
     const cp_next = document.getElementById('commandsPre'); if(cp_next) cp_next.textContent = '[]';
-    setStatus('Seviye ' + (next+1) + ' yÃ¼klendi');
+    setStatus('Seviye ' + (next+1) + ' yüklendi');
   }, 700);
 }
 
@@ -940,7 +940,7 @@ function runProgram(){
   state.commands = generateCommands();
   // show executable JS generated from Blockly if available
   const cp_run = document.getElementById('commandsPre'); if(cp_run) cp_run.textContent = generateExecutableJS();
-  state.ip = 0; state.running = true; setStatus('Ã‡alÄ±ÅŸÄ±yor...');
+  state.ip = 0; state.running = true; setStatus('Çalışıyor...');
   function tick(){
     if(!state.running) return;
     const ok = stepOnce();
@@ -963,7 +963,7 @@ function stepProgram(){
 }
 
 function generateJSFromCommands(cmds){
-  if(!cmds || cmds.length===0) return '// Program boÅŸ';
+  if(!cmds || cmds.length===0) return '// Program boş';
   // Fallback: produce readable pseudo-JS from commands
   const lines = [];
   lines.push('async function program(){');
@@ -974,10 +974,10 @@ function generateJSFromCommands(cmds){
   }
   lines.push('}');
   lines.push('');
-  lines.push('// Ã–rnek hareket fonksiyonlarÄ±:');
-  lines.push('async function moveForward(){ /* karakteri bir hÃ¼cre Ã¶ne taÅŸÄ± */ }');
-  lines.push('async function turnLeft(){ /* 90Â° sola dÃ¶n */ }');
-  lines.push('async function turnRight(){ /* 90Â° saÄŸa dÃ¶n */ }');
+  lines.push('// Örnek hareket fonksiyonları:');
+  lines.push('async function moveForward(){ /* karakteri bir hücre öne taşı */ }');
+  lines.push('async function turnLeft(){ /* 90° sola dön */ }');
+  lines.push('async function turnRight(){ /* 90° sağa dön */ }');
   return lines.join('\n');
 }
 
@@ -993,10 +993,10 @@ function generateExecutableJS(){
       wrapper.push(...bodyLines);
       wrapper.push('}');
       wrapper.push('');
-      wrapper.push('// YardÄ±mcÄ± hareket fonksiyonlarÄ± (Ã¶rnek):');
-      wrapper.push('async function moveForward(){ /* karakter bir hÃ¼cre ilerlesin */ }');
-      wrapper.push('async function turnLeft(){ /* sola dÃ¶n */ }');
-      wrapper.push('async function turnRight(){ /* saÄŸa dÃ¶n */ }');
+      wrapper.push('// Yardımcı hareket fonksiyonları (örnek):');
+      wrapper.push('async function moveForward(){ /* karakter bir hücre ilerlesin */ }');
+      wrapper.push('async function turnLeft(){ /* sola dön */ }');
+      wrapper.push('async function turnRight(){ /* sağa dön */ }');
       return wrapper.join('\n');
     }
   }catch(e){/* ignore */}
@@ -1147,9 +1147,9 @@ function initUI(){
     const darkToggle = document.getElementById('darkToggle');
     function applyTheme(t){ if(t==='dark') document.body.classList.add('dark'); else document.body.classList.remove('dark'); }
     const stored = localStorage.getItem('theme'); if(stored) applyTheme(stored);
-    if(darkToggle){ darkToggle.addEventListener('click', ()=>{ const isDark = document.body.classList.toggle('dark'); localStorage.setItem('theme', isDark? 'dark':'light'); darkToggle.textContent = isDark? 'â˜€ï¸' : 'ğŸŒ™'; });
+    if(darkToggle){ darkToggle.addEventListener('click', ()=>{ const isDark = document.body.classList.toggle('dark'); localStorage.setItem('theme', isDark? 'dark':'light'); darkToggle.textContent = isDark? '☀️' : '🌙'; });
       // set initial icon
-      darkToggle.textContent = document.body.classList.contains('dark')? 'â˜€ï¸' : 'ğŸŒ™';
+      darkToggle.textContent = document.body.classList.contains('dark')? '☀️' : '🌙';
     }
   }catch(e){/* ignore */}
 }
@@ -1161,16 +1161,16 @@ function openLevelDesigner(editMode = false){
   designerEditMode = !!editMode;
 
   const header = modal.querySelector('.modal-header h3');
-  if(header) header.textContent = designerEditMode ? 'Seviye Duzenle' : 'Seviye Tasarla';
+  if(header) header.textContent = designerEditMode ? 'Seviye Düzenle' : 'Seviye Tasarla';
 
   const saveBtn = document.getElementById('designerSaveBtn');
-  if(saveBtn) saveBtn.textContent = designerEditMode ? 'Guncelle' : 'Kaydet';
+  if(saveBtn) saveBtn.textContent = designerEditMode ? 'Güncelle' : 'Kaydet';
 
   document.getElementById('designerLevelName').value = designerEditMode
-    ? (lvl.name || 'Ozel Seviye')
-    : (lvl.name ? lvl.name + ' - kopya' : 'Ozel Seviye');
+    ? (lvl.name || 'Özel Seviye')
+    : (lvl.name ? lvl.name + ' - kopya' : 'Özel Seviye');
   const groupInput = document.getElementById('designerGroup');
-  if(groupInput) groupInput.value = lvl.group || 'Ozel';
+  if(groupInput) groupInput.value = lvl.group || 'Özel';
   const orderInput = document.getElementById('designerLevelOrder');
   if(orderInput) {
     const fallbackOrder = state.levelIndex + 1;
@@ -1278,13 +1278,13 @@ function resetDesignerModal(){
   designerDraft = makeEmptyDesignerDraft();
   setDesignerTool('obstacle');
   renderDesignerBoard();
-  setStatus('Tasarim alanÄ± temizlendi');
+  setStatus('Tasarım alanı temizlendi');
 }
 
 function saveDesignerLevel(){
   try{
-    const name = (document.getElementById('designerLevelName')||{}).value || ('Ozel Seviye');
-    const groupName = ((document.getElementById('designerGroup')||{}).value || 'Ozel').trim() || 'Ozel';
+    const name = (document.getElementById('designerLevelName')||{}).value || ('Özel Seviye');
+    const groupName = ((document.getElementById('designerGroup')||{}).value || 'Özel').trim() || 'Özel';
     const levelOrder = Math.max(1, parseInt((document.getElementById('designerLevelOrder')||{}).value) || 1);
     const levelXp = normalizeLevelXp((document.getElementById('designerLevelXp')||{}).value);
     if(!designerDraft) designerDraft = makeEmptyDesignerDraft();
@@ -1339,7 +1339,7 @@ function saveDesignerLevel(){
       populateLevels();
       const newIndex = levels.findIndex(l => Number(l?.id) === Number(newLevel.id));
       loadLevel(newIndex >= 0 ? newIndex : 0);
-      setStatus('Yeni seviye tasarlandi ve yuklendi: ' + name);
+      setStatus('Yeni seviye tasarlandı ve yüklendi: ' + name);
     }
 
     try{ if(window.Blockly && workspace) workspace.clear(); }catch(e){}
@@ -1356,10 +1356,10 @@ function addCurrentAsLevel(){
     const base = levels[state.levelIndex];
     const nextId = Math.max(...levels.map(l=>l.id))+1;
     const nameInput = document.getElementById('newLevelName');
-    const name = (nameInput && nameInput.value.trim()) ? nameInput.value.trim() : ('Ã–zel Seviye ' + nextId);
-    // if designerGroup input exists in the UI, use it; otherwise default to 'Ã–zel'
+    const name = (nameInput && nameInput.value.trim()) ? nameInput.value.trim() : ('Özel Seviye ' + nextId);
+    // if designerGroup input exists in the UI, use it; otherwise default to 'Özel'
     const groupInput = document.getElementById('designerGroup');
-    const groupName = (groupInput && groupInput.value.trim()) ? groupInput.value.trim() : 'Ã–zel';
+    const groupName = (groupInput && groupInput.value.trim()) ? groupInput.value.trim() : 'Özel';
     const xmlText = (window.Blockly && workspace) ? Blockly.Xml.domToText(Blockly.Xml.workspaceToDom(workspace)) : '';
     const code = generateExecutableJS();
     const newLevel = JSON.parse(JSON.stringify(base));
@@ -1396,23 +1396,23 @@ function addCurrentAsLevel(){
     // Clear Blockly workspace so the user can start solving the new level from empty
     try{ if(window.Blockly && workspace) workspace.clear(); }catch(e){ /* ignore */ }
     // reset commands view
-    const cmdsPre = document.getElementById('commandsPre'); if(cmdsPre) cmdsPre.textContent = '// Buraya bloklar ile Ã§Ã¶zÃ¼m yazÄ±lacak';
-    setStatus('Yeni seviye eklendi ve workspace temizlendi: ' + name + ' â€” ÅŸimdi Ã§Ã¶zebilirsin.');
+    const cmdsPre = document.getElementById('commandsPre'); if(cmdsPre) cmdsPre.textContent = '// Buraya bloklar ile çözüm yazılacak';
+    setStatus('Yeni seviye eklendi ve workspace temizlendi: ' + name + ' - şimdi çözebilirsin.');
     // close menu
     const sideMenu = document.getElementById('sideMenu'); if(sideMenu) { sideMenu.classList.add('hidden'); sideMenu.setAttribute('aria-hidden','true'); }
-  }catch(e){ console.warn('addCurrentAsLevel', e); setStatus('Seviye eklenirken hata oluÅŸtu'); }
+  }catch(e){ console.warn('addCurrentAsLevel', e); setStatus('Seviye eklenirken hata oluştu'); }
 }
 
 function exportBlocklyXml(){
   try{
-    if(!window.Blockly || !workspace){ setStatus('Blockly yÃ¼klÃ¼ deÄŸil'); return; }
+    if(!window.Blockly || !workspace){ setStatus('Blockly yüklü değil'); return; }
     const xml = Blockly.Xml.domToPrettyText(Blockly.Xml.workspaceToDom(workspace));
     // download as file
     const blob = new Blob([xml], {type:'text/xml'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = 'workspace.xml'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-    setStatus('Blockly XML dÄ±ÅŸa aktarÄ±ldÄ±');
-  }catch(e){ console.warn('exportBlocklyXml', e); setStatus('DÄ±ÅŸa aktarÄ±m baÅŸarÄ±sÄ±z'); }
+    setStatus('Blockly XML dışa aktarıldı');
+  }catch(e){ console.warn('exportBlocklyXml', e); setStatus('Dışa aktarım başarısız'); }
 }
 
 // --- Level editor and persistence ---
@@ -1509,13 +1509,13 @@ function saveLevelsToStorage(){
           } else {
             loadLevel(state.levelIndex);
           }
-          setStatus(`Seviye aralÄ±ÄŸÄ±: ${start}-${end}`);
+          setStatus(`Seviye aralığı: ${start}-${end}`);
         }catch(err){/* ignore */}
       }
       else if(data.type === 'FORCE_ASSIGNMENT_LOCK'){
         try{
           assignmentRangeLocked = true;
-          setStatus('Ã–dev aralÄ±ÄŸÄ± tamamlandÄ±');
+          setStatus('Ödev aralığı tamamlandı');
         }catch(err){/* ignore */}
       }
       else if(data.type === 'SET_ASSIGNMENT_PROGRESS'){
@@ -1569,7 +1569,7 @@ function saveLevelsToStorage(){
 
 // Level editor removed: editor UI and canvas editing handlers were deleted
 // boot
-// (removed START_SESSION handler â€” sessionStart set when user interacts inside iframe)
+// (removed START_SESSION handler - sessionStart set when user interacts inside iframe)
 
 // boot
 loadStoredLevels();

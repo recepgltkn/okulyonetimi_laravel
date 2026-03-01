@@ -1,5 +1,5 @@
-﻿/* ================= FIREBASE ================= */
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+﻿/* ================= MYSQL ADAPTER ================= */
+import { initializeApp } from "./mysql-client-adapter.js";
 import {
   getAuth,
   signInWithEmailAndPassword,
@@ -8,9 +8,9 @@ import {
   deleteUser as deleteAuthUser,
   onAuthStateChanged,
   signOut
-} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+} from "./mysql-client-adapter.js";
 import {
-  getFirestore,
+  getStore,
   doc,
   setDoc,
   getDoc,
@@ -28,26 +28,19 @@ import {
   getDocs,
   writeBatch,
   collectionGroup
-} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+} from "./mysql-client-adapter.js";
 import {
   getFunctions,
   httpsCallable
-} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js";
+} from "./mysql-client-adapter.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyAdqw2UN55YmKT1AdkkrQ-QNZJ6qGdeP5k",
-  authDomain: "okulportali.firebaseapp.com",
-  projectId: "okulportali",
-  storageBucket: "okulportali.firebasestorage.app",
-  messagingSenderId: "375223980753",
-  appId: "1:375223980753:web:67e2d4f6609ee4e7022bf0"
-};
+const appConfig = {};
 
-const app = initializeApp(firebaseConfig);
+const app = initializeApp(appConfig);
 const auth = getAuth(app);
-const secondaryApp = initializeApp(firebaseConfig, "Secondary");
+const secondaryApp = initializeApp(appConfig, "Secondary");
 const secondaryAuth = getAuth(secondaryApp);
-const db = getFirestore(app);
+const db = getStore(app);
 const functions = getFunctions(app);
 const deleteUserByAdmin = httpsCallable(functions, "deleteUserByAdmin");
 const setUserPasswordByAdmin = httpsCallable(functions, "setUserPasswordByAdmin");
@@ -638,7 +631,7 @@ window.openBlockRunner = async function(userId, options = {}){
   setActivityStartButtons(false);
   setActivityPausedUI(false);
   const timerEl = document.getElementById("activity-timer");
-  if (timerEl) timerEl.innerText = "⏱️ 0 dk 0 sn";
+  if (timerEl) timerEl.innerText = "⏱ 0 dk 0 sn";
   modal.classList.add("block-runner-mode");
   modal.classList.toggle("teacher-block-runner", userRole === "teacher");
   setComputeTeacherHeaderMode(false);
@@ -733,7 +726,7 @@ window.openBlockRunner = async function(userId, options = {}){
     sendBlockRunnerInitMessages(null);
   }, { once: true });
 
-  // Try to load saved state from Firestore and send to iframe
+  // Try to load saved state from MySQL API and send to iframe
   try{
     let payload = null;
     if (userRole === "teacher") {
@@ -876,7 +869,7 @@ window.addEventListener('message', async function(e){
   const isBlock3DSource = data.source === "block-3d";
   const isSilentTeacherSource = data.source === "silent-teacher";
   const isLightbotSource = data.source === "lightbot";
-  // Save/Update game state in Firestore
+  // Save/Update game state in MySQL API
   if(data.type === 'GAME_UPDATE'){
     if (isLightbotSource) {
       try {
@@ -1944,7 +1937,7 @@ function showCompletionCelebration({
         : p.hours > 0
           ? `${p.hours}s ${p.mins}dk ${p.secs}sn`
           : `${p.mins} dk ${p.secs} sn`;
-      infoRow.appendChild(infoPill(`🧭 ${txt}`));
+      infoRow.appendChild(infoPill(`⏱ ${txt}`));
     }
 
     const canvas = document.createElement("canvas");
@@ -2728,7 +2721,7 @@ function startTeacherHomeQuizListener() {
     const visibleRows = rows.filter((qz) => !qz?.isDeleted);
     countEl.innerText = String(visibleRows.length);
     if (!visibleRows.length) {
-      list.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🧠</div>Henüz quiz eklenmedi.</div>`;
+      list.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📝</div>Henüz quiz eklenmedi.</div>`;
       if (completedList) completedList.innerHTML = "";
       if (noPendingEl) noPendingEl.style.display = "none";
       if (noCompletedEl) noCompletedEl.style.display = "none";
@@ -3999,7 +3992,7 @@ function startStudentLiveQuizListener() {
       if (!playerOpen) {
         invite.style.display = "flex";
         if (lastLiveInviteSessionId !== live.id) {
-          showNotice("🔔 Canlı quize katıl bildirimi", "#f97316");
+          showNotice("📣 Canlı quize katıl bildirimi", "#f97316");
         }
       }
       lastLiveInviteSessionId = live.id;
@@ -5033,6 +5026,22 @@ function updateUserXPDisplay(taskXP) {
   const total = Math.max(computedTotal, persistedTotal);
   const el = document.getElementById("user-xp");
   if (el) el.innerText = `${total} XP`;
+  if (currentUserId && Array.isArray(leaderboardRowsCache) && leaderboardRowsCache.length) {
+    let changed = false;
+    leaderboardRowsCache = leaderboardRowsCache.map((row) => {
+      if (String(row.id) !== String(currentUserId)) return row;
+      if (Number(row.xp || 0) === Number(total)) return row;
+      changed = true;
+      return { ...row, xp: Number(total) };
+    });
+    if (changed) {
+      leaderboardRowsCache = buildLeaderboardRankedRows(leaderboardRowsCache);
+      renderLeaderboardPreview(leaderboardRowsCache);
+      if (document.getElementById("leaderboard-modal")?.style.display === "flex") {
+        renderLeaderboardModalList();
+      }
+    }
+  }
   if (avatarShopModal && avatarShopModal.style.display === "flex") {
     renderAvatarShop();
   }
@@ -5193,7 +5202,7 @@ function updateBlockRunnerTimerUI() {
   const mins = Math.floor(sec / 60);
   const secs = sec % 60;
   const el = document.getElementById("block-runner-timer");
-  if (el) el.innerText = `⏱️ ${mins} dk ${secs} sn`;
+  if (el) el.innerText = `⏱ ${mins} dk ${secs} sn`;
 }
 
 function setBlockRunnerHeaderByRole() {
@@ -5244,7 +5253,7 @@ function setBlockRunnerStartButton(running) {
   const pauseBtn = document.getElementById("btn-activity-resume");
   if (pauseTitle) pauseTitle.innerText = running ? "Çalışıyor" : "Hazır";
   if (pauseBtn) {
-    pauseBtn.innerHTML = "▶";
+    pauseBtn.innerHTML = "?";
     pauseBtn.classList.add("btn-play-resume");
     pauseBtn.title = "Devam Et";
     pauseBtn.setAttribute("aria-label", "Devam Et");
@@ -5290,7 +5299,7 @@ function updateComputeRunnerTimerUI() {
   const mins = Math.floor(sec / 60);
   const secs = sec % 60;
   const el = document.getElementById("block-runner-timer");
-  if (el) el.innerText = `⏱️ ${mins} dk ${secs} sn`;
+  if (el) el.innerText = `⏱ ${mins} dk ${secs} sn`;
 }
 
 function pauseComputeRunnerTimer() {
@@ -5753,7 +5762,7 @@ function closeBlockRunnerView() {
   setBlockRunnerStartButton(false);
   setActivityPausedUI(false);
   const timerLabel = document.getElementById("block-runner-timer");
-  if (timerLabel) timerLabel.innerText = "⏱️ 0 dk 0 sn";
+  if (timerLabel) timerLabel.innerText = "⏱ 0 dk 0 sn";
 }
 
 function taskMatchesStudent(task) {
@@ -6107,7 +6116,7 @@ window.openComputeItRunner = async function(userId, options = {}){
   const fullBar = document.getElementById("activity-fullbar");
   if (fullBar) fullBar.style.display = "none";
   const timerEl = document.getElementById("block-runner-timer");
-  if (timerEl) timerEl.innerText = "⏱️ 0 dk 0 sn";
+  if (timerEl) timerEl.innerText = "⏱ 0 dk 0 sn";
   const sendComputeRunnerRoleState = () => {
     try {
       if (!iframe.contentWindow) return;
@@ -6271,7 +6280,7 @@ window.openLineTraceRunner = function(options = {}) {
   if (fullStartBtn) fullStartBtn.style.display = "none";
   if (fullSaveBtn) fullSaveBtn.style.display = "none";
   if (fullExitBtn) {
-    fullExitBtn.innerText = "✕";
+    fullExitBtn.innerText = "?";
     fullExitBtn.title = "Çık";
     fullExitBtn.classList.add("line-trace-close-btn");
   }
@@ -6329,7 +6338,7 @@ window.openSilentTeacherRunner = function(options = {}) {
   if (fullStartBtn) fullStartBtn.style.display = "none";
   if (fullSaveBtn) fullSaveBtn.style.display = "none";
   if (fullExitBtn) {
-    fullExitBtn.innerText = "✕";
+    fullExitBtn.innerText = "?";
     fullExitBtn.title = "Çık";
     fullExitBtn.classList.add("line-trace-close-btn");
   }
@@ -6387,7 +6396,7 @@ window.openLightbotRunner = function(options = {}) {
   if (fullStartBtn) fullStartBtn.style.display = "none";
   if (fullSaveBtn) fullSaveBtn.style.display = "none";
   if (fullExitBtn) {
-    fullExitBtn.innerText = "✕";
+    fullExitBtn.innerText = "?";
     fullExitBtn.title = "Çık";
     fullExitBtn.classList.add("line-trace-close-btn");
   }
@@ -7031,7 +7040,7 @@ function renderFlowAssignmentTimer() {
   const sec = getFlowAssignmentElapsedSeconds();
   const mins = Math.floor(sec / 60);
   const secs = sec % 60;
-  timerEl.innerText = `⏱️ ${mins} dk ${secs} sn`;
+  timerEl.innerText = `⏱ ${mins} dk ${secs} sn`;
 }
 
 function startFlowAssignmentTimer(initialSeconds = 0) {
@@ -9718,39 +9727,41 @@ if (deleteBlockHomeworkBtn) {
   };
 }
 
+async function openComputeHomeworkModalWithDefaults() {
+  if (userRole !== "teacher") return;
+  editingComputeHomeworkId = null;
+  const saveBtn = document.getElementById("btn-save-compute-homework");
+  const deleteBtn = document.getElementById("btn-delete-compute-homework");
+  if (saveBtn) saveBtn.innerText = "Kaydet";
+  if (deleteBtn) deleteBtn.style.display = "none";
+  const titleInput = document.getElementById("compute-hw-title");
+  const classInput = document.getElementById("compute-hw-class");
+  const sectionInput = document.getElementById("compute-hw-section");
+  const deadlineInput = document.getElementById("compute-hw-deadline");
+  const deadlineTimeInput = document.getElementById("compute-hw-deadline-time");
+  if (titleInput) titleInput.value = "";
+  if (classInput) classInput.value = "";
+  if (sectionInput) sectionInput.value = "";
+  if (deadlineInput) deadlineInput.value = "";
+  if (deadlineTimeInput) deadlineTimeInput.value = "23:59";
+  const maxLevels = await getAvailableComputeLevelCount();
+  const startInput = document.getElementById("compute-hw-level-start");
+  const endInput = document.getElementById("compute-hw-level-end");
+  if (startInput) {
+    startInput.max = String(maxLevels);
+    startInput.value = "1";
+  }
+  if (endInput) {
+    endInput.max = String(maxLevels);
+    endInput.value = String(maxLevels);
+  }
+  const modal = document.getElementById("compute-homework-modal");
+  if (modal) modal.style.display = "flex";
+}
+
 const createComputeHomeworkBtn = document.getElementById("btn-create-compute-homework");
 if (createComputeHomeworkBtn) {
-  createComputeHomeworkBtn.onclick = async function () {
-    if (userRole !== "teacher") return;
-    editingComputeHomeworkId = null;
-    const saveBtn = document.getElementById("btn-save-compute-homework");
-    const deleteBtn = document.getElementById("btn-delete-compute-homework");
-    if (saveBtn) saveBtn.innerText = "Kaydet";
-    if (deleteBtn) deleteBtn.style.display = "none";
-    const titleInput = document.getElementById("compute-hw-title");
-    const classInput = document.getElementById("compute-hw-class");
-    const sectionInput = document.getElementById("compute-hw-section");
-    const deadlineInput = document.getElementById("compute-hw-deadline");
-    const deadlineTimeInput = document.getElementById("compute-hw-deadline-time");
-    if (titleInput) titleInput.value = "";
-    if (classInput) classInput.value = "";
-    if (sectionInput) sectionInput.value = "";
-    if (deadlineInput) deadlineInput.value = "";
-    if (deadlineTimeInput) deadlineTimeInput.value = "23:59";
-    const maxLevels = await getAvailableComputeLevelCount();
-    const startInput = document.getElementById("compute-hw-level-start");
-    const endInput = document.getElementById("compute-hw-level-end");
-    if (startInput) {
-      startInput.max = String(maxLevels);
-      startInput.value = "1";
-    }
-    if (endInput) {
-      endInput.max = String(maxLevels);
-      endInput.value = String(maxLevels);
-    }
-    const modal = document.getElementById("compute-homework-modal");
-    if (modal) modal.style.display = "flex";
-  };
+  createComputeHomeworkBtn.onclick = openComputeHomeworkModalWithDefaults;
 }
 
 const closeComputeHomeworkModalBtn = document.getElementById("btn-close-compute-homework-modal");
@@ -11064,12 +11075,12 @@ onAuthStateChanged(auth, (user) => {
     document.getElementById("teacher-filters").style.display = "none";
     document.getElementById("tasks-title").innerText = isTeacher ? "📚 Verilen Ödevler" : "📚 Ödevlerim";
     document.getElementById("leaderboard-section").style.display = isTeacher ? "none" : "block";
-    document.getElementById("activities-title").innerText = isTeacher ? "🎯 Verilen Etkinlikler" : "🎯 Etkinliklerim";
+    document.getElementById("activities-title").innerText = isTeacher ? "🧩 Verilen Etkinlikler" : "🧩 Etkinliklerim";
     document.getElementById("activities-tabs").style.display = "flex";
     document.getElementById("activities-teacher-stats").style.display = isTeacher ? "block" : "none";
     const blockTitle = document.getElementById("block-homework-title");
     if (blockTitle) {
-      blockTitle.innerText = isTeacher ? "" : "🧩 Blok Kodlama Ödevim";
+      blockTitle.innerText = isTeacher ? "" : "🧱 Blok Kodlama Ödevim";
       blockTitle.style.display = isTeacher ? "none" : "";
     }
     const blockAssignTabs = document.getElementById("block-homework-assign-tabs");
@@ -11091,7 +11102,7 @@ onAuthStateChanged(auth, (user) => {
       setBlockAssignCreateButton("block2d");
     }
     const computeTitle = document.getElementById("compute-homework-title");
-    if (computeTitle) computeTitle.innerText = isTeacher ? "🧠 Verilen Compute It Ödevleri" : "🧠 Compute It Ödevim";
+    if (computeTitle) computeTitle.innerText = isTeacher ? "🧮 Verilen Compute It Ödevleri" : "🧮 Compute It Ödevim";
     const computeTabs = document.getElementById("compute-homework-tabs");
     if (computeTabs) computeTabs.style.display = "flex";
     const computeTeacherStats = document.getElementById("compute-homework-teacher-stats");
@@ -11116,10 +11127,7 @@ onAuthStateChanged(auth, (user) => {
     if (inlineComputeCreateBtn) {
       inlineComputeCreateBtn.style.display = isTeacher ? 'inline-flex' : 'none';
       inlineComputeCreateBtn.innerText = 'Ödev Ver';
-      inlineComputeCreateBtn.onclick = function () {
-        const computeCreate = document.getElementById("btn-create-compute-homework");
-        if (computeCreate) computeCreate.click();
-      };
+      inlineComputeCreateBtn.onclick = openComputeHomeworkModalWithDefaults;
     }
     const activityFilters = document.getElementById("activity-filters");
     if (activityFilters) activityFilters.style.display = "none";
@@ -11225,7 +11233,7 @@ onAuthStateChanged(auth, (user) => {
     const topStudentsCard = document.getElementById("top-students-card");
     if (topStudentsCard) topStudentsCard.style.display = isTeacher ? "block" : "none";
     const lessonsTitle = document.getElementById("lessons-title");
-    if (lessonsTitle) lessonsTitle.innerText = isTeacher ? "📑 Verilen Dersler" : "📑 Derslerim";
+    if (lessonsTitle) lessonsTitle.innerText = isTeacher ? "📖 Verilen Dersler" : "📖 Derslerim";
     const lessonsTabs = document.getElementById("lessons-tabs");
     if (lessonsTabs) lessonsTabs.style.display = "flex";
     const lessonsTeacherStats = document.getElementById("lessons-teacher-stats");
@@ -11558,7 +11566,7 @@ function createTaskElement(task, isCompleted, completionData, manualProgress) {
       if (completionData.duration) {
         const mins = Math.floor(completionData.duration / 60);
         const secs = completionData.duration % 60;
-        timeInfo = `<small style="color:#666;display:block;margin-top:4px;">⏱️ ${mins}dk ${secs}sn</small>`;
+        timeInfo = `<small style="color:#666;display:block;margin-top:4px;">⏱ ${mins}dk ${secs}sn</small>`;
       }
     } else {
       if (isExpired) {
@@ -11570,7 +11578,7 @@ function createTaskElement(task, isCompleted, completionData, manualProgress) {
       if (deadline) {
         const daysLeft = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
         if (daysLeft > 0) {
-          deadlineInfo = `<small style="color:${daysLeft <= 2 ? '#e74c3c' : '#f39c12'};display:block;margin-top:4px;">⏳ ${daysLeft} gün kaldı</small>`;
+          deadlineInfo = `<small style="color:${daysLeft <= 2 ? '#e74c3c' : '#f39c12'};display:block;margin-top:4px;">? ${daysLeft} gün kaldı</small>`;
         } else if (daysLeft === 0) {
           deadlineInfo = `<small style="color:#e74c3c;display:block;margin-top:4px;">⚠️ Bugün son gün!</small>`;
         }
@@ -11589,13 +11597,13 @@ function createTaskElement(task, isCompleted, completionData, manualProgress) {
     const totalStudents = studentIdSet.size || allStudents.length || 0;
     const suffix = totalStudents ? `/${totalStudents}` : "";
     const controlBadge = requiresTeacherApprovalTask(task)
-      ? `<span class="badge badge-danger">🟠 Kontrol Gerekli</span> `
+      ? `<span class="badge badge-danger">⚠️ Kontrol Gerekli</span> `
       : "";
     const rewardXP = getTaskRewardXP(task);
     const dateInline = deadline ? ` • 📅 ${deadline.toLocaleDateString('tr-TR')}` : "";
     const xpInfo = requiresTeacherApprovalTask(task)
-      ? `<small style="color:#7c2d12;display:block;margin-top:4px;">⭐ Onaylanınca +${rewardXP} XP${dateInline}</small>`
-      : `<small style="color:#1e40af;display:block;margin-top:4px;">⭐ Tamamlayınca +${rewardXP} XP${dateInline}</small>`;
+      ? `<small style="color:#7c2d12;display:block;margin-top:4px;">? Onaylanınca +${rewardXP} XP${dateInline}</small>`
+      : `<small style="color:#1e40af;display:block;margin-top:4px;">? Tamamlayınca +${rewardXP} XP${dateInline}</small>`;
     badge = `${controlBadge}<span class="badge badge-info" style="font-size:1.02rem; padding:8px 14px;">${uniqueCount}${suffix} tamamlama</span>`;
     deadlineInfo = "";
     timeInfo = xpInfo;
@@ -11984,7 +11992,7 @@ async function openTaskModal(id, data, isCompleted = false) {
       if (bookApprovalTitle) {
         bookApprovalTitle.innerText = isBookOnlyTask(data)
           ? "📘 Kitap/Test Ödevi Onayı"
-          : "🗂️ Sorusuz Ödev Onayı";
+          : "📝 Sorusuz Ödev Onayı";
       }
       await populateClassSectionFilters(
         document.getElementById("book-approve-class"),
@@ -12032,7 +12040,7 @@ async function openTaskModal(id, data, isCompleted = false) {
       const prog = await getBookTaskProgress(id, currentUserId);
       const approved = !!prog?.approved;
       startBtn.style.display = "none";
-      if (bookTaskTitle) bookTaskTitle.innerText = isBookOnlyTask(data) ? "📗 Kitap/Test Ödevi" : "🗂️ Sorusuz Ödev";
+      if (bookTaskTitle) bookTaskTitle.innerText = isBookOnlyTask(data) ? "📘 Kitap/Test Ödevi" : "📝 Sorusuz Ödev";
       if (bookTaskNote) {
         bookTaskNote.innerText = isBookOnlyTask(data)
           ? "Not: Bitirdim dediğinizde öğretmen onayı gerekir."
@@ -12044,7 +12052,7 @@ async function openTaskModal(id, data, isCompleted = false) {
         if (bookActions) bookActions.style.display = "none";
         if (completedInfo) {
           completedInfo.style.display = "block";
-          document.getElementById("completed-score").innerText = `✅ Bu ödev tamamlandı ve onaylandı. +${MANUAL_TASK_APPROVAL_XP} XP`;
+          document.getElementById("completed-score").innerText = `? Bu ödev tamamlandı ve onaylandı. +${MANUAL_TASK_APPROVAL_XP} XP`;
           document.getElementById("completed-time").innerText = "Ödül XP hesabına işlendi.";
         }
       } else {
@@ -12381,7 +12389,7 @@ function updateGameTimer() {
   const elapsed = Math.floor((Date.now() - gameStartTime) / 1000);
   const mins = Math.floor(elapsed / 60).toString().padStart(2, '0');
   const secs = (elapsed % 60).toString().padStart(2, '0');
-  document.getElementById("game-timer").innerText = `⏱️ ${mins}:${secs}`;
+  document.getElementById("game-timer").innerText = `⏱ ${mins}:${secs}`;
 }
 
 function showQuestion() {
@@ -12454,7 +12462,7 @@ function checkAnswer(selected, correct, btnElement) {
   if (isCorrect) {
     btnElement.classList.add("correct");
     correctAnswers++;
-    showNotice("Doğru! ✅", "#2ecc71");
+    showNotice("Doğru! ?", "#2ecc71");
   } else {
     btnElement.classList.add("wrong");
     showNotice("Yanlış!", "#e74c3c");
@@ -12479,12 +12487,12 @@ function checkFillAnswer(selected, correct) {
   if (isCorrect) {
     resultDiv.style.background = "#d4edda";
     resultDiv.style.color = "#155724";
-    resultDiv.innerText = "✅ Doğru!";
+    resultDiv.innerText = "? Doğru!";
     correctAnswers++;
   } else {
     resultDiv.style.background = "#f8d7da";
     resultDiv.style.color = "#721c24";
-    resultDiv.innerText = "❌ Yanlış! Doğru: " + correct;
+    resultDiv.innerText = "? Yanlış! Doğru: " + correct;
   }
   
   container.appendChild(resultDiv);
@@ -12522,7 +12530,7 @@ function showGameResults() {
   `;
   
   document.getElementById("time-result").innerHTML = `
-    <strong>⏱️ Tamamlama Süresi:</strong> ${mins} dakika ${secs} saniye
+    <strong>? Tamamlama Süresi:</strong> ${mins} dakika ${secs} saniye
   `;
   
   const saveBtn = document.getElementById("btn-complete");
@@ -12607,7 +12615,7 @@ function backToMain() {
   document.getElementById("dynamic-game-container").innerHTML = "";
   document.getElementById("game-results").style.display = "none";
   document.getElementById("btn-complete").style.display = "none";
-  document.getElementById("game-timer").innerText = "⏱️ 00:00";
+  document.getElementById("game-timer").innerText = "⏱ 00:00";
   
   updateTaskLists();
   
@@ -12777,16 +12785,17 @@ function loadLeaderboard() {
         const studentOwner = String(data?.ownerTeacherId || data?.createdBy || "");
         if (myOwner && myOwner !== studentOwner) return;
       }
-      const fallbackXP = reportsXPMap.get(docSnap.id) || 0;
-      users.push({
-        id: docSnap.id,
-        name: getUserDisplayName(data),
-        className: String(data.className || "").trim(),
-        section: String(data.section || "").trim(),
-        selectedAvatarId: String(data.selectedAvatarId || AVATAR_DEFAULT_ID),
-        xp: Math.max(getStudentXPValue({ id: docSnap.id, ...data }), fallbackXP)
-      });
+    const fallbackXP = reportsXPMap.get(docSnap.id) || 0;
+    const liveXP = String(docSnap.id) === String(currentUserId) ? getEffectiveStudentXP() : 0;
+    users.push({
+      id: docSnap.id,
+      name: getUserDisplayName(data),
+      className: String(data.className || "").trim(),
+      section: String(data.section || "").trim(),
+      selectedAvatarId: String(data.selectedAvatarId || AVATAR_DEFAULT_ID),
+      xp: Math.max(getStudentXPValue({ id: docSnap.id, ...data }), fallbackXP, liveXP)
     });
+  });
     leaderboardRowsCache = buildLeaderboardRankedRows(users);
     renderLeaderboardPreview(leaderboardRowsCache);
     populateLeaderboardFilters(leaderboardRowsCache);
@@ -13140,7 +13149,7 @@ function renderLoginCardsModal() {
             <span class="val">${escapeHtmlBasic(username)}</span>
           </div>
           <div class="login-card-field">
-            <span class="icon">👤</span>
+            <span class="icon">🏫</span>
             <span class="val">${escapeHtmlBasic(pass)}</span>
           </div>
         </div>
@@ -13203,7 +13212,7 @@ function openLoginCardsPrintPreview() {
             <div class="print-val">${username}</div>
           </div>
           <div class="print-row">
-            <div class="print-icon">👤</div>
+            <div class="print-icon">🏫</div>
             <div class="print-val">${pass}</div>
           </div>
           <div class="print-foot">Öğrenci Giriş Kartı</div>
@@ -15160,7 +15169,7 @@ function renderBlockHomeworkList() {
         <div>
           <div style="font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${a.title || `${appLabel} Ödevi`} ${appBadge}</div>
           <small style="color:#666;">📅 ${a.deadline || "-"} • ${isFlowchart ? "Flowchart Soru" : (isSilentTeacher || isLightbot) ? `Bolum ${rangeText}` : `Seviye ${rangeText}`}</small>
-          ${isFlowchart ? `<small style="color:#666;display:block;">🔀 ${a.flowQuestion || "Flowchart şemasını kur"}</small>` : ""}
+          ${isFlowchart ? `<small style="color:#666;display:block;">🧭 ${a.flowQuestion || "Flowchart şemasını kur"}</small>` : ""}
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
           <span class="completion-badge">%${percent}</span>
@@ -16329,7 +16338,7 @@ function renderLessonPlayer() {
       const b = document.createElement("button");
       b.className = "btn";
       b.style.cssText = `width:100%;text-align:left;margin-bottom:6px;background:${i === st.index ? "#dbeafe" : "#f8fafc"};border:1px solid #e5e7eb;`;
-      const done = st.visited.has(i) ? "✅ " : "";
+      const done = st.visited.has(i) ? "? " : "";
       b.innerText = `${done}${i + 1}. ${s.title || "Slide"}`;
       b.onclick = () => {
         st.index = i;
@@ -16451,7 +16460,7 @@ function renderLessonPlayer() {
       ? '<button id="btn-save-question-answer" class="btn btn-primary" style="margin-top:8px;">Cevabı Kaydet</button>'
       : "";
     const statusHtml = hasAnswered
-      ? `<div style="margin-top:8px;font-size:12px;font-weight:700;color:${answeredCorrect ? "#22c55e" : "#ef4444"};">${answeredCorrect ? "✅ Doğru cevap" : "❌ Yanlış cevap"}</div>`
+      ? `<div style="margin-top:8px;font-size:12px;font-weight:700;color:${answeredCorrect ? "#22c55e" : "#ef4444"};">${answeredCorrect ? "? Doğru cevap" : "? Yanlış cevap"}</div>`
       : "";
     questionBlock = `
       <div style="background:${cardBg};color:${cardText};padding:14px;border-radius:10px;border:1px solid ${cardBorder};margin-top:${hasContent ? "10px" : "0"};">
@@ -17851,7 +17860,7 @@ async function showCompletionInfoPopup({ category = "İçerik", title = "", xp =
   await infoDialog(html, {
     allowHtml: true,
     title: "Tamamlandı Bilgisi",
-    iconText: "✅",
+    iconText: "✓",
     iconBg: "#dcfce7",
     iconColor: "#15803d",
     showContinue: false,
@@ -17924,7 +17933,7 @@ function infoDialog(message, options = {}) {
     }
     if (contBtn) {
       const continueLabel = options.continueText || "Devam Et";
-      contBtn.innerHTML = options.continueHtml || `<span class="play-ico">▶</span>`;
+      contBtn.innerHTML = options.continueHtml || `<span class="play-ico">?</span>`;
       contBtn.className = options.continueClass || "btn btn-continue-play";
       contBtn.style.background = options.continueBg || "";
       contBtn.style.color = options.continueColor || "";
@@ -18657,9 +18666,9 @@ function updateActivityTimerUI() {
   const mins = Math.floor(elapsed / 60);
   const secs = elapsed % 60;
   const timerEl = document.getElementById("activity-timer");
-  if (timerEl) timerEl.innerText = `⏱️ ${mins} dk ${secs} sn`;
+  if (timerEl) timerEl.innerText = `⏱ ${mins} dk ${secs} sn`;
   const fullTimer = document.getElementById("activity-full-timer");
-  if (fullTimer) fullTimer.innerText = `⏱️ ${mins} dk ${secs} sn`;
+  if (fullTimer) fullTimer.innerText = `⏱ ${mins} dk ${secs} sn`;
   const fullTitle = document.getElementById("activity-full-title");
   if (fullTitle) fullTitle.innerText = document.getElementById("activity-title")?.innerText || "Uygulama";
 }
@@ -18846,9 +18855,9 @@ async function stopActivitySession(opts = {}) {
     if (activityTimerInterval) clearInterval(activityTimerInterval);
     activityTimerInterval = null;
     const timerEl = document.getElementById("activity-timer");
-    if (timerEl) timerEl.innerText = "⏱️ 0 dk 0 sn";
+    if (timerEl) timerEl.innerText = "⏱ 0 dk 0 sn";
     const fullTimer = document.getElementById("activity-full-timer");
-    if (fullTimer) fullTimer.innerText = "⏱️ 0 dk 0 sn";
+    if (fullTimer) fullTimer.innerText = "⏱ 0 dk 0 sn";
     setActivityStartButtons(false);
     setActivityPausedUI(false);
     activitySession = null;
@@ -19373,7 +19382,7 @@ async function startAppSession(content, item, appUsage, completedSet, answers, o
   iframe.src = item.appLink || "about:blank";
   setupIframeFallback(iframe, item.appLink);
   const timerEl = document.getElementById("app-timer");
-  if (timerEl) timerEl.innerText = "⏱️ 0 dk 0 sn";
+  if (timerEl) timerEl.innerText = "⏱ 0 dk 0 sn";
   const titleEl = document.getElementById("app-title");
   if (titleEl) titleEl.innerText = item.appTitle || "Uygulama";
   const linkEl = document.getElementById("app-link");
@@ -19394,7 +19403,7 @@ async function startAppSession(content, item, appUsage, completedSet, answers, o
     const elapsed = Math.max(0, Math.round((Date.now() - activeAppSession.start) / 1000));
     const mins = Math.floor(elapsed / 60);
     const secs = elapsed % 60;
-    if (timerEl) timerEl.innerText = `⏱️ ${mins} dk ${secs} sn`;
+    if (timerEl) timerEl.innerText = `⏱ ${mins} dk ${secs} sn`;
   }, 1000);
 }
 
@@ -19428,7 +19437,7 @@ async function stopActiveAppSession() {
   if (appTimerInterval) clearInterval(appTimerInterval);
   appTimerInterval = null;
   const timerEl = document.getElementById("app-timer");
-  if (timerEl) timerEl.innerText = "⏱️ 0 dk 0 sn";
+  if (timerEl) timerEl.innerText = "⏱ 0 dk 0 sn";
   const titleEl = document.getElementById("app-title");
   if (titleEl) titleEl.innerText = "Uygulama";
   const linkEl = document.getElementById("app-link");
@@ -19533,7 +19542,7 @@ function renderContentItemsEditor() {
 
     wrap.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-        <div><span class="drag-handle">⋮⋮</span> <strong>${item.type}</strong></div>
+        <div><span class="drag-handle">|</span> <strong>${item.type}</strong></div>
         <button class="btn btn-danger btn-delete-item" data-index="${index}" style="padding:6px 10px;">Sil</button>
       </div>
       ${inner}
@@ -21030,7 +21039,7 @@ async function showStudentDetail(student, completions, rank) {
           </span>
         </div>
         <small style="color: #666; display: block; margin-top: 5px;">
-          📅 ${task.date} | ⏱️ ${mins}dk ${secs}sn | ⭐ +${task.xp} XP
+          📅 ${task.date} | ⏱ ${mins}dk ${secs}sn | ➕ +${task.xp} XP
         </small>
       `;
       historyContainer.appendChild(div);
@@ -21085,7 +21094,7 @@ async function showStudentDetail(student, completions, rank) {
             <span class="badge ${cls}">%${act.percent}</span>
           </div>
           <small style="color: #666; display: block; margin-top: 5px;">
-            📅 ${act.updatedAt} | ⏱️ ${mins}dk ${secs}sn
+            📅 ${act.updatedAt} | ⏱ ${mins}dk ${secs}sn
           </small>
         `;
         contentHistoryContainer.appendChild(div);
@@ -21106,7 +21115,7 @@ async function showStudentDetail(student, completions, rank) {
             <span class="badge ${qz.successRate >= 80 ? 'badge-success' : qz.successRate >= 60 ? 'badge-info' : 'badge-pending'}">%${qz.successRate}</span>
           </div>
           <small style="color: #666; display: block; margin-top: 5px;">
-            📅 ${qz.date} | ⏱️ ${qz.durationText} | ✅ ${qz.correct} • ❌ ${qz.wrong} | ⭐ +${qz.xp} XP
+            📅 ${qz.date} | ⏱ ${qz.durationText} | ✅ ${qz.correct} • ❌ ${qz.wrong} | ➕ +${qz.xp} XP
           </small>
         `;
         quizHistoryContainer.appendChild(div);
@@ -21961,6 +21970,22 @@ async function loadMyStatsModal() {
     showNotice("İstatistikler yüklenemedi. Lütfen tekrar deneyin.", "#e74c3c");
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
