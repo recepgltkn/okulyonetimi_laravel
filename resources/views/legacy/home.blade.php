@@ -351,6 +351,8 @@
             display: flex;
             flex-direction: column;
             gap: 12px;
+            height: 520px;
+            min-height: 520px;
         }
         #app-screen.student-view .student-shell-head {
             display: block;
@@ -1297,6 +1299,15 @@
         .tabs { display: flex; gap: 10px; margin-bottom: 15px; border-bottom: 2px solid #eee; align-items: flex-end; }
         .tab-btn { flex: 1; padding: 12px; border: none; background: none; cursor: pointer; font-weight: bold; color: #666; border-bottom: 3px solid transparent; transition: 0.3s; }
         .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+        .tab-btn:focus,
+        .tab-btn:focus-visible {
+            outline: none;
+            box-shadow: none;
+        }
+        #block-homework-assign-tabs .tab-btn[data-assign-type="computeit"] {
+            border: none !important;
+            box-shadow: none !important;
+        }
         #student-tabs,
         #activities-tabs,
         #block-homework-tabs,

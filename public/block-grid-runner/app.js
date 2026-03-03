@@ -7,7 +7,7 @@ let workspace;
 const canvas = document.getElementById('gridCanvas');
 const ctx = canvas.getContext('2d');
 const gridSize = 8; // cells per side
-const DEFAULT_LEVEL_XP = 100;
+const DEFAULT_LEVEL_XP = 20;
 
 function getCurrentLevelGridWidth(){
   const lvl = levels?.[state?.levelIndex ?? 0] || {};
@@ -107,7 +107,7 @@ levels = levels.concat(buildExtraBlockLevels());
 function normalizeLevelXp(value){
   const n = Number(value);
   if(!Number.isFinite(n)) return DEFAULT_LEVEL_XP;
-  return Math.max(1, Math.min(500, Math.floor(n)));
+  return Math.max(1, Math.min(20, Math.floor(n)));
 }
 
 function applyXpDefaults(){
@@ -291,6 +291,21 @@ function initBlockly(){
       nextStatement: null
     },
     {
+      type: "repeat_times",
+      message0: "repeat %1 times",
+      args0: [
+        { type: "field_number", name: "TIMES", value: 2, min: 0, max: 50, precision: 1 }
+      ],
+      message1: "do %1",
+      args1: [
+        { type: "input_statement", name: "DO" }
+      ],
+      previousStatement: null,
+      nextStatement: null,
+      colour: 95,
+      tooltip: "Belirtilen sayı kadar tekrar et"
+    },
+    {
       type: "move_forward",
       message0: "Ileri git",
       previousStatement: null,
@@ -319,16 +334,10 @@ function initBlockly(){
   const toolbox = `
     <xml xmlns="https://developers.google.com/blockly/xml">
       <block type="program_start"></block>
+      <block type="repeat_times"></block>
       <block type="move_forward"></block>
       <block type="turn_left"></block>
       <block type="turn_right"></block>
-      <block type="controls_repeat_ext">
-        <value name="TIMES">
-          <shadow type="math_number">
-            <field name="NUM">2</field>
-          </shadow>
-        </value>
-      </block>
     </xml>
   `;
 
@@ -688,20 +697,23 @@ function checkStar(){
     }catch(e){}
     populateLevels();
     unlockNext();
-    if (runnerRole !== "teacher" && levelRange) {
+    const isAssignmentRangeEnd = (() => {
+      if (runnerRole === "teacher" || !levelRange) return false;
       const endIdx = Math.min(levels.length - 1, Math.max(0, Number(levelRange.endIdx || (levels.length - 1))));
-      if (state.levelIndex >= endIdx) {
-        try {
-          if (window.parent && window.parent !== window) {
-            window.parent.postMessage({
-              type: "ASSIGNMENT_RANGE_COMPLETED",
-              source: "block-runner",
-              currentLevelIndex: state.levelIndex,
-              levels
-            }, "*");
-          }
-        } catch (e) {}
-      }
+      return state.levelIndex >= endIdx;
+    })();
+    if (isAssignmentRangeEnd) {
+      try {
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({
+            type: "ASSIGNMENT_RANGE_COMPLETED",
+            source: "block-runner",
+            currentLevelIndex: state.levelIndex,
+            levels
+          }, "*");
+        }
+      } catch (e) {}
+      return;
     }
     // show modal with generated JS and options (Sonraki, Tekrar Dene)
     state.commands = state.commands.length? state.commands : generateCommands();
@@ -721,16 +733,14 @@ function showLevelModal(){
   const rangeStartIdx = levelRange ? Math.max(0, Number(levelRange.startIdx || 0)) : 0;
   const rangeEndIdx = levelRange ? Math.min(levels.length - 1, Math.max(0, Number(levelRange.endIdx || (levels.length - 1)))) : (levels.length - 1);
   const isRangeEnd = !!levelRange && state.levelIndex >= rangeEndIdx;
+  const currentLevelXp = normalizeLevelXp(levels[state.levelIndex]?.xp);
   const xpTotal = levels
     .slice(rangeStartIdx, rangeEndIdx + 1)
-    .reduce((sum, lv) => {
-      if (!lv?.completed) return sum;
-      return sum + normalizeLevelXp(lv?.xp);
-    }, 0);
+    .reduce((sum, lv) => sum + (lv?.completed ? normalizeLevelXp(lv?.xp) : 0), 0);
   title.textContent = 'Harika! Seviye Tamamlandı 🎉';
   sub.textContent = isRangeEnd
     ? `Toplam adım: ${cmdCount}. Toplam +${xpTotal} XP ile ödevdeki tüm seviyeler tamamlandı.`
-    : `Toplam adım: ${cmdCount}. Toplam +${xpTotal} XP birikti, bir sonraki seviyeye hazırsın.`;
+    : `Toplam adım: ${cmdCount}. Bu seviyede +${currentLevelXp} XP kazandın, bir sonraki seviyeye hazırsın.`;
   pre.textContent = generateExecutableJS();
   const nextBtn = document.getElementById('modalNextBtn');
   if (nextBtn) {

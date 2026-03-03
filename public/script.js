@@ -1816,6 +1816,35 @@ function showNotice(msg, color = "#4a90e2") {
   setTimeout(() => n.remove(), 3000);
 }
 
+let loadingNoticeEl = null;
+function showLoadingNotice(msg = "Rapor hazırlanıyor...", color = "#1d4ed8") {
+  if (loadingNoticeEl) {
+    try { loadingNoticeEl.remove(); } catch (e) {}
+    loadingNoticeEl = null;
+  }
+  const n = document.createElement("div");
+  n.innerText = msg;
+  n.style.cssText = `
+    position:fixed;
+    bottom:20px;
+    right:20px;
+    background:${color};
+    color:white;
+    padding:12px 25px;
+    border-radius:10px;
+    z-index:50060;
+    font-weight:bold;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  `;
+  document.body.appendChild(n);
+  loadingNoticeEl = n;
+  return () => {
+    if (!loadingNoticeEl) return;
+    try { loadingNoticeEl.remove(); } catch (e) {}
+    loadingNoticeEl = null;
+  };
+}
+
 let completionCelebrationCleanup = null;
 function showCompletionCelebration({
   title = "Tebrikler!",
@@ -2061,13 +2090,13 @@ function syncRunnerSaveButtons() {
 async function saveAndExitCompletedRunner() {
   if (currentRunnerType === "compute") {
     if (!computeRunnerSession) return true;
-    pauseComputeRunnerTimer();
-    return await saveComputeRunnerSession({ closeAfter: true, askContinue: false });
+    pauseComputeRunnerTimer({ showPauseUI: false, markDialogPause: false });
+    return await saveComputeRunnerSession({ closeAfter: true, askContinue: false, forceComplete: true });
   }
   if (currentRunnerType === "block") {
     if (!blockRunnerSession) return true;
-    pauseBlockRunnerTimer();
-    return await saveBlockRunnerSession({ closeAfter: true, askContinue: false });
+    pauseBlockRunnerTimer({ showPauseUI: false, markDialogPause: false });
+    return await saveBlockRunnerSession({ closeAfter: true, askContinue: false, forceComplete: true });
   }
   if (currentRunnerType === "block3d") {
     return await saveBlock3DRunnerSession({ closeAfter: true, askContinue: false });
@@ -2083,8 +2112,8 @@ async function requestRunnerExitWithPromptPolicy() {
       closeBlockRunnerView();
       return true;
     }
-    pauseComputeRunnerTimer();
-    return await saveComputeRunnerSession({ closeAfter: true, askContinue: !shouldCloseDirectly });
+    pauseComputeRunnerTimer({ showPauseUI: false, markDialogPause: false });
+    return await saveComputeRunnerSession({ closeAfter: true, askContinue: !shouldCloseDirectly, forceComplete: true });
   }
   if (currentRunnerType === "block3d") {
     if (!block3DRunnerSession) {
@@ -2098,8 +2127,8 @@ async function requestRunnerExitWithPromptPolicy() {
       closeBlockRunnerView();
       return true;
     }
-    pauseBlockRunnerTimer();
-    return await saveBlockRunnerSession({ closeAfter: true, askContinue: !shouldCloseDirectly });
+    pauseBlockRunnerTimer({ showPauseUI: false, markDialogPause: false });
+    return await saveBlockRunnerSession({ closeAfter: true, askContinue: !shouldCloseDirectly, forceComplete: true });
   }
   closeBlockRunnerView();
   return true;
@@ -4434,7 +4463,12 @@ async function downloadStudentPdf() {
     showNotice("Öğrenci bilgisi yok!", "#e74c3c");
     return;
   }
-  await openStudentReportWindow(currentStudentDetail);
+  const hideLoadingNotice = showLoadingNotice("Rapor hazırlanıyor...");
+  try {
+    await openStudentReportWindow(currentStudentDetail);
+  } finally {
+    hideLoadingNotice();
+  }
 }
 
 window.closeStudentDetail = function() {
@@ -5253,23 +5287,23 @@ function setBlockRunnerStartButton(running) {
   const pauseBtn = document.getElementById("btn-activity-resume");
   if (pauseTitle) pauseTitle.innerText = running ? "Çalışıyor" : "Hazır";
   if (pauseBtn) {
-    pauseBtn.innerHTML = "?";
+    pauseBtn.innerHTML = "&#9654;";
     pauseBtn.classList.add("btn-play-resume");
     pauseBtn.title = "Devam Et";
     pauseBtn.setAttribute("aria-label", "Devam Et");
   }
 }
 
-function pauseBlockRunnerTimer() {
+function pauseBlockRunnerTimer({ showPauseUI = true, markDialogPause = true } = {}) {
   if (!blockRunnerSession || !blockRunnerSession.running) return;
   blockRunnerSession.savedElapsedSeconds = getBlockRunnerElapsedSeconds();
   blockRunnerSession.startAt = null;
   blockRunnerSession.running = false;
-  blockRunnerSession.wasPausedByDialog = true;
+  blockRunnerSession.wasPausedByDialog = !!markDialogPause;
   if (blockRunnerTimerInterval) clearInterval(blockRunnerTimerInterval);
   blockRunnerTimerInterval = null;
   setBlockRunnerStartButton(false);
-  setActivityPausedUI(true);
+  setActivityPausedUI(!!showPauseUI);
   updateBlockRunnerTimerUI();
 }
 
@@ -5302,16 +5336,16 @@ function updateComputeRunnerTimerUI() {
   if (el) el.innerText = `⏱ ${mins} dk ${secs} sn`;
 }
 
-function pauseComputeRunnerTimer() {
+function pauseComputeRunnerTimer({ showPauseUI = true, markDialogPause = true } = {}) {
   if (!computeRunnerSession || !computeRunnerSession.running) return;
   computeRunnerSession.savedElapsedSeconds = getComputeRunnerElapsedSeconds();
   computeRunnerSession.startAt = null;
   computeRunnerSession.running = false;
-  computeRunnerSession.wasPausedByDialog = true;
+  computeRunnerSession.wasPausedByDialog = !!markDialogPause;
   if (computeRunnerTimerInterval) clearInterval(computeRunnerTimerInterval);
   computeRunnerTimerInterval = null;
   setBlockRunnerStartButton(false);
-  setActivityPausedUI(true);
+  setActivityPausedUI(!!showPauseUI);
   updateComputeRunnerTimerUI();
 }
 
@@ -5477,7 +5511,7 @@ async function saveComputeRunnerSession({
   if (askContinue) {
     const ok = await infoDialog(
       `%${progressPercentForUi} seviyesine ulaştın. Süre: ${Math.floor(elapsed / 60)} dk. Tamamlanan seviye: ${uiCompletedLevels}/${uiTotalLevels}. Devam etmek ister misin?`,
-      { showContinue: true, okText: "Çık", continueText: "Devam Et" }
+      { showContinue: true, okText: "Çık", continueText: "Devam Et", pauseSession: false }
     );
     if (!ok) {
       resumeComputeRunnerTimer();
@@ -5546,7 +5580,7 @@ async function getBlockRunnerCurrentState(uid) {
   }
 }
 
-async function saveBlockRunnerSession({ closeAfter = false, askContinue = false } = {}) {
+async function saveBlockRunnerSession({ closeAfter = false, askContinue = false, forceComplete = false } = {}) {
   if (!blockRunnerSession) return false;
   const uid = blockRunnerSession.userId || currentUserId;
   if (!uid) return false;
@@ -5613,7 +5647,9 @@ async function saveBlockRunnerSession({ closeAfter = false, askContinue = false 
         ? levelsForProgress.filter((l) => mergedCompletedIds.includes(Number(l?.id))).length
         : 0;
       const nextPercent = totalLevels > 0 ? Math.round((nextCompletedLevels / totalLevels) * 100) : Math.max(prevPercent, progressPercent);
-      const completedNow = totalLevels > 0 && nextCompletedLevels >= totalLevels;
+      const completedByLevels = totalLevels > 0 && nextCompletedLevels >= totalLevels;
+      const completedByExit = !!forceComplete && (nextCompletedLevels > 0 || nextPercent > 0 || elapsed >= 60);
+      const completedNow = completedByLevels || completedByExit;
       const wasCompleted = !!prev.completed;
       const assignmentXPNow = (totalLevels > 0 ? levelsForProgress : [])
         .reduce((sum, l) => {
@@ -5652,7 +5688,7 @@ async function saveBlockRunnerSession({ closeAfter = false, askContinue = false 
   if (askContinue) {
     const ok = await infoDialog(
       `%${progressPercent} seviyesine ulaştın. Süre: ${elapsedMinutes} dk. Tamamlanan seviye: ${completedLevels}/${totalLevels}. Devam etmek ister misin?`,
-      { showContinue: true, okText: "Çık", continueText: "Devam Et" }
+      { showContinue: true, okText: "Çık", continueText: "Devam Et", pauseSession: false }
     );
     if (!ok) {
       resumeBlockRunnerTimer();
@@ -5708,7 +5744,7 @@ async function saveBlock3DRunnerSession({ closeAfter = false, askContinue = fals
   if (askContinue) {
     const ok = await infoDialog(
       `%${percent} seviyesine ulaştın. Süre: ${Math.floor(elapsed / 60)} dk. Tamamlanan seviye: ${completedLevels}/${totalLevels}. Devam etmek ister misin?`,
-      { showContinue: true, okText: "Çık", continueText: "Devam Et" }
+      { showContinue: true, okText: "Çık", continueText: "Devam Et", pauseSession: false }
     );
     if (!ok) return false;
   } else {
@@ -9896,11 +9932,14 @@ document.getElementById("btn-my-stats-report").onclick = async function() {
   if (currentStudentDetail.student && currentStudentDetail.student.id === currentUserId) {
     currentStudentDetail.student.totalTimeSeconds = getLiveSystemSeconds();
   }
+  const hideLoadingNotice = showLoadingNotice("Rapor hazırlanıyor...");
   try {
     await openStudentReportWindow(currentStudentDetail);
   } catch (e) {
     console.error("Rapor açma hatası:", e);
     showNotice("Rapor açılamadı. Lütfen tekrar deneyin.", "#e74c3c");
+  } finally {
+    hideLoadingNotice();
   }
 };
 
@@ -10070,7 +10109,6 @@ async function createStudentAccount({ firstName, lastName, username, password, c
     xp: 0,
     createdAt: serverTimestamp()
   });
-  await signOut(secondaryAuth);
 }
 
 async function createTeacherAccount({ firstName, lastName, username, password }) {
@@ -10088,7 +10126,6 @@ async function createTeacherAccount({ firstName, lastName, username, password })
     createdAt: serverTimestamp(),
     createdBy: currentUserId || ""
   });
-  await signOut(secondaryAuth);
 }
 
 document.getElementById("btn-add-student-save").onclick = async function () {
@@ -14000,8 +14037,9 @@ async function openStudentReportWindow(detail) {
         <td>${q.finishedAtMs ? new Date(Number(q.finishedAtMs)).toLocaleDateString("tr-TR") : "-"}</td>
       </tr>
     `).join("");
-  const blockCompletedCount = Math.min(Math.max(0, blockStats.completedLevels || 0), Math.max(0, blockStats.totalLevels || 0));
-  const blockTotalCount = Math.max(0, blockStats.totalLevels || 0);
+  const blockAssignmentCounts = getBlockHomeworkAssignmentCounts(blockStats);
+  const blockCompletedCount = Math.max(0, Number(blockAssignmentCounts.completedCount || 0));
+  const blockTotalCount = Math.max(0, Number(blockAssignmentCounts.totalCount || 0));
   const blockPendingCount = Math.max(0, blockTotalCount - blockCompletedCount);
   const computeCompletedCount = Math.min(Math.max(0, computeStats.completedLevels || 0), Math.max(0, computeStats.totalLevels || 0));
   const computeTotalCount = Math.max(0, computeStats.totalLevels || 0);
@@ -14503,8 +14541,9 @@ async function buildStudentReportHtml(detail) {
   const activityTotalCount = Math.max(0, totalActivities || 0);
   const activityCompletedCount = Math.min(Math.max(0, activityCompleted || 0), activityTotalCount);
   const activityPendingCount = Math.max(0, activityTotalCount - activityCompletedCount);
-  const blockCompletedCount = Math.min(Math.max(0, blockStats.completedLevels || 0), Math.max(0, blockStats.totalLevels || 0));
-  const blockTotalCount = Math.max(0, blockStats.totalLevels || 0);
+  const blockAssignmentCounts = getBlockHomeworkAssignmentCounts(blockStats);
+  const blockCompletedCount = Math.max(0, Number(blockAssignmentCounts.completedCount || 0));
+  const blockTotalCount = Math.max(0, Number(blockAssignmentCounts.totalCount || 0));
   const blockPendingCount = Math.max(0, blockTotalCount - blockCompletedCount);
   const computeCompletedCount = Math.min(Math.max(0, computeStats.completedLevels || 0), Math.max(0, computeStats.totalLevels || 0));
   const computeTotalCount = Math.max(0, computeStats.totalLevels || 0);
@@ -17933,7 +17972,7 @@ function infoDialog(message, options = {}) {
     }
     if (contBtn) {
       const continueLabel = options.continueText || "Devam Et";
-      contBtn.innerHTML = options.continueHtml || `<span class="play-ico">?</span>`;
+      contBtn.innerHTML = options.continueHtml || `<span class="play-ico">&#9654;</span>`;
       contBtn.className = options.continueClass || "btn btn-continue-play";
       contBtn.style.background = options.continueBg || "";
       contBtn.style.color = options.continueColor || "";
@@ -17944,7 +17983,7 @@ function infoDialog(message, options = {}) {
     }
     const modal = document.getElementById("info-modal");
     if (modal) modal.style.display = "flex";
-    pauseActivityTimer();
+    if (options.pauseSession !== false) pauseActivityTimer();
   });
 }
 
@@ -18336,8 +18375,8 @@ document.getElementById("btn-activity-save").onclick = async function () {
     const shouldClose = isRunnerCompletionHandled();
     if (currentRunnerType === "compute") {
       if (!computeRunnerSession) return;
-      pauseComputeRunnerTimer();
-      await saveComputeRunnerSession({ closeAfter: shouldClose, askContinue: !shouldClose });
+      pauseComputeRunnerTimer({ showPauseUI: false, markDialogPause: false });
+      await saveComputeRunnerSession({ closeAfter: shouldClose, askContinue: !shouldClose, forceComplete: shouldClose });
       return;
     }
     if (currentRunnerType === "block3d") {
@@ -18346,8 +18385,8 @@ document.getElementById("btn-activity-save").onclick = async function () {
       return;
     }
     if (!blockRunnerSession) return;
-    pauseBlockRunnerTimer();
-    await saveBlockRunnerSession({ closeAfter: shouldClose, askContinue: !shouldClose });
+    pauseBlockRunnerTimer({ showPauseUI: false, markDialogPause: false });
+    await saveBlockRunnerSession({ closeAfter: shouldClose, askContinue: !shouldClose, forceComplete: shouldClose });
     return;
   }
   await stopActivitySession({ action: "save", showMessage: true, allowContinue: true, askContinue: true });
@@ -18381,8 +18420,8 @@ document.getElementById("btn-activity-full-save").onclick = async function () {
     const shouldClose = isRunnerCompletionHandled();
     if (currentRunnerType === "compute") {
       if (!computeRunnerSession) return;
-      pauseComputeRunnerTimer();
-      const ok = await saveComputeRunnerSession({ closeAfter: shouldClose, askContinue: !shouldClose });
+      pauseComputeRunnerTimer({ showPauseUI: false, markDialogPause: false });
+      const ok = await saveComputeRunnerSession({ closeAfter: shouldClose, askContinue: !shouldClose, forceComplete: shouldClose });
       if (ok && shouldClose) exitActivityFullscreen();
       return;
     }
@@ -18393,8 +18432,8 @@ document.getElementById("btn-activity-full-save").onclick = async function () {
       return;
     }
     if (!blockRunnerSession) return;
-    pauseBlockRunnerTimer();
-    const ok = await saveBlockRunnerSession({ closeAfter: shouldClose, askContinue: !shouldClose });
+    pauseBlockRunnerTimer({ showPauseUI: false, markDialogPause: false });
+    const ok = await saveBlockRunnerSession({ closeAfter: shouldClose, askContinue: !shouldClose, forceComplete: shouldClose });
     if (ok && shouldClose) exitActivityFullscreen();
     return;
   }
@@ -18431,7 +18470,7 @@ if (activityHeadStartBtn) {
     if (currentRunnerType === "compute") {
       if (!computeRunnerSession) return;
       if (computeRunnerSession.running) {
-        pauseComputeRunnerTimer();
+        pauseComputeRunnerTimer({ showPauseUI: true, markDialogPause: true });
       } else {
         resumeComputeRunnerTimer();
       }
@@ -18439,7 +18478,7 @@ if (activityHeadStartBtn) {
     }
     if (!blockRunnerSession) return;
     if (blockRunnerSession.running) {
-      pauseBlockRunnerTimer();
+      pauseBlockRunnerTimer({ showPauseUI: true, markDialogPause: true });
       return;
     }
     resumeBlockRunnerTimer();
@@ -18469,8 +18508,8 @@ if (activityHeadSaveBtn) {
     const shouldClose = isRunnerCompletionHandled();
     if (currentRunnerType === "compute") {
       if (!computeRunnerSession) return;
-      pauseComputeRunnerTimer();
-      await saveComputeRunnerSession({ closeAfter: shouldClose, askContinue: !shouldClose });
+      pauseComputeRunnerTimer({ showPauseUI: false, markDialogPause: false });
+      await saveComputeRunnerSession({ closeAfter: shouldClose, askContinue: !shouldClose, forceComplete: shouldClose });
       return;
     }
     if (currentRunnerType === "block3d") {
@@ -18479,8 +18518,8 @@ if (activityHeadSaveBtn) {
       return;
     }
     if (!blockRunnerSession) return;
-    pauseBlockRunnerTimer();
-    await saveBlockRunnerSession({ closeAfter: shouldClose, askContinue: !shouldClose });
+    pauseBlockRunnerTimer({ showPauseUI: false, markDialogPause: false });
+    await saveBlockRunnerSession({ closeAfter: shouldClose, askContinue: !shouldClose, forceComplete: shouldClose });
   };
 }
 const activityHeadExitBtn = document.getElementById("btn-activity-head-exit");
@@ -18492,8 +18531,8 @@ if (activityHeadExitBtn) {
         closeBlockRunnerView();
         return;
       }
-      pauseComputeRunnerTimer();
-      await saveComputeRunnerSession({ closeAfter: true, askContinue: !shouldClose });
+      pauseComputeRunnerTimer({ showPauseUI: false, markDialogPause: false });
+      await saveComputeRunnerSession({ closeAfter: true, askContinue: !shouldClose, forceComplete: true });
       return;
     }
     if (currentRunnerType === "block3d") {
@@ -18508,8 +18547,8 @@ if (activityHeadExitBtn) {
       closeBlockRunnerView();
       return;
     }
-    pauseBlockRunnerTimer();
-    await saveBlockRunnerSession({ closeAfter: true, askContinue: !shouldClose });
+    pauseBlockRunnerTimer({ showPauseUI: false, markDialogPause: false });
+    await saveBlockRunnerSession({ closeAfter: true, askContinue: !shouldClose, forceComplete: true });
   };
 }
 const activityHeadAddLevelBtn = document.getElementById("btn-activity-head-add-level");
@@ -21275,6 +21314,30 @@ async function fetchBlockRunStats(studentId) {
   }
 }
 
+function getBlockHomeworkAssignmentCounts(blockStats = {}) {
+  const runs = Array.isArray(blockStats?.runs) ? blockStats.runs : [];
+  if (!runs.length) {
+    const completedLevels = Math.max(0, Number(blockStats?.completedLevels || 0));
+    const totalLevels = Math.max(0, Number(blockStats?.totalLevels || 0));
+    return {
+      completedCount: Math.min(completedLevels, totalLevels),
+      totalCount: totalLevels
+    };
+  }
+  const normalizedRuns = runs.filter((r) => {
+    const type = getBlockHomeworkType(r?.assignmentType);
+    return type !== "silentteacher" && type !== "lightbot";
+  });
+  const totalCount = normalizedRuns.length;
+  const completedCount = normalizedRuns.filter((r) => {
+    const completedLevels = Math.max(0, Number(r?.completedLevels || 0));
+    const totalLevels = Math.max(0, Number(r?.totalLevels || 0));
+    const percent = Math.max(0, Number(r?.percent || 0));
+    return !!r?.completed || percent >= 100 || (totalLevels > 0 && completedLevels >= totalLevels);
+  }).length;
+  return { completedCount, totalCount };
+}
+
 async function fetchStudentQuizStats(studentId) {
   const fallback = {
     totalQuizzes: 0,
@@ -21833,7 +21896,11 @@ async function loadMyStatsModal() {
       ? Math.round((computeCompleted / computeAssignmentsForStudent.length) * 100)
       : Math.max(0, Number(computeStats.progressPercent || 0));
 
-    const pythonQuizRate = Math.max(0, Math.min(100, Number(quizStats.avgSuccess || 0)));
+    const pythonQuizAssignments = blockAssignmentsForStudent.filter((a) => getBlockHomeworkType(a.assignmentType) === "silentteacher");
+    const pythonQuizCompleted = pythonQuizAssignments.filter((a) => isBlockAssignmentDone(a)).length;
+    const pythonQuizTotal = pythonQuizAssignments.length;
+    const pythonQuizPending = Math.max(0, pythonQuizTotal - pythonQuizCompleted);
+    const pythonQuizRate = pythonQuizTotal > 0 ? Math.round((pythonQuizCompleted / pythonQuizTotal) * 100) : 0;
 
     setText("my-task-summary", `${completedCount}/${totalTasks} • %${taskRate}`);
     setText("my-activity-summary", `${activityCompleted}/${totalActivities} • %${activityRate}`);
@@ -21841,7 +21908,7 @@ async function loadMyStatsModal() {
     setText("my-block2d-summary", `${block2DCompleted}/${block2DAssignments.length} • %${block2DRate}`);
     setText("my-block3d-summary", `${block3DCompleted}/${block3DAssignments.length} • %${block3DRate}`);
     setText("my-compute-summary", `${computeCompleted}/${computeAssignmentsForStudent.length} • %${computeRate}`);
-    setText("my-python-quiz-summary", `${quizStats.totalQuizzes || 0} • %${pythonQuizRate}`);
+    setText("my-python-quiz-summary", `${pythonQuizCompleted}/${pythonQuizTotal} • %${pythonQuizRate}`);
     setText("my-total-xp", totalXP);
 
     const student = userData ? { ...userData, id: currentUserId } : { id: currentUserId };
@@ -21944,12 +22011,20 @@ async function loadMyStatsModal() {
 
     safeChart(myPythonQuizChart, "myPythonQuizChart", {
       type: "bar",
-      data: { labels: ["Başarı", "Kalan"], datasets: [{ label: "Python Quiz", data: [pythonQuizRate, Math.max(0, 100 - pythonQuizRate)], backgroundColor: ["#6366f1", "#e5e7eb"], borderRadius: 8 }] },
+      data: {
+        labels: ["Yapılan", "Bekleyen"],
+        datasets: [{
+          label: "Python Quiz",
+          data: [pythonQuizCompleted, pythonQuizPending],
+          backgroundColor: ["#6366f1", "#e5e7eb"],
+          borderRadius: 8
+        }]
+      },
       options: {
         responsive: true,
         maintainAspectRatio: false,
         plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true, max: 100 } }
+        scales: { y: { beginAtZero: true } }
       }
     }, (c) => { myPythonQuizChart = c; });
 
