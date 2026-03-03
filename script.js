@@ -6280,7 +6280,7 @@ window.openLineTraceRunner = function(options = {}) {
   if (fullStartBtn) fullStartBtn.style.display = "none";
   if (fullSaveBtn) fullSaveBtn.style.display = "none";
   if (fullExitBtn) {
-    fullExitBtn.innerText = "?";
+    fullExitBtn.innerText = "✕";
     fullExitBtn.title = "Çık";
     fullExitBtn.classList.add("line-trace-close-btn");
   }
@@ -6338,7 +6338,7 @@ window.openSilentTeacherRunner = function(options = {}) {
   if (fullStartBtn) fullStartBtn.style.display = "none";
   if (fullSaveBtn) fullSaveBtn.style.display = "none";
   if (fullExitBtn) {
-    fullExitBtn.innerText = "?";
+    fullExitBtn.innerText = "✕";
     fullExitBtn.title = "Çık";
     fullExitBtn.classList.add("line-trace-close-btn");
   }
@@ -6396,7 +6396,7 @@ window.openLightbotRunner = function(options = {}) {
   if (fullStartBtn) fullStartBtn.style.display = "none";
   if (fullSaveBtn) fullSaveBtn.style.display = "none";
   if (fullExitBtn) {
-    fullExitBtn.innerText = "?";
+    fullExitBtn.innerText = "✕";
     fullExitBtn.title = "Çık";
     fullExitBtn.classList.add("line-trace-close-btn");
   }
