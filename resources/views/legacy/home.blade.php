@@ -1410,7 +1410,8 @@
             object-fit: contain;
             filter: drop-shadow(0 4px 10px rgba(15, 23, 42, 0.18));
         }
-        #app-screen.teacher-view #header-center-logo { display: inline-flex; }
+        #app-screen.teacher-view #header-center-logo,
+        #app-screen.student-view #header-center-logo { display: inline-flex; }
         #user-header-avatar {
             width: 36px;
             height: 36px;
@@ -3128,13 +3129,10 @@
             100% { box-shadow: 0 0 0 8px rgba(22, 163, 74, 0); }
         }
         .certificate-shell {
-            max-width: 1160px !important;
+            max-width: 1180px !important;
             width: 96vw;
-            background:
-                radial-gradient(circle at 95% 0%, rgba(139, 92, 246, 0.16), rgba(139, 92, 246, 0) 38%),
-                radial-gradient(circle at 0% 100%, rgba(167, 139, 250, 0.14), rgba(167, 139, 250, 0) 42%),
-                linear-gradient(160deg, #f7f5ff 0%, #ffffff 100%);
-            border: 1px solid #ded8ff;
+            background: linear-gradient(165deg, #eef4fb 0%, #ffffff 100%);
+            border: 1px solid #d2dcea;
         }
         .certificate-modal-head {
             display: flex;
@@ -3148,177 +3146,143 @@
             position: relative;
             overflow: hidden;
             width: 100%;
-            min-height: 600px;
-            border-radius: 30px;
-            border: 1px solid #c4b5fd;
+            min-height: 640px;
+            border-radius: 24px;
+            border: 1px solid #c9d9e8;
             background:
-                radial-gradient(circle at 16% 14%, rgba(221, 214, 254, 0.62), rgba(221, 214, 254, 0) 45%),
-                radial-gradient(circle at 84% 86%, rgba(196, 181, 253, 0.45), rgba(196, 181, 253, 0) 44%),
-                repeating-linear-gradient(
-                    135deg,
-                    rgba(255, 255, 255, 0.95) 0px,
-                    rgba(255, 255, 255, 0.95) 16px,
-                    rgba(245, 243, 255, 0.9) 16px,
-                    rgba(245, 243, 255, 0.9) 32px
-                );
-            box-shadow: 0 26px 64px rgba(76, 29, 149, 0.18);
-            padding: 40px 34px 34px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
+                radial-gradient(circle at 10% 12%, rgba(30, 64, 175, 0.08), transparent 38%),
+                radial-gradient(circle at 90% 88%, rgba(3, 105, 161, 0.09), transparent 40%),
+                #ffffff;
+            box-shadow: 0 18px 45px rgba(15, 23, 42, 0.12);
+            padding: 42px 44px 34px;
+            display: grid;
+            align-content: start;
+            justify-items: center;
+            gap: 12px;
             text-align: center;
-            gap: 10px;
         }
         .student-certificate::before {
             content: "";
             position: absolute;
-            inset: 16px;
-            border-radius: 22px;
-            border: 3px double rgba(109, 40, 217, 0.48);
+            inset: 20px;
+            border: 2px solid #0f4c81;
+            border-radius: 14px;
             pointer-events: none;
         }
         .student-certificate::after {
             content: "";
             position: absolute;
-            width: 290px;
-            height: 290px;
-            right: -120px;
-            top: -126px;
-            border-radius: 999px;
-            background: radial-gradient(circle, rgba(167, 139, 250, 0.25), rgba(167, 139, 250, 0));
+            inset: 33px;
+            border: 1px solid rgba(15, 76, 129, 0.22);
+            border-radius: 10px;
             pointer-events: none;
         }
         .certificate-badge {
-            width: 104px;
-            height: 104px;
+            width: 88px;
+            height: 88px;
             border-radius: 999px;
-            background: radial-gradient(circle at 30% 25%, #ffffff, #ede9fe 70%);
-            border: 4px solid #7c3aed;
-            box-shadow: 0 10px 26px rgba(109, 40, 217, 0.24);
+            border: 3px solid #d4af37;
+            background: radial-gradient(circle at 30% 30%, #fff7d2 0%, #e8b84e 72%);
             display: grid;
             place-items: center;
-            color: #5b21b6;
+            color: #6f4b00;
             font-size: 2rem;
-            margin-bottom: 6px;
+            box-shadow: 0 8px 20px rgba(111, 75, 0, 0.2);
+            margin-top: 4px;
         }
         .certificate-logo {
-            width: 112px;
+            width: 188px;
             height: auto;
-            margin: 0 auto 6px;
-            border-radius: 16px;
-            padding: 9px;
-            border: 1px solid #c4b5fd;
-            background: linear-gradient(145deg, #ffffff, #f5f3ff);
-            box-shadow: 0 8px 18px rgba(76, 29, 149, 0.14);
-        }
-        .certificate-kicker {
-            font-size: 0.78rem;
-            letter-spacing: 0.28em;
-            font-weight: 800;
-            color: #6d28d9;
-            text-transform: uppercase;
-            background: #f5f3ff;
-            border: 1px solid #c4b5fd;
-            border-radius: 999px;
-            padding: 6px 12px;
+            margin-top: 4px;
+            margin-bottom: 0;
+            filter: drop-shadow(0 4px 10px rgba(15, 23, 42, 0.15));
         }
         .certificate-title {
             font-family: "Cinzel", "Times New Roman", Georgia, serif;
-            font-size: 2.55rem;
-            letter-spacing: 0.09em;
-            color: #4c1d95;
-            margin-bottom: 4px;
-            font-weight: 800;
+            font-size: 3.1rem;
+            letter-spacing: 0.08em;
             text-transform: uppercase;
-            text-shadow: 0 2px 10px rgba(109, 40, 217, 0.16);
+            color: #0f355d;
+            margin: 0;
+            font-weight: 700;
+        }
+        .certificate-student-name {
+            font-family: "Brush Script MT", "Segoe Script", "Times New Roman", Georgia, serif;
+            font-size: 4rem;
+            line-height: 1.1;
+            color: #0b5fa0;
+            font-weight: 700;
+            margin: 0;
+            padding: 0 16px 10px;
+            border-bottom: 2px solid rgba(11, 95, 160, 0.35);
         }
         .certificate-text {
-            max-width: 800px;
-            font-size: 1.05rem;
+            max-width: 920px;
+            font-size: 1.14rem;
             line-height: 1.75;
             color: #374151;
             margin: 0;
         }
-        .certificate-student-name {
-            font-family: "Cinzel", "Times New Roman", Georgia, serif;
-            font-size: 2.95rem;
-            line-height: 1.2;
-            font-weight: 800;
-            color: #5b21b6;
-            margin: 12px 0 4px;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            border-bottom: 2px solid rgba(139, 92, 246, 0.32);
-            padding: 0 10px 8px;
-        }
         .certificate-meta-row {
-            margin-top: 10px;
+            margin-top: 6px;
             width: 100%;
             display: grid;
             grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 10px;
+            gap: 12px;
         }
         .certificate-meta-item {
-            border: 1px solid #d8ccff;
-            background: linear-gradient(160deg, rgba(255,255,255,0.96), rgba(245, 243, 255, 0.92));
-            border-radius: 14px;
-            padding: 11px 8px;
-            text-align: center;
+            border: 1px solid #d1dbe7;
+            background: linear-gradient(180deg, #ffffff 0%, #f6f9fc 100%);
+            border-radius: 10px;
+            padding: 10px 8px;
             display: flex;
             flex-direction: column;
-            gap: 3px;
-            box-shadow: 0 8px 16px rgba(76, 29, 149, 0.08);
+            gap: 4px;
         }
         .certificate-meta-item .k {
             font-size: 0.7rem;
-            letter-spacing: 0.06em;
-            color: #6d28d9;
+            letter-spacing: 0.09em;
             text-transform: uppercase;
+            color: #1d4f7a;
             font-weight: 700;
         }
         .certificate-meta-item .v {
-            font-size: 1.08rem;
-            font-weight: 800;
-            color: #312e81;
+            font-size: 1.02rem;
+            color: #0f355d;
+            font-weight: 700;
+        }
+        .certificate-footer-note {
+            margin-top: 8px;
+            width: 100%;
         }
         .certificate-sign-row {
             width: 100%;
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 24px;
-            margin-top: 16px;
+            gap: 30px;
         }
         .certificate-sign-col {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 4px;
+            gap: 6px;
         }
         .certificate-sign-line {
-            width: 82%;
-            border-bottom: 1.6px solid #7c3aed;
+            width: 78%;
+            border-bottom: 1.7px solid #264f77;
             height: 24px;
         }
         .certificate-sign-role {
             font-size: 0.74rem;
-            letter-spacing: 0.08em;
-            color: #6d28d9;
+            letter-spacing: 0.1em;
             text-transform: uppercase;
+            color: #1d4f7a;
             font-weight: 700;
         }
         .certificate-sign-name {
             font-size: 1rem;
-            color: #312e81;
+            color: #0f355d;
             font-weight: 700;
-        }
-        .certificate-footer-note {
-            margin-top: 12px;
-            font-size: 0.95rem;
-            color: #4b5563;
-            border-top: 1px solid rgba(124, 58, 237, 0.26);
-            padding-top: 10px;
-            width: 100%;
         }
         .teacher-cert-toolbar {
             display: grid;
@@ -3341,16 +3305,24 @@
         @media (max-width: 900px) {
             .student-certificate {
                 min-height: 0;
-                padding: 22px 16px;
+                padding: 24px 16px 18px;
             }
-            .certificate-title {
+            .certificate-badge {
+                width: 68px;
+                height: 68px;
                 font-size: 1.45rem;
             }
+            .certificate-logo {
+                width: 130px;
+            }
+            .certificate-title {
+                font-size: 1.8rem;
+            }
             .certificate-text {
-                font-size: 0.95rem;
+                font-size: 0.98rem;
             }
             .certificate-student-name {
-                font-size: 1.55rem;
+                font-size: 2.5rem;
             }
             .certificate-meta-row {
                 grid-template-columns: 1fr 1fr;
@@ -3555,7 +3527,7 @@
         body.dark-mode .btn:not(.btn-primary):not(.btn-success):not(.btn-danger):not(.btn-warning) {
             background: #1f2937 !important;
         }
-        body.dark-mode #side-menu { background-color: #020617; }
+        body.dark-mode #side-menu { background-color: #020617; border-right: none; }
         body.dark-mode #side-menu .sidebar-footer { border-top-color: #1f2937; }
         body.dark-mode .sidebar-footer-title { color: #94a3b8; }
         body.dark-mode #side-menu button { color: #cbd5e1; }
@@ -3857,9 +3829,7 @@
         body.dark-mode .stat-number,
         body.dark-mode .stat-detail-value,
         body.dark-mode .top-student-name,
-        body.dark-mode .pie-summary-val,
-        body.dark-mode .certificate-title,
-        body.dark-mode .certificate-student-name {
+        body.dark-mode .pie-summary-val {
             color: #e2e8f0 !important;
         }
         body.dark-mode .activity-fullbar,
@@ -3882,7 +3852,6 @@
         body.dark-mode .lesson-toolbar,
         body.dark-mode .lesson-toolbar .btn,
         body.dark-mode .lesson-quick-tools .btn,
-        body.dark-mode .certificate-shell,
         body.dark-mode .pie-summary-item,
         body.dark-mode .time-widget {
             background: #111827 !important;
@@ -4443,7 +4412,7 @@
             aspect-ratio: 16 / 9;
             object-fit: contain;
             border-radius: 14px;
-            background: #ffffff; /* arka kutucuğu beyaz yapıldı */
+            background: #f1f5f9;
             margin-bottom: 10px;
         }
         .apps-hub-card h4 {
@@ -4463,6 +4432,7 @@
         }
         body.dark-mode .apps-hub-modal-content { background: #0f172a; border-color: #334155; }
         body.dark-mode .apps-hub-card { background: #111827; border-color: #334155; }
+        body.dark-mode .apps-hub-card-image { background: #0b1220; }
         body.dark-mode .apps-hub-card h4 { color: #f8fafc; }
         body.dark-mode .apps-hub-card p { color: #cbd5e1; }
     </style>
@@ -4553,19 +4523,19 @@
                     <button id="btn-apps-hub-open-compute" class="btn btn-primary apps-hub-start-btn">Uygulamaya Başla</button>
                 </article>
                 <article class="apps-hub-card">
-                    <img src="compute-it.png" alt="Python Quiz Lab" class="apps-hub-card-image">
+                    <img src="python.png" alt="Python Quiz Lab" class="apps-hub-card-image">
                     <h4>Python Quiz Lab</h4>
                     <p>Python temelinden zora giden 3 bolumde soru ve mini konu anlatimi.</p>
                     <button id="btn-apps-hub-open-silent-teacher" class="btn btn-primary apps-hub-start-btn">Uygulamaya Başla</button>
                 </article>
                 <article class="apps-hub-card" id="apps-hub-card-live-quiz" style="display:none;">
-                    <img src="compute-it.png" alt="Canlı Quiz" class="apps-hub-card-image">
+                    <img src="quiz.png" alt="Canlı Quiz" class="apps-hub-card-image">
                     <h4>Canlı Quiz</h4>
                     <p>Quiz oluştur, başlat ve sonuçları yönet.</p>
                     <button id="btn-apps-hub-open-live-quiz" class="btn btn-primary apps-hub-start-btn">Quiz Yönet</button>
                 </article>
                 <article class="apps-hub-card">
-                    <img src="blok-kodlama.png" alt="Code Robot Lab" class="apps-hub-card-image">
+                    <img src="code-robot.png" alt="Code Robot Lab" class="apps-hub-card-image">
                     <h4>Code Robot Lab</h4>
                     <p>Lightbot mantiginda komutlarla robotu yonet, kolaydan zora bolumleri gec.</p>
                     <button id="btn-apps-hub-open-lightbot" class="btn btn-primary apps-hub-start-btn">Uygulamaya Başla</button>
@@ -6007,31 +5977,38 @@ Ayşe, Yılmaz, ayse, 123456, 9, B"></textarea>
             <input type="text" id="profile-username" class="form-control" placeholder="Kullanıcı Adı">
             <input type="password" id="profile-password" class="form-control" placeholder="Yeni Şifre (en az 6 karakter)">
             <button id="btn-profile-save" class="btn btn-success" style="width: 100%;">Güncelle</button>
-            <button id="btn-profile-delete" class="btn btn-danger" style="width: 100%; margin-top: 10px;">Hesabımı Sil</button>
-            <hr style="margin: 16px 0;">
-            <h3 style="margin: 0 0 10px 0;">Öğretmen Ekle</h3>
-            <h4 style="margin: 6px 0;">Tekli Kayıt</h4>
-            <div style="display:flex; gap:10px;">
-                <input type="text" id="add-teacher-firstname" class="form-control" placeholder="Ad">
-                <input type="text" id="add-teacher-lastname" class="form-control" placeholder="Soyad">
-            </div>
-            <input type="text" id="add-teacher-username" class="form-control" placeholder="Kullanıcı Adı (e-posta olabilir)">
-            <input type="password" id="add-teacher-password" class="form-control" placeholder="Şifre (en az 6 karakter)">
-            <button id="btn-add-teacher-save" class="btn btn-primary" style="width: 100%; margin-top: 8px;">Öğretmen Kaydet</button>
-            <hr style="margin: 16px 0;">
-            <h4 style="margin: 6px 0;">Toplu Kayıt (CSV / XLSX)</h4>
-            <small style="color:#666; display:block; margin-bottom:6px;">
-                Satır formatı: Ad, Soyad, Kullanıcı Adı, Şifre
-            </small>
-            <div style="display:flex; gap:10px; flex-wrap: wrap; margin-bottom:8px;">
-                <button id="btn-download-teacher-template" class="btn btn-primary" style="flex:1;">⬇️ Örnek CSV İndir</button>
-                <input type="file" id="bulk-teachers-file" class="form-control" accept=".csv,.xlsx,.xls" style="flex:1;">
-            </div>
-            <textarea id="bulk-teachers-input" class="form-control" rows="5" placeholder="Örn:
+            <div id="profile-teacher-tools" style="display:none;">
+                <button id="btn-profile-delete" class="btn btn-danger" style="width: 100%; margin-top: 10px;">Hesabımı Sil</button>
+                <div id="profile-change-approvals-wrap" style="display:none; margin-top:12px;">
+                    <hr style="margin: 12px 0;">
+                    <h4 style="margin: 6px 0;">Onay Bekleyenler</h4>
+                    <div id="profile-change-approvals-list" style="max-height:220px; overflow:auto; border:1px solid #e5e7eb; border-radius:10px; padding:8px; background:#fff;"></div>
+                </div>
+                <hr style="margin: 16px 0;">
+                <h3 style="margin: 0 0 10px 0;">Öğretmen Ekle</h3>
+                <h4 style="margin: 6px 0;">Tekli Kayıt</h4>
+                <div style="display:flex; gap:10px;">
+                    <input type="text" id="add-teacher-firstname" class="form-control" placeholder="Ad">
+                    <input type="text" id="add-teacher-lastname" class="form-control" placeholder="Soyad">
+                </div>
+                <input type="text" id="add-teacher-username" class="form-control" placeholder="Kullanıcı Adı (e-posta olabilir)">
+                <input type="password" id="add-teacher-password" class="form-control" placeholder="Şifre (en az 6 karakter)">
+                <button id="btn-add-teacher-save" class="btn btn-primary" style="width: 100%; margin-top: 8px;">Öğretmen Kaydet</button>
+                <hr style="margin: 16px 0;">
+                <h4 style="margin: 6px 0;">Toplu Kayıt (CSV / XLSX)</h4>
+                <small style="color:#666; display:block; margin-bottom:6px;">
+                    Satır formatı: Ad, Soyad, Kullanıcı Adı, Şifre
+                </small>
+                <div style="display:flex; gap:10px; flex-wrap: wrap; margin-bottom:8px;">
+                    <button id="btn-download-teacher-template" class="btn btn-primary" style="flex:1;">⬇️ Örnek CSV İndir</button>
+                    <input type="file" id="bulk-teachers-file" class="form-control" accept=".csv,.xlsx,.xls" style="flex:1;">
+                </div>
+                <textarea id="bulk-teachers-input" class="form-control" rows="5" placeholder="Örn:
 Ali, Veli, ogretmen.ali, 123456
 Ayşe, Yılmaz, ogretmen.ayse, 123456"></textarea>
-            <input type="password" id="bulk-teachers-default-password" class="form-control" placeholder="Varsayılan Şifre (boş olanlar için)">
-            <button id="btn-bulk-teacher-save" class="btn btn-success" style="width: 100%; margin-top: 8px;">Toplu Öğretmen Kaydet</button>
+                <input type="password" id="bulk-teachers-default-password" class="form-control" placeholder="Varsayılan Şifre (boş olanlar için)">
+                <button id="btn-bulk-teacher-save" class="btn btn-success" style="width: 100%; margin-top: 8px;">Toplu Öğretmen Kaydet</button>
+            </div>
             <button id="btn-profile-cancel" class="btn" style="width: 100%; margin-top: 10px; background: #eee;">Kapat</button>
         </div>
     </div>
@@ -6601,14 +6578,13 @@ Ayşe, Yılmaz, ogretmen.ayse, 123456"></textarea>
                 </div>
             </div>
             <div id="student-certificate-card" class="student-certificate">
-                <div class="certificate-badge">🏅</div>
                 <img src="logo.png" alt="Logo" class="certificate-logo">
-                <div class="certificate-kicker">EĞİTİM PORTALI</div>
+                <div class="certificate-badge">✦</div>
                 <div class="certificate-title">BAŞARI SERTİFİKASI</div>
-                <p id="certificate-award-text" class="certificate-text">
-                    Bu sertifika, platformdaki düzenli katılımı ve öğrenme sürecindeki başarılı ilerlemesi nedeniyle verilmiştir.
-                </p>
                 <div id="certificate-student-name" class="certificate-student-name">Öğrenci Adı Soyadı</div>
+                <p id="certificate-award-text" class="certificate-text">
+                    Bu sertifika, Bilişim, Kodlama, Yazılım ve Robotik alanlarındaki eğitim çalışmalarında gösterilen başarı nedeniyle verilmiştir.
+                </p>
                 <div class="certificate-meta-row">
                     <div class="certificate-meta-item">
                         <span class="k">Sınıf / Şube</span>
@@ -6631,16 +6607,15 @@ Ayşe, Yılmaz, ogretmen.ayse, 123456"></textarea>
                     <div class="certificate-sign-row">
                         <div class="certificate-sign-col">
                             <div class="certificate-sign-line"></div>
-                            <div class="certificate-sign-role">Müdür</div>
-                            <div id="certificate-principal-name" class="certificate-sign-name">Okul Müdürü</div>
-                        </div>
-                        <div class="certificate-sign-col">
-                            <div class="certificate-sign-line"></div>
                             <div class="certificate-sign-role">Ders Öğretmeni</div>
                             <div id="certificate-teacher-name" class="certificate-sign-name">Ders Öğretmeni</div>
                         </div>
+                        <div class="certificate-sign-col">
+                            <div class="certificate-sign-line"></div>
+                            <div class="certificate-sign-role">Okul Müdürü</div>
+                            <div id="certificate-principal-name" class="certificate-sign-name">Okul Müdürü</div>
+                        </div>
                     </div>
-                    Öğrencinin sistemde gösterdiği gayret, disiplin ve başarıya ithafen takdim edilmiştir.
                 </div>
             </div>
         </div>
@@ -6678,14 +6653,13 @@ Ayşe, Yılmaz, ogretmen.ayse, 123456"></textarea>
                 <button id="btn-download-class-certificates" class="btn btn-success">Filtredeki Tümünü Önizle</button>
             </div>
             <div id="teacher-certificate-card" class="student-certificate">
-                <div class="certificate-badge">🏅</div>
                 <img src="logo.png" alt="Logo" class="certificate-logo">
-                <div class="certificate-kicker">EĞİTİM PORTALI</div>
+                <div class="certificate-badge">✦</div>
                 <div class="certificate-title">BAŞARI SERTİFİKASI</div>
-                <p id="teacher-certificate-award-text" class="certificate-text">
-                    Bu sertifika, platformdaki düzenli katılımı ve öğrenme sürecindeki başarılı ilerlemesi nedeniyle verilmiştir.
-                </p>
                 <div id="teacher-certificate-student-name" class="certificate-student-name">Öğrenci Adı Soyadı</div>
+                <p id="teacher-certificate-award-text" class="certificate-text">
+                    Bu sertifika, Bilişim, Kodlama, Yazılım ve Robotik alanlarındaki eğitim çalışmalarında gösterilen başarı nedeniyle verilmiştir.
+                </p>
                 <div class="certificate-meta-row">
                     <div class="certificate-meta-item">
                         <span class="k">Sınıf / Şube</span>
@@ -6708,16 +6682,15 @@ Ayşe, Yılmaz, ogretmen.ayse, 123456"></textarea>
                     <div class="certificate-sign-row">
                         <div class="certificate-sign-col">
                             <div class="certificate-sign-line"></div>
-                            <div class="certificate-sign-role">Müdür</div>
-                            <div id="teacher-certificate-principal-name" class="certificate-sign-name">Okul Müdürü</div>
-                        </div>
-                        <div class="certificate-sign-col">
-                            <div class="certificate-sign-line"></div>
                             <div class="certificate-sign-role">Ders Öğretmeni</div>
                             <div id="teacher-certificate-teacher-name" class="certificate-sign-name">Ders Öğretmeni</div>
                         </div>
+                        <div class="certificate-sign-col">
+                            <div class="certificate-sign-line"></div>
+                            <div class="certificate-sign-role">Okul Müdürü</div>
+                            <div id="teacher-certificate-principal-name" class="certificate-sign-name">Okul Müdürü</div>
+                        </div>
                     </div>
-                    Öğrencinin sistemde gösterdiği gayret, disiplin ve başarıya ithafen takdim edilmiştir.
                 </div>
             </div>
         </div>

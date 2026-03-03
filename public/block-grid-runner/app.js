@@ -7,7 +7,11 @@ let workspace;
 const canvas = document.getElementById('gridCanvas');
 const ctx = canvas.getContext('2d');
 const gridSize = 8; // cells per side
-const DEFAULT_LEVEL_XP = 20;
+const EASY_LEVEL_XP = 8;
+const MEDIUM_LEVEL_XP = 18;
+const HARD_LEVEL_XP = 27;
+const DEFAULT_LEVEL_XP = MEDIUM_LEVEL_XP;
+const MAX_LEVEL_XP = 500;
 
 function getCurrentLevelGridWidth(){
   const lvl = levels?.[state?.levelIndex ?? 0] || {};
@@ -104,14 +108,30 @@ function buildExtraBlockLevels(){
 
 levels = levels.concat(buildExtraBlockLevels());
 
+function getDefaultXpByGroup(group){
+  const g = String(group || '').trim().toLowerCase();
+  if(g === 'kolay' || g === 'easy') return EASY_LEVEL_XP;
+  if(g === 'orta' || g === 'medium') return MEDIUM_LEVEL_XP;
+  if(g === 'zor' || g === 'hard') return HARD_LEVEL_XP;
+  return DEFAULT_LEVEL_XP;
+}
+
 function normalizeLevelXp(value){
   const n = Number(value);
   if(!Number.isFinite(n)) return DEFAULT_LEVEL_XP;
-  return Math.max(1, Math.min(20, Math.floor(n)));
+  return Math.max(1, Math.min(MAX_LEVEL_XP, Math.floor(n)));
 }
 
 function applyXpDefaults(){
-  levels = (levels || []).map((lvl) => ({ ...lvl, xp: normalizeLevelXp(lvl?.xp) }));
+  levels = (levels || []).map((lvl) => {
+    const g = String(lvl?.group || '').trim().toLowerCase();
+    const isDifficultyBand = g === 'kolay' || g === 'easy' || g === 'orta' || g === 'medium' || g === 'zor' || g === 'hard';
+    const hasManualXp = Number.isFinite(Number(lvl?.xp));
+    const xp = isDifficultyBand
+      ? getDefaultXpByGroup(lvl?.group)
+      : (hasManualXp ? Number(lvl?.xp) : getDefaultXpByGroup(lvl?.group));
+    return { ...lvl, xp: normalizeLevelXp(xp) };
+  });
 }
 
 applyXpDefaults();

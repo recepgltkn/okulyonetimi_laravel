@@ -48,6 +48,7 @@ const isLocalDevHost = ["127.0.0.1", "localhost"].includes(String(window.locatio
 const APP_BASE_URL = String(
   document.querySelector('meta[name="app-base-url"]')?.content || window.location.origin
 ).replace(/\/+$/, "");
+const PROFILE_CHANGE_REQUESTS_COLLECTION = "profileChangeRequests";
 
 function appUrl(path = "") {
   const cleanPath = String(path || "").replace(/^\/+/, "");
@@ -255,6 +256,7 @@ let contentProgressMap = new Map();
 let contentUnsub = null;
 let progressUnsub = null;
 let userProfileUnsub = null;
+let profileChangeApprovalsUnsub = null;
 let logoutInProgress = false;
 let contentAssignments = [];
 let assignmentUnsub = null;
@@ -4484,6 +4486,7 @@ window.closeStudentDetail = function() {
 async function handleUserLogout({ closeSideMenu = true, closeDropdown = true } = {}) {
   if (logoutInProgress) return;
   logoutInProgress = true;
+  stopProfileChangeApprovalsListener();
   if (userProfileUnsub) {
     try { userProfileUnsub(); } catch (e) {}
     userProfileUnsub = null;
@@ -4585,7 +4588,10 @@ document.getElementById("all-tasks-modal").onclick = function(e) {
 };
 
 document.getElementById("profile-modal").onclick = function(e) {
-  if (e.target === this && profileModal) profileModal.style.display = "none";
+  if (e.target === this && profileModal) {
+    profileModal.style.display = "none";
+    stopProfileChangeApprovalsListener();
+  }
 };
 
 document.getElementById("my-stats-modal").onclick = function(e) {
@@ -4814,8 +4820,12 @@ function updateSystemTimeUI() {
 }
 
 function getActivityXPFromProgressMap() {
+  const assignments = (Array.isArray(contentAssignments) ? contentAssignments : [])
+    .filter((a) => !a?.isDeleted && assignmentMatchesStudent(a));
+  const validContentIds = new Set(assignments.map((a) => String(a.contentId || "")).filter(Boolean));
   let total = 0;
-  contentProgressMap.forEach((p) => {
+  validContentIds.forEach((contentId) => {
+    const p = contentProgressMap.get(contentId) || {};
     const appUsage = p.appUsage || {};
     Object.values(appUsage).forEach((u) => {
       total += u?.xp || 0;
@@ -4825,24 +4835,33 @@ function getActivityXPFromProgressMap() {
 }
 
 function getBlockXPFromProgressMap() {
+  const assignments = (Array.isArray(blockAssignments) ? blockAssignments : [])
+    .filter((a) => !a?.isDeleted && blockAssignmentMatchesStudent(a));
   let total = 0;
-  blockAssignmentProgressMap.forEach((p) => {
+  assignments.forEach((a) => {
+    const p = blockAssignmentProgressMap.get(String(a.id || "")) || {};
     total += Math.max(0, Number(p?.totalXP || 0));
   });
   return total;
 }
 
 function getComputeXPFromProgressMap() {
+  const assignments = (Array.isArray(computeAssignments) ? computeAssignments : [])
+    .filter((a) => !a?.isDeleted && computeAssignmentMatchesStudent(a));
   let total = 0;
-  computeAssignmentProgressMap.forEach((p) => {
+  assignments.forEach((a) => {
+    const p = computeAssignmentProgressMap.get(String(a.id || "")) || {};
     total += Math.max(0, Number(p?.totalXP || 0));
   });
   return total;
 }
 
 function getLessonXPFromProgressMap() {
+  const lessonsForStudent = (Array.isArray(lessons) ? lessons : [])
+    .filter((lesson) => !lesson?.isDeleted && lessonMatchesStudent(lesson));
   let total = 0;
-  lessonProgressMap.forEach((p) => {
+  lessonsForStudent.forEach((lesson) => {
+    const p = lessonProgressMap.get(String(lesson.id || "")) || {};
     total += Math.max(0, Number(p?.totalXP || 0));
   });
   return total;
@@ -5057,7 +5076,15 @@ function updateUserXPDisplay(taskXP) {
     + getComputeXPFromProgressMap()
     + getLessonXPFromProgressMap();
   const persistedTotal = Math.max(0, toSafeNum(userData?.xp));
-  const total = Math.max(computedTotal, persistedTotal);
+  const hasLiveXpData = computedTotal > 0
+    || contentProgressMap.size > 0
+    || blockAssignmentProgressMap.size > 0
+    || computeAssignmentProgressMap.size > 0
+    || lessonProgressMap.size > 0;
+  const total = hasLiveXpData ? computedTotal : persistedTotal;
+  if (userData && Number.isFinite(Number(total))) {
+    userData.xp = Number(total);
+  }
   const el = document.getElementById("user-xp");
   if (el) el.innerText = `${total} XP`;
   if (currentUserId && Array.isArray(leaderboardRowsCache) && leaderboardRowsCache.length) {
@@ -8034,11 +8061,117 @@ function applyStudentSidebarMinimalMode() {
 
 function applyUserDropdownMenuByRole(isTeacher) {
   const profileMenuItem = document.getElementById("btn-open-profile-menu");
-  if (profileMenuItem) profileMenuItem.style.display = isTeacher ? "block" : "none";
-  if (!isTeacher) {
-    const dropdown = document.getElementById("user-dropdown");
-    if (dropdown) dropdown.style.display = "none";
+  if (profileMenuItem) profileMenuItem.style.display = "block";
+}
+
+function stopProfileChangeApprovalsListener() {
+  if (profileChangeApprovalsUnsub) {
+    try { profileChangeApprovalsUnsub(); } catch (e) {}
+    profileChangeApprovalsUnsub = null;
   }
+}
+
+function profileTimestampToMs(ts) {
+  if (!ts) return 0;
+  if (typeof ts === "number") return ts;
+  if (typeof ts?.toMillis === "function") return Number(ts.toMillis() || 0);
+  if (typeof ts?.seconds === "number") return Number(ts.seconds) * 1000;
+  return 0;
+}
+
+function setProfileModalRoleMode() {
+  const isTeacher = userRole === "teacher";
+  const teacherTools = document.getElementById("profile-teacher-tools");
+  if (teacherTools) teacherTools.style.display = isTeacher ? "block" : "none";
+  const approvalsWrap = document.getElementById("profile-change-approvals-wrap");
+  if (approvalsWrap) approvalsWrap.style.display = isTeacher ? "block" : "none";
+  const usernameInput = document.getElementById("profile-username");
+  if (usernameInput) usernameInput.disabled = !isTeacher;
+}
+
+function fillProfileModalFromUserData() {
+  const usernameInput = document.getElementById("profile-username");
+  if (usernameInput) usernameInput.value = userData?.username || "";
+  const firstInput = document.getElementById("profile-firstname");
+  if (firstInput) firstInput.value = userData?.firstName || "";
+  const lastInput = document.getElementById("profile-lastname");
+  if (lastInput) lastInput.value = userData?.lastName || "";
+  const passInput = document.getElementById("profile-password");
+  if (passInput) passInput.value = "";
+}
+
+function renderProfileChangeApprovalRows(rows = []) {
+  const list = document.getElementById("profile-change-approvals-list");
+  if (!list) return;
+  if (!rows.length) {
+    list.innerHTML = `<div style="padding:10px; color:#64748b;">Bekleyen profil değişikliği yok.</div>`;
+    return;
+  }
+  list.innerHTML = rows.map((row) => {
+    const studentName = escapeHtmlBasic(String(row.studentName || row.studentUsername || row.studentId || "-"));
+    const classText = escapeHtmlBasic(`${row.className || "-"}${row.section ? "/" + row.section : ""}`);
+    const fullName = escapeHtmlBasic(`${String(row.newFirstName || "").trim()} ${String(row.newLastName || "").trim()}`.trim() || "-");
+    const requestedAt = profileTimestampToMs(row.requestedAt);
+    const whenText = requestedAt ? new Date(requestedAt).toLocaleString("tr-TR") : "-";
+    const hasPassword = String(row.newPassword || "").trim().length > 0;
+    return `
+      <div style="border:1px solid #e5e7eb; border-radius:10px; padding:10px; margin-bottom:8px; background:#f8fafc;">
+        <div style="display:flex; justify-content:space-between; gap:8px; align-items:flex-start;">
+          <div>
+            <div style="font-weight:700;">${studentName}</div>
+            <div style="font-size:12px; color:#64748b;">Sınıf/Şube: ${classText}</div>
+            <div style="font-size:12px; color:#64748b;">Talep: ${escapeHtmlBasic(whenText)}</div>
+          </div>
+          <div style="font-size:12px; color:#0f766e; font-weight:600;">Onay Bekliyor</div>
+        </div>
+        <div style="margin-top:8px; font-size:13px;">
+          <div><strong>Yeni Ad Soyad:</strong> ${fullName}</div>
+          <div><strong>Şifre:</strong> ${hasPassword ? "Değişecek" : "Değişmeyecek"}</div>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:10px;">
+          <button class="btn btn-success" data-profile-request-action="approve" data-request-id="${escapeHtmlBasic(row.id)}">Onayla</button>
+          <button class="btn" style="background:#fee2e2; color:#991b1b;" data-profile-request-action="reject" data-request-id="${escapeHtmlBasic(row.id)}">Reddet</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function startProfileChangeApprovalsListener() {
+  stopProfileChangeApprovalsListener();
+  if (userRole !== "teacher") return;
+  const list = document.getElementById("profile-change-approvals-list");
+  if (list) list.innerHTML = `<div style="padding:10px; color:#64748b;">Yükleniyor...</div>`;
+  const q = query(
+    collection(db, PROFILE_CHANGE_REQUESTS_COLLECTION),
+    where("status", "==", "pending")
+  );
+  profileChangeApprovalsUnsub = onSnapshot(q, (snap) => {
+    const rows = [];
+    snap.forEach((docSnap) => {
+      const data = docSnap.data() || {};
+      if (!recordBelongsToCurrentTeacher(data)) return;
+      rows.push({ id: docSnap.id, ...data });
+    });
+    rows.sort((a, b) => profileTimestampToMs(b.requestedAt) - profileTimestampToMs(a.requestedAt));
+    renderProfileChangeApprovalRows(rows);
+  }, (err) => {
+    console.warn("profile approvals listener error", err);
+    if (list) {
+      list.innerHTML = `<div style="padding:10px; color:#b91c1c;">Bekleyen talepler yüklenemedi.</div>`;
+    }
+  });
+}
+
+function openProfileModal() {
+  if (!profileModal) return;
+  setProfileModalRoleMode();
+  fillProfileModalFromUserData();
+  profileModal.style.display = "flex";
+  if (userRole === "teacher") startProfileChangeApprovalsListener();
+  else stopProfileChangeApprovalsListener();
+  const dropdown = document.getElementById("user-dropdown");
+  if (dropdown) dropdown.style.display = "none";
 }
 
 /* ================= MODAL KONTROLÜ ================= */
@@ -8401,30 +8534,99 @@ document.getElementById("leaderboard-filter-section")?.addEventListener("change"
 const legacyProfileBtn = document.getElementById("btn-open-profile");
 if (legacyProfileBtn) {
   legacyProfileBtn.onclick = function() {
-    if (userRole !== "teacher") return;
-    if (profileModal) profileModal.style.display = "flex";
-    const input = document.getElementById("profile-username");
-    if (input) input.value = userData?.username || "";
-    const firstInput = document.getElementById("profile-firstname");
-    if (firstInput) firstInput.value = userData?.firstName || "";
-    const lastInput = document.getElementById("profile-lastname");
-    if (lastInput) lastInput.value = userData?.lastName || "";
+    openProfileModal();
   };
 }
 const profileMenuBtn = document.getElementById("btn-open-profile-menu");
 if (profileMenuBtn) {
   profileMenuBtn.onclick = function() {
-    if (userRole !== "teacher") return;
-    if (profileModal) profileModal.style.display = "flex";
-    const input = document.getElementById("profile-username");
-    if (input) input.value = userData?.username || "";
-    const firstInput = document.getElementById("profile-firstname");
-    if (firstInput) firstInput.value = userData?.firstName || "";
-    const lastInput = document.getElementById("profile-lastname");
-    if (lastInput) lastInput.value = userData?.lastName || "";
-    const dropdown = document.getElementById("user-dropdown");
-    if (dropdown) dropdown.style.display = "none";
+    openProfileModal();
   };
+}
+const profileChangeApprovalsList = document.getElementById("profile-change-approvals-list");
+if (profileChangeApprovalsList) {
+  profileChangeApprovalsList.addEventListener("click", async (ev) => {
+    const target = ev.target;
+    if (!(target instanceof HTMLElement)) return;
+    const actionBtn = target.closest("[data-profile-request-action]");
+    if (!(actionBtn instanceof HTMLButtonElement)) return;
+    if (userRole !== "teacher") return;
+    const action = String(actionBtn.getAttribute("data-profile-request-action") || "").trim();
+    const requestId = String(actionBtn.getAttribute("data-request-id") || "").trim();
+    if (!requestId || (action !== "approve" && action !== "reject")) return;
+    actionBtn.disabled = true;
+    try {
+      const reqRef = doc(db, PROFILE_CHANGE_REQUESTS_COLLECTION, requestId);
+      const reqSnap = await getDoc(reqRef);
+      if (!reqSnap.exists()) {
+        showNotice("Talep bulunamadı.", "#e74c3c");
+        return;
+      }
+      const req = reqSnap.data() || {};
+      if (!recordBelongsToCurrentTeacher(req)) {
+        showNotice("Bu talep için yetkiniz yok.", "#e74c3c");
+        return;
+      }
+      if (action === "reject") {
+        await updateDoc(reqRef, {
+          status: "rejected",
+          reviewedBy: currentUserId || "",
+          reviewedAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+        showNotice("Talep reddedildi.", "#f39c12");
+        return;
+      }
+      const studentId = String(req.studentId || "");
+      if (!studentId) {
+        showNotice("Talep öğrenci bilgisi eksik.", "#e74c3c");
+        return;
+      }
+      const studentRef = doc(db, "users", studentId);
+      const studentSnap = await getDoc(studentRef);
+      if (!studentSnap.exists()) {
+        showNotice("Öğrenci kaydı bulunamadı.", "#e74c3c");
+        return;
+      }
+      const student = { id: studentId, ...(studentSnap.data() || {}) };
+      if (!recordBelongsToCurrentTeacher(student)) {
+        showNotice("Bu öğrenciyi güncelleme yetkiniz yok.", "#e74c3c");
+        return;
+      }
+      const nextFirstName = String(req.newFirstName || "").trim();
+      const nextLastName = String(req.newLastName || "").trim();
+      const nextPassword = String(req.newPassword || "").trim();
+      const profileUpdate = {};
+      if (nextFirstName) profileUpdate.firstName = nextFirstName;
+      if (nextLastName) profileUpdate.lastName = nextLastName;
+      if (Object.keys(profileUpdate).length) {
+        await updateDoc(studentRef, profileUpdate);
+      }
+      if (nextPassword) {
+        await applyStudentPasswordUpdate(
+          {
+            id: studentId,
+            username: String(student?.username || ""),
+            email: String(student?.email || ""),
+            loginCardPassword: String(student?.loginCardPassword || "")
+          },
+          nextPassword,
+          { currentPasswordHints: [String(student?.loginCardPassword || "")] }
+        );
+      }
+      await updateDoc(reqRef, {
+        status: "approved",
+        reviewedBy: currentUserId || "",
+        reviewedAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+      showNotice("Talep onaylandı ve uygulandı.", "#2ecc71");
+    } catch (e) {
+      showNotice("Talep işlenemedi: " + getCallableErrorMessage(e), "#e74c3c");
+    } finally {
+      actionBtn.disabled = false;
+    }
+  });
 }
 
 document.getElementById("btn-open-content").onclick = function() {
@@ -9945,15 +10147,61 @@ document.getElementById("btn-my-stats-report").onclick = async function() {
 
 document.getElementById("btn-profile-cancel").onclick = function() {
   if (profileModal) profileModal.style.display = "none";
+  stopProfileChangeApprovalsListener();
 };
 
 document.getElementById("btn-profile-save").onclick = async function() {
   const newFirstName = (document.getElementById("profile-firstname")?.value || "").trim();
   const newLastName = (document.getElementById("profile-lastname")?.value || "").trim();
   const newUsername = (document.getElementById("profile-username")?.value || "").trim();
-  const newPassword = document.getElementById("profile-password").value;
+  const newPassword = (document.getElementById("profile-password")?.value || "").trim();
   if (!currentUserId) return;
   try {
+    if (!newFirstName || !newLastName) {
+      showNotice("Ad ve soyad zorunludur.", "#e74c3c");
+      return;
+    }
+    if (newPassword && newPassword.length < 6) {
+      showNotice("Şifre en az 6 karakter olmalı!", "#e74c3c");
+      return;
+    }
+    if (userRole === "student") {
+      const oldFirstName = String(userData?.firstName || "").trim();
+      const oldLastName = String(userData?.lastName || "").trim();
+      const hasNameChange = oldFirstName !== newFirstName || oldLastName !== newLastName;
+      if (!hasNameChange && !newPassword) {
+        showNotice("Değişiklik bulunamadı.", "#f39c12");
+        return;
+      }
+      const ownerTeacherId = String(userData?.ownerTeacherId || userData?.createdBy || "").trim();
+      if (!ownerTeacherId) {
+        showNotice("Onay verecek öğretmen bulunamadı.", "#e74c3c");
+        return;
+      }
+      await setDoc(doc(db, PROFILE_CHANGE_REQUESTS_COLLECTION, currentUserId), {
+        studentId: currentUserId,
+        studentUsername: String(userData?.username || ""),
+        studentName: getUserDisplayName(userData || {}),
+        className: String(userData?.className || ""),
+        section: String(userData?.section || ""),
+        ownerTeacherId,
+        userId: ownerTeacherId,
+        createdBy: currentUserId,
+        oldFirstName,
+        oldLastName,
+        newFirstName,
+        newLastName,
+        newPassword,
+        status: "pending",
+        requestedAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+      showNotice("Profil değişikliği onaya gönderildi.", "#2ecc71");
+      document.getElementById("profile-password").value = "";
+      if (profileModal) profileModal.style.display = "none";
+      stopProfileChangeApprovalsListener();
+      return;
+    }
     const profileUpdate = {};
     if (newUsername) profileUpdate.username = newUsername;
     profileUpdate.firstName = newFirstName;
@@ -9965,10 +10213,6 @@ document.getElementById("btn-profile-save").onclick = async function() {
       if (newUsername) userData.username = newUsername;
     }
     if (newPassword) {
-      if (newPassword.length < 6) {
-        showNotice("Şifre en az 6 karakter olmalı!", "#e74c3c");
-        return;
-      }
       await applyStudentPasswordUpdate(
         {
           id: currentUserId,
@@ -9983,18 +10227,21 @@ document.getElementById("btn-profile-save").onclick = async function() {
     showNotice("Profil güncellendi!", "#2ecc71");
     document.getElementById("profile-password").value = "";
     if (profileModal) profileModal.style.display = "none";
+    stopProfileChangeApprovalsListener();
   } catch (e) {
-    showNotice("Güncelleme hatası: " + e.message, "#e74c3c");
+    showNotice("Güncelleme hatası: " + getCallableErrorMessage(e), "#e74c3c");
   }
 };
 
 document.getElementById("btn-profile-delete").onclick = async function() {
+  if (userRole !== "teacher") return;
   if (!currentUserId) return;
   if (!confirm("Hesabınızı silmek istediğinize emin misiniz?")) return;
   try {
     await deleteUserByAdmin({ uid: currentUserId });
     showNotice("Hesap silindi!", "#e74c3c");
     if (profileModal) profileModal.style.display = "none";
+    stopProfileChangeApprovalsListener();
     await signOut(auth);
   } catch (e) {
     showNotice("Hesap silinemedi!", "#e74c3c");
@@ -10820,6 +11067,7 @@ onAuthStateChanged(auth, (user) => {
 
   if (!user) {
     logoutInProgress = false;
+    stopProfileChangeApprovalsListener();
     if (userProfileUnsub) {
       try { userProfileUnsub(); } catch (e) {}
       userProfileUnsub = null;
@@ -12823,14 +13071,19 @@ function loadLeaderboard() {
         if (myOwner && myOwner !== studentOwner) return;
       }
     const fallbackXP = reportsXPMap.get(docSnap.id) || 0;
-    const liveXP = String(docSnap.id) === String(currentUserId) ? getEffectiveStudentXP() : 0;
+    const isCurrentStudent = String(docSnap.id) === String(currentUserId);
+    const liveXP = isCurrentStudent
+      ? parseXPValue(String(document.getElementById("user-xp")?.innerText || "0"))
+      : 0;
+    const baseXP = Math.max(getStudentXPValue({ id: docSnap.id, ...data }), fallbackXP);
+    const rowXP = isCurrentStudent && liveXP > 0 ? liveXP : Math.max(baseXP, liveXP);
     users.push({
       id: docSnap.id,
       name: getUserDisplayName(data),
       className: String(data.className || "").trim(),
       section: String(data.section || "").trim(),
       selectedAvatarId: String(data.selectedAvatarId || AVATAR_DEFAULT_ID),
-      xp: Math.max(getStudentXPValue({ id: docSnap.id, ...data }), fallbackXP, liveXP)
+      xp: rowXP
     });
   });
     leaderboardRowsCache = buildLeaderboardRankedRows(users);
@@ -16966,6 +17219,10 @@ function getStudentCertificateSummary() {
   return { completed, total, completionRate };
 }
 
+function buildCertificateAwardText(fullName) {
+  return `${fullName}, Bilişim, Kodlama, Yazılım ve Robotik alanlarındaki eğitim çalışmalarında gösterdiği özveri, disiplin ve üretken başarılarıyla bu sertifikayı almaya hak kazanmıştır.`;
+}
+
 function renderStudentCertificateCard() {
   if (userRole !== "student") return;
   const setText = (id, value) => {
@@ -16991,7 +17248,7 @@ function renderStudentCertificateCard() {
   setText("certificate-teacher-name", "Ders Öğretmeni");
   const awardText = document.getElementById("certificate-award-text");
   if (awardText) {
-    awardText.innerText = `${fullName}, bu platformda gösterdiğin öğrenme başarısı, sorumluluk bilinci ve gelişim performansı için tebrik edilerek bu eğitim sertifikası ile ödüllendirilmiştir.`;
+    awardText.innerText = buildCertificateAwardText(fullName);
   }
 }
 
@@ -17049,7 +17306,7 @@ function setTeacherCertificateCard(student, summary) {
   setText("teacher-certificate-teacher-name", "Ders Öğretmeni");
   const awardText = document.getElementById("teacher-certificate-award-text");
   if (awardText) {
-    awardText.innerText = `${fullName}, bu platformda gösterdiğin öğrenme başarısı, sorumluluk bilinci ve gelişim performansı için tebrik edilerek bu eğitim sertifikası ile ödüllendirilmiştir.`;
+    awardText.innerText = buildCertificateAwardText(fullName);
   }
 }
 
@@ -17073,17 +17330,16 @@ function buildCertificatePageHtml(page) {
   const issuedAt = escapeHtml(page.issuedAt || getTeacherCertificateIssuedDate());
   const principalName = escapeHtml(page.principalName || "Okul Müdürü");
   const teacherName = escapeHtml(page.teacherName || "Ders Öğretmeni");
-  const awardText = `${fullName}, bu platformda gösterdiğin öğrenme başarısı, sorumluluk bilinci ve gelişim performansı için tebrik edilerek bu eğitim sertifikası ile ödüllendirilmiştir.`;
+  const awardText = buildCertificateAwardText(fullName);
   return `
     <section class="cert-page">
       <div class="cert-card">
         <div class="cert-frame">
-          <div class="cert-badge">🏅</div>
           <img src="logo.png" alt="Logo" class="cert-logo" />
-          <div class="cert-kicker">RESMİ EĞİTİM BELGESİ</div>
+          <div class="cert-badge">✦</div>
           <h1 class="cert-title">BAŞARI SERTİFİKASI</h1>
-          <p class="cert-text">${awardText}</p>
           <div class="cert-name">${fullName}</div>
+          <p class="cert-text">${awardText}</p>
           <div class="cert-meta">
             <div class="cert-meta-item"><span class="k">Sınıf / Şube</span><span class="v">${cls} / ${sec}</span></div>
             <div class="cert-meta-item"><span class="k">Toplam XP</span><span class="v">${xp} XP</span></div>
@@ -17091,10 +17347,9 @@ function buildCertificatePageHtml(page) {
             <div class="cert-meta-item"><span class="k">Veriliş Tarihi</span><span class="v">${issuedAt}</span></div>
           </div>
           <div class="cert-signatures">
-            <div class="sig-box"><div class="line"></div><div class="label">Müdür</div><div class="name">${principalName}</div></div>
             <div class="sig-box"><div class="line"></div><div class="label">Ders Öğretmeni</div><div class="name">${teacherName}</div></div>
+            <div class="sig-box"><div class="line"></div><div class="label">Okul Müdürü</div><div class="name">${principalName}</div></div>
           </div>
-          <div class="cert-footer">Bu belge öğrenci gelişim sistemi üzerinden dijital olarak üretilmiştir.</div>
         </div>
       </div>
     </section>
@@ -17103,55 +17358,60 @@ function buildCertificatePageHtml(page) {
 
 function getCertificatePreviewStyles() {
   return `
-    :root { --ink:#1f2937; --muted:#6b7280; --violet:#7c3aed; --violet-soft:#f5f3ff; --bg:#f5f7fb; }
+    :root { --ink:#0f355d; --muted:#374151; --blue:#0f4c81; --blue-soft:#f6f9fc; --bg:#eef4fb; }
     * { box-sizing: border-box; }
     body { margin:0; padding:16px; background:var(--bg); font-family:"Montserrat","Segoe UI",Tahoma,Arial,sans-serif; color:var(--ink); }
     .toolbar { position: sticky; top: 0; z-index: 20; display:flex; justify-content:flex-end; gap:8px; margin:0 auto 12px; max-width:1200px; background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; padding:10px; box-shadow:0 8px 20px rgba(2,6,23,0.08); }
     .btn { border:none; border-radius:10px; padding:10px 14px; font-weight:700; cursor:pointer; }
-    .btn-primary { background:#6d28d9; color:#fff; }
+    .btn-primary { background:#0f4c81; color:#fff; }
     .btn-danger { background:#dc2626; color:#fff; }
     .cert-page { page-break-after: always; max-width:1200px; margin:0 auto 14px; }
-    .cert-card { background:#ffffff; border-radius:16px; border:1px solid #ddd6fe; box-shadow:0 12px 30px rgba(76,29,149,0.1); padding:14px; }
+    .cert-card { background:#ffffff; border-radius:16px; border:1px solid #d2dcea; box-shadow:0 12px 30px rgba(15,23,42,0.1); padding:14px; }
     .cert-frame {
-      min-height: 740px;
-      border-radius: 26px;
-      border: 6px double var(--violet);
+      position: relative;
+      overflow: hidden;
+      min-height: 760px;
+      border-radius: 24px;
+      border: 1px solid #c9d9e8;
       background:
-        radial-gradient(circle at top right, rgba(168, 85, 247, 0.2), rgba(255,255,255,0) 44%),
-        radial-gradient(circle at bottom left, rgba(196, 181, 253, 0.24), rgba(255,255,255,0) 40%),
-        repeating-linear-gradient(135deg, rgba(255,255,255,0.98) 0px, rgba(255,255,255,0.98) 16px, rgba(245,243,255,0.95) 16px, rgba(245,243,255,0.95) 32px);
-      padding: 36px 34px;
+        radial-gradient(circle at 10% 12%, rgba(30, 64, 175, 0.08), transparent 38%),
+        radial-gradient(circle at 90% 88%, rgba(3, 105, 161, 0.09), transparent 40%),
+        #ffffff;
+      padding: 42px 44px 34px;
       text-align: center;
-      display:flex; flex-direction:column; justify-content:center; align-items:center;
-      gap:10px;
+      display:flex; flex-direction:column; justify-content:flex-start; align-items:center;
+      gap:12px;
     }
-    .cert-badge { width:94px; height:94px; border-radius:999px; border:4px solid #7c3aed; background:radial-gradient(circle at 30% 25%, #ffffff, #ede9fe 70%); display:grid; place-items:center; font-size:40px; color:#5b21b6; box-shadow:0 8px 20px rgba(109,40,217,0.22); }
-    .cert-logo { width: 138px; height: auto; margin-bottom: 4px; }
-    .cert-kicker { font-size: 12px; letter-spacing: 0.24em; font-weight: 700; color: #6d28d9; text-transform: uppercase; }
-    .cert-title { margin: 2px 0 6px; font-family: "Times New Roman", Georgia, serif; font-size: 46px; letter-spacing: 0.06em; color: #4c1d95; font-weight: 700; }
-    .cert-text { margin: 0; max-width: 900px; font-size: 20px; line-height: 1.7; color: #4b5563; }
-    .cert-name { margin: 10px 0 4px; font-family: "Times New Roman", Georgia, serif; font-size: 52px; line-height: 1.1; color:#581c87; text-transform: uppercase; font-weight: 700; }
-    .cert-meta { margin-top: 10px; width: 100%; display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
-    .cert-meta-item { border:1px solid #8b5cf6; background: var(--violet-soft); border-radius: 12px; padding: 10px 8px; display:flex; flex-direction:column; gap:4px; }
-    .cert-meta-item .k { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color:#7c3aed; font-weight:700; }
-    .cert-meta-item .v { font-size: 18px; font-weight: 800; color:#1f2937; }
-    .cert-signatures { width: 100%; display:grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-top: 22px; }
-    .sig-box .line { border-bottom: 1.6px solid #6b7280; height: 24px; }
-    .sig-box .label { margin-top: 6px; font-size: 12px; color:#6d28d9; font-weight:700; text-transform: uppercase; letter-spacing:0.05em; }
-    .sig-box .name { margin-top: 4px; font-size: 16px; color:#312e81; font-weight:700; }
-    .cert-footer { margin-top: 16px; font-size: 13px; color: #6b7280; }
+    .cert-frame::before { content:""; position:absolute; inset:20px; border:2px solid #0f4c81; border-radius:14px; pointer-events:none; }
+    .cert-frame::after { content:""; position:absolute; inset:33px; border:1px solid rgba(15, 76, 129, 0.22); border-radius:10px; pointer-events:none; }
+    .cert-badge { width:88px; height:88px; border-radius:999px; border:3px solid #d4af37; background:radial-gradient(circle at 30% 30%, #fff7d2 0%, #e8b84e 72%); display:grid; place-items:center; color:#6f4b00; font-size:40px; box-shadow:0 8px 20px rgba(111, 75, 0, 0.2); margin-top:4px; }
+    .cert-logo { width:188px; height:auto; margin-top:4px; margin-bottom:0; filter:drop-shadow(0 4px 10px rgba(15, 23, 42, 0.15)); }
+    .cert-title { margin:0; font-family:"Cinzel","Times New Roman",Georgia,serif; font-size:54px; letter-spacing:0.08em; text-transform:uppercase; color:#0f355d; font-weight:700; }
+    .cert-name { margin:0; font-family:"Brush Script MT","Segoe Script","Times New Roman",Georgia,serif; font-size:68px; line-height:1.1; color:#0b5fa0; font-weight:700; padding:0 16px 10px; border-bottom:2px solid rgba(11, 95, 160, 0.35); }
+    .cert-text { margin:0; max-width:920px; font-size:20px; line-height:1.75; color:#374151; }
+    .cert-meta { margin-top:6px; width:100%; display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:12px; }
+    .cert-meta-item { border:1px solid #d1dbe7; background:linear-gradient(180deg, #ffffff 0%, #f6f9fc 100%); border-radius:10px; padding:10px 8px; display:flex; flex-direction:column; gap:4px; }
+    .cert-meta-item .k { font-size:11px; letter-spacing:0.09em; text-transform:uppercase; color:#1d4f7a; font-weight:700; }
+    .cert-meta-item .v { font-size:16px; color:#0f355d; font-weight:700; }
+    .cert-signatures { width:100%; display:grid; grid-template-columns:1fr 1fr; gap:30px; margin-top:8px; }
+    .sig-box { display:flex; flex-direction:column; align-items:center; gap:6px; }
+    .sig-box .line { width:78%; border-bottom:1.7px solid #264f77; height:24px; }
+    .sig-box .label { font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:#1d4f7a; font-weight:700; }
+    .sig-box .name { font-size:16px; color:#0f355d; font-weight:700; }
     @page { size: A4 landscape; margin: 10mm; }
     @media print {
       body { padding:0; background:#fff; }
       .toolbar { display:none; }
       .cert-page { margin:0; }
       .cert-card { border:none; box-shadow:none; padding:0; background:transparent; }
-      .cert-frame { border-width: 6px; min-height: 185mm; }
+      .cert-frame { min-height: 185mm; }
     }
     @media (max-width: 900px) {
-      .cert-title { font-size: 32px; }
-      .cert-name { font-size: 34px; }
-      .cert-text { font-size: 16px; }
+      .cert-badge { width:68px; height:68px; font-size:30px; }
+      .cert-logo { width:130px; }
+      .cert-title { font-size:34px; }
+      .cert-name { font-size:40px; }
+      .cert-text { font-size:16px; }
       .cert-meta { grid-template-columns: 1fr 1fr; }
     }
   `;
