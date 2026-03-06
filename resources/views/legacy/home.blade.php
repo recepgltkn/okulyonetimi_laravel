@@ -1395,7 +1395,9 @@
             box-shadow: none;
         }
         #block-homework-assign-tabs .tab-btn[data-assign-type="computeit"] {
-            border: none !important;
+            border-top: none !important;
+            border-left: none !important;
+            border-right: none !important;
             box-shadow: none !important;
         }
         #student-tabs,
@@ -2590,7 +2592,7 @@
             border-radius: 10px !important;
             padding: 10px !important;
             background: #f8fafc !important;
-            min-height: 130px !important;
+            min-height: 320px !important;
         }
         .lesson-panel.right {
             display: flex;
@@ -4452,6 +4454,7 @@
             .lesson-builder-main { grid-template-columns: 1fr; }
             .lesson-quick-tools { grid-template-columns: 1fr; }
             .lesson-question-grid { grid-template-columns: 1fr; }
+            #lesson-slide-preview { min-height: 220px !important; }
             .lesson-player-shell {
                 width: 100vw !important;
                 height: 100vh !important;
@@ -4673,25 +4676,27 @@
             #app-screen.teacher-view #block-homework-assign-tabs .tab-btn[data-assign-type="lightbot"]::after { content: "RobotCode"; }
             #app-screen.teacher-view #block-homework-assign-tabs .tab-btn[data-assign-type="computeit"]::after { content: "Comp.it"; }
 
-            /* Iki kart mobilde ayni yukseklikte ve 3 kayitlik sabit liste alani */
+            /* Mobilde kart/liste sabit yukseklige kilitlenmesin, icerige gore uzasin */
             #app-screen.teacher-view #student-homework-shell,
             #app-screen.teacher-view #block-homework-section {
-                height: 560px !important;
-                min-height: 560px !important;
-                max-height: 560px !important;
-                overflow: hidden;
+                height: auto !important;
+                min-height: 0 !important;
+                max-height: none !important;
+                overflow: visible !important;
             }
             #app-screen.teacher-view #teacher-home-sections-host .embedded-home-card .tab-content.active,
             #app-screen.teacher-view #block-homework-section #block-homework-pending,
             #app-screen.teacher-view #block-homework-section #compute-homework-pending {
-                min-height: 240px;
-                max-height: 240px;
-                overflow: auto !important;
+                min-height: 0 !important;
+                max-height: none !important;
+                height: auto !important;
+                overflow: visible !important;
             }
             #app-screen.teacher-view #teacher-home-sections-host .embedded-home-card .tab-content.active > ul,
             #app-screen.teacher-view #block-homework-section #block-homework-pending > ul,
             #app-screen.teacher-view #block-homework-section #compute-homework-pending > ul {
                 min-height: 0;
+                overflow: visible !important;
             }
         }
 
@@ -4976,20 +4981,19 @@
         @media (min-width: 900px) {
             #app-screen.teacher-view {
                 --teacher-row-height: 78px;
-                --teacher-visible-rows: 3;
-                --teacher-list-area: calc(var(--teacher-row-height) * var(--teacher-visible-rows));
             }
             #app-screen.teacher-view #teacher-home-sections-host .embedded-home-card .tab-content.active,
             #app-screen.teacher-view #block-homework-section .status-split .tab-content.active {
-                min-height: var(--teacher-list-area) !important;
-                max-height: var(--teacher-list-area) !important;
-                height: var(--teacher-list-area) !important;
+                min-height: 0 !important;
+                max-height: none !important;
+                height: auto !important;
+                flex: 1 1 auto !important;
                 overflow: auto !important;
             }
             #app-screen.teacher-view #teacher-home-sections-host .embedded-home-card .tab-content.active > .empty-state,
             #app-screen.teacher-view #block-homework-section .status-split .tab-content.active > .empty-state {
-                min-height: var(--teacher-list-area);
-                max-height: var(--teacher-list-area);
+                min-height: 100%;
+                max-height: none;
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -5009,6 +5013,61 @@
             #app-screen.teacher-view #block-homework-section .list-item {
                 flex-direction: row !important;
                 align-items: center !important;
+            }
+            #app-screen.student-view #tasks-section .list-item,
+            #app-screen.student-view #activities-section .list-item,
+            #app-screen.student-view #lessons-section .list-item,
+            #app-screen.student-view #block-homework-section .list-item,
+            #app-screen.student-view #compute-homework-section .list-item,
+            #app-screen.student-view #student-homework-shell .list-item,
+            #app-screen.student-view #student-apps-shell .list-item {
+                flex-direction: row !important;
+                align-items: center !important;
+                justify-content: space-between !important;
+                flex-wrap: nowrap !important;
+                gap: 8px;
+            }
+            #app-screen.student-view #tasks-section .list-item > div:first-child,
+            #app-screen.student-view #activities-section .list-item > div:first-child,
+            #app-screen.student-view #lessons-section .list-item > div:first-child,
+            #app-screen.student-view #block-homework-section .list-item > div:first-child,
+            #app-screen.student-view #compute-homework-section .list-item > div:first-child,
+            #app-screen.student-view #student-homework-shell .list-item > div:first-child,
+            #app-screen.student-view #student-apps-shell .list-item > div:first-child {
+                flex: 1 1 auto;
+                min-width: 0;
+                overflow: hidden;
+            }
+            #app-screen.student-view #tasks-section .list-item > div:first-child > div,
+            #app-screen.student-view #activities-section .list-item > div:first-child > div,
+            #app-screen.student-view #lessons-section .list-item > div:first-child > div,
+            #app-screen.student-view #block-homework-section .list-item > div:first-child > div,
+            #app-screen.student-view #compute-homework-section .list-item > div:first-child > div,
+            #app-screen.student-view #student-homework-shell .list-item > div:first-child > div,
+            #app-screen.student-view #student-apps-shell .list-item > div:first-child > div,
+            #app-screen.student-view #tasks-section .list-item > div:first-child > small,
+            #app-screen.student-view #activities-section .list-item > div:first-child > small,
+            #app-screen.student-view #lessons-section .list-item > div:first-child > small,
+            #app-screen.student-view #block-homework-section .list-item > div:first-child > small,
+            #app-screen.student-view #compute-homework-section .list-item > div:first-child > small,
+            #app-screen.student-view #student-homework-shell .list-item > div:first-child > small,
+            #app-screen.student-view #student-apps-shell .list-item > div:first-child > small {
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            #app-screen.student-view #tasks-section .list-item > div:last-child,
+            #app-screen.student-view #activities-section .list-item > div:last-child,
+            #app-screen.student-view #lessons-section .list-item > div:last-child,
+            #app-screen.student-view #block-homework-section .list-item > div:last-child,
+            #app-screen.student-view #compute-homework-section .list-item > div:last-child,
+            #app-screen.student-view #student-homework-shell .list-item > div:last-child,
+            #app-screen.student-view #student-apps-shell .list-item > div:last-child {
+                white-space: nowrap;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                flex: 0 0 auto;
             }
             .student-list-item { flex-direction: column; align-items: flex-start; }
             .stats-grid { grid-template-columns: 1fr; }

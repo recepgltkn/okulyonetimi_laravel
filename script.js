@@ -9089,9 +9089,6 @@ if (quickCodeBtn) {
     setLessonEditorType("content", "code");
     const codeInput = document.getElementById("slide-code-input");
     if (codeInput) {
-      if (!String(codeInput.value || "").trim()) {
-        codeInput.value = "<div id=\"app\">Merhaba</div>\n<style>\n  #app { color: #2563eb; font-weight: 700; }\n</style>\n<script>\n  console.log(\"Kod hazır\");\n</script>";
-      }
       codeInput.focus();
     }
     updateLessonSlidePreview();
@@ -9284,6 +9281,15 @@ if (deleteLessonBtn) {
 
 const closeLessonPlayerBtn = document.getElementById("btn-close-lesson-player");
 if (closeLessonPlayerBtn) closeLessonPlayerBtn.onclick = async () => { await persistLessonProgress(true); };
+
+const lessonNavToggleBtn = document.getElementById("btn-lesson-nav-toggle");
+if (lessonNavToggleBtn) {
+  lessonNavToggleBtn.onclick = () => {
+    const shell = document.querySelector("#lesson-player-modal .lesson-player-shell");
+    if (!shell) return;
+    shell.classList.toggle("is-nav-collapsed");
+  };
+}
 
 const lessonZoomOutBtn = document.getElementById("lesson-zoom-out");
 if (lessonZoomOutBtn) {
@@ -16397,6 +16403,17 @@ function openLessonBuilderModal(lesson = null) {
     bgImage: lesson?.bgImage || "",
     slides: Array.isArray(lesson?.slides) ? JSON.parse(JSON.stringify(lesson.slides)) : []
   };
+  if (!lessonDraft.slides.length) {
+    lessonDraft.slides.push({
+      id: `s_${Date.now()}`,
+      type: "content",
+      title: "",
+      content: "",
+      codeSnippet: "",
+      imageUrl: "",
+      layout: "code"
+    });
+  }
   selectedLessonSlideIndex = lessonDraft.slides.length ? 0 : -1;
   lessonCanvasElements = [];
   selectedLessonCanvasElementId = null;
@@ -16446,6 +16463,8 @@ function openLessonPlayerModal(lesson) {
   }
   const modal = document.getElementById("lesson-player-modal");
   if (modal) modal.style.display = "flex";
+  const shell = document.querySelector("#lesson-player-modal .lesson-player-shell");
+  if (shell) shell.classList.remove("is-nav-collapsed");
   lessonPlayerZoom = 100;
   renderLessonPlayer();
 }
@@ -22159,4 +22178,3 @@ async function loadMyStatsModal() {
     showNotice("İstatistikler yüklenemedi. Lütfen tekrar deneyin.", "#e74c3c");
   }
 }
-
