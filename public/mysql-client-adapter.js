@@ -7,6 +7,14 @@ const authListeners = new Set();
 const watchRegistry = new Map();
 const authInstances = new Set();
 
+function isPrimaryApp(app) {
+  return String(app?.name || "default") === "default";
+}
+
+function isPrimaryAuth(auth) {
+  return isPrimaryApp(auth?.app);
+}
+
 try {
   const raw = localStorage.getItem(AUTH_KEY);
   if (raw) currentUser = JSON.parse(raw);
@@ -15,7 +23,7 @@ try {
 function persistAuthUser(user) {
   currentUser = user || null;
   for (const auth of authInstances) {
-    auth.currentUser = currentUser;
+    if (isPrimaryAuth(auth)) auth.currentUser = currentUser;
   }
   try {
     if (currentUser) localStorage.setItem(AUTH_KEY, JSON.stringify(currentUser));
@@ -116,7 +124,12 @@ function subscribeWatch(target, cb) {
 
 export function initializeApp(config, name = "default") { return { config, name }; }
 export function getAuth(app) {
-  const auth = { app, kind: "auth", currentUser };
+  const auth = {
+    app,
+    kind: "auth",
+    currentUser: isPrimaryApp(app) ? currentUser : null,
+    listeners: new Set(),
+  };
   authInstances.add(auth);
   return auth;
 }
@@ -189,7 +202,14 @@ export async function signInWithEmailAndPassword(_auth, email, password) {
   const res = await api("/auth/login", "POST", { identifier: email, password });
   const user = res?.user || null;
   if (!user) throw new Error("Login failed");
-  persistAuthUser(user);
+  if (isPrimaryAuth(_auth)) {
+    persistAuthUser(user);
+  } else {
+    _auth.currentUser = user;
+    for (const cb of _auth.listeners || []) {
+      try { cb(user); } catch {}
+    }
+  }
   return { user };
 }
 export async function createUserWithEmailAndPassword(_auth, email, password) {
@@ -200,8 +220,27 @@ export async function createUserWithEmailAndPassword(_auth, email, password) {
 }
 export async function updatePassword(user, newPassword) { await api("/auth/update-password", "POST", { uid: user?.uid || user?.id, newPassword }); }
 export async function deleteUser(user) { await api("/auth/delete-user", "POST", { uid: user?.uid || user?.id }); }
-export function onAuthStateChanged(_auth, cb) { authListeners.add(cb); setTimeout(() => cb(currentUser), 0); return () => authListeners.delete(cb); }
-export async function signOut(_auth) { persistAuthUser(null); }
+export function onAuthStateChanged(_auth, cb) {
+  if (isPrimaryAuth(_auth)) {
+    authListeners.add(cb);
+    setTimeout(() => cb(currentUser), 0);
+    return () => authListeners.delete(cb);
+  }
+  if (!_auth?.listeners) _auth.listeners = new Set();
+  _auth.listeners.add(cb);
+  setTimeout(() => cb(_auth.currentUser || null), 0);
+  return () => _auth.listeners.delete(cb);
+}
+export async function signOut(_auth) {
+  if (isPrimaryAuth(_auth)) {
+    persistAuthUser(null);
+    return;
+  }
+  if (_auth) _auth.currentUser = null;
+  for (const cb of _auth?.listeners || []) {
+    try { cb(null); } catch {}
+  }
+}
 export function httpsCallable(_functions, name) {
   return async (data = {}) => {
     const res = await api(`/callable/${encodeURIComponent(String(name || ""))}`, "POST", { data });

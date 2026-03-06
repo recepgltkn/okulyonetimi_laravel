@@ -122,13 +122,24 @@ function getBlockLevelXPByDifficulty(diffToken) {
   return BLOCK_XP_MEDIUM;
 }
 
+function getBlockLevelXPByLevelNo(levelNo) {
+  const n = Math.max(1, Number(levelNo || 1));
+  if (n <= 5) return BLOCK_XP_EASY;
+  if (n <= 11) return BLOCK_XP_MEDIUM;
+  return BLOCK_XP_HARD;
+}
+
 function resolveBlockLevelXP(level = {}, levelNo = 0, totalLevels = 0, extraText = "") {
-  const direct = normalizeBlockDifficultyToken(level?.difficulty || level?.levelDifficulty || "");
+  if (Number.isFinite(Number(levelNo)) && Number(levelNo) > 0) {
+    return getBlockLevelXPByLevelNo(levelNo);
+  }
+  const direct = normalizeBlockDifficultyToken(level?.difficulty || level?.levelDifficulty || level?.group || "");
   if (direct) return getBlockLevelXPByDifficulty(direct);
   const mixedText = [
     level?.name,
     level?.title,
     level?.label,
+    level?.group,
     level?.difficultyLabel,
     extraText
   ].map((v) => String(v || "")).join(" ");
@@ -346,6 +357,7 @@ let editingLessonIsPublished = false;
 let lessonDraft = { slides: [] };
 let selectedLessonSlideIndex = -1;
 let lessonPlayerState = null;
+let lessonPlayerZoom = 100;
 let lessonCanvasElements = [];
 let lessonCanvasDrag = null;
 let selectedLessonCanvasElementId = null;
@@ -3295,7 +3307,7 @@ function getBlockLevelNamesByTypeAndRange(typeRaw, start, end) {
     const e = Math.max(s, Number(end || s));
     const out = [];
     for (let i = s - 1; i <= e - 1 && i < sections.length; i++) {
-      out.push(String(sections[i]?.name || `Bolum ${i + 1}`));
+      out.push(String(sections[i]?.name || `Bölüm ${i + 1}`));
     }
     return out;
   }
@@ -9090,6 +9102,7 @@ if (insertLessonImageBtn) {
 const slideLayoutEl = document.getElementById("slide-layout");
 if (slideLayoutEl) {
   slideLayoutEl.addEventListener("change", () => {
+    setLessonCodeEditorVisibility();
     renderLessonCanvasEditor();
     updateLessonSlidePreview();
   });
@@ -9105,6 +9118,8 @@ if (qTypeEl) {
 }
 const slideContentEditorEl = document.getElementById("slide-content-editor");
 if (slideContentEditorEl) slideContentEditorEl.addEventListener("input", updateLessonSlidePreview);
+const slideCodeInputEl = document.getElementById("slide-code-input");
+if (slideCodeInputEl) slideCodeInputEl.addEventListener("input", updateLessonSlidePreview);
 const slideImageFileEl = document.getElementById("slide-image-file");
 if (slideImageFileEl) {
   slideImageFileEl.addEventListener("change", async (e) => {
@@ -9269,7 +9284,21 @@ function setLessonEditorType(type, layout) {
     layoutEl.dispatchEvent(new Event("change"));
   }
   if (typeof updateLessonQuestionTypeUI === "function") updateLessonQuestionTypeUI();
+  setLessonCodeEditorVisibility();
   updateLessonSlidePreview();
+}
+
+function setLessonCodeEditorVisibility() {
+  const layout = document.getElementById("slide-layout")?.value || "text";
+  const codeWrap = document.getElementById("slide-code-editor");
+  const contentEditor = document.getElementById("slide-content-editor");
+  const mediaRow = document.getElementById("slide-media-row");
+  const toolbar = document.querySelector(".lesson-toolbar");
+  const isCode = layout === "code";
+  if (codeWrap) codeWrap.style.display = isCode ? "block" : "none";
+  if (contentEditor) contentEditor.style.display = isCode ? "none" : "block";
+  if (mediaRow) mediaRow.style.display = isCode ? "none" : "grid";
+  if (toolbar) toolbar.style.display = isCode ? "none" : "flex";
 }
 
 const quickTextBtn = document.getElementById("btn-lesson-quick-text");
@@ -9287,6 +9316,21 @@ if (quickImageBtn) {
     setLessonEditorType("content", "split");
     const imageInput = document.getElementById("slide-image-file");
     if (imageInput) imageInput.click();
+  });
+}
+
+const quickCodeBtn = document.getElementById("btn-lesson-quick-code");
+if (quickCodeBtn) {
+  quickCodeBtn.addEventListener("click", () => {
+    setLessonEditorType("content", "code");
+    const codeInput = document.getElementById("slide-code-input");
+    if (codeInput) {
+      if (!String(codeInput.value || "").trim()) {
+        codeInput.value = "<div id=\"app\">Merhaba</div>\n<style>\n  #app { color: #2563eb; font-weight: 700; }\n</style>\n<script>\n  console.log(\"Kod hazır\");\n</script>";
+      }
+      codeInput.focus();
+    }
+    updateLessonSlidePreview();
   });
 }
 
@@ -9476,6 +9520,27 @@ if (deleteLessonBtn) {
 
 const closeLessonPlayerBtn = document.getElementById("btn-close-lesson-player");
 if (closeLessonPlayerBtn) closeLessonPlayerBtn.onclick = async () => { await persistLessonProgress(true); };
+
+const lessonZoomOutBtn = document.getElementById("lesson-zoom-out");
+if (lessonZoomOutBtn) {
+  lessonZoomOutBtn.onclick = () => {
+    applyLessonPlayerZoom(lessonPlayerZoom - 10, { keepCenter: true });
+  };
+}
+
+const lessonZoomResetBtn = document.getElementById("lesson-zoom-reset");
+if (lessonZoomResetBtn) {
+  lessonZoomResetBtn.onclick = () => {
+    applyLessonPlayerZoom(100, { keepCenter: true });
+  };
+}
+
+const lessonZoomInBtn = document.getElementById("lesson-zoom-in");
+if (lessonZoomInBtn) {
+  lessonZoomInBtn.onclick = () => {
+    applyLessonPlayerZoom(lessonPlayerZoom + 10, { keepCenter: true });
+  };
+}
 
 const lessonPrevBtn = document.getElementById("btn-lesson-prev");
 if (lessonPrevBtn) lessonPrevBtn.onclick = async function () {
@@ -11724,6 +11789,10 @@ function updateTaskLists() {
   let completedCount = 0;
   const pendingRows = [];
   const completedRows = [];
+  const taskCompletedUsers = new Set();
+  let taskAssignedTotal = 0;
+  let taskDoneTotal = 0;
+  let taskXpTotal = 0;
   
   let filteredTasks = userRole === "teacher" 
     ? allTasks.filter(task => matchesFilter(task))
@@ -11752,6 +11821,16 @@ function updateTaskLists() {
       const teacherDoneCount = requiresTeacherApprovalTask(task)
         ? Number(taskStats[task.id]?.completedCount || 0)
         : new Set((completedTasks.get(task.id) || []).map((c) => c.userId)).size;
+      taskAssignedTotal += Math.max(0, Number(assignedStudents || 0));
+      taskDoneTotal += Math.max(0, Number(teacherDoneCount || 0));
+      if (requiresTeacherApprovalTask(task)) {
+        taskXpTotal += Math.max(0, Number(teacherDoneCount || 0)) * Number(MANUAL_TASK_APPROVAL_XP || 0);
+      } else {
+        (completedTasks.get(task.id) || []).forEach((c) => {
+          if (c?.userId) taskCompletedUsers.add(String(c.userId));
+          taskXpTotal += Math.max(0, Number(c?.xpEarned || 0));
+        });
+      }
       const teacherCompleted = assignedStudents > 0 && teacherDoneCount >= assignedStudents;
       if (teacherCompleted) {
         completedRows.push(li);
@@ -11781,13 +11860,13 @@ function updateTaskLists() {
   };
   if (userRole === "teacher") {
     const allRows = [...pendingRows, ...completedRows];
-    renderLimitedRows(pendingList, allRows, 5);
+    renderLimitedRows(pendingList, allRows, 3);
     if (completedList) completedList.innerHTML = "";
     if (noPending) noPending.style.display = allRows.length === 0 ? "block" : "none";
     if (noCompleted) noCompleted.style.display = "none";
     setShowMoreButton(
       "btn-show-all-tasks",
-      allRows.length > 5,
+      allRows.length > 3,
       () => openAllItemsModal(homeListCache.tasks.title, homeListCache.tasks.pending, homeListCache.tasks.completed)
     );
   } else {
@@ -11806,6 +11885,9 @@ function updateTaskLists() {
   if (userRole !== "teacher") {
     const statCompleted = document.getElementById("stat-completed");
     if (statCompleted) statCompleted.innerText = completedCount;
+  } else {
+    const avgTaskProgress = taskAssignedTotal > 0 ? (taskDoneTotal / taskAssignedTotal) * 100 : 0;
+    setTeacherSectionStats("task", taskCompletedUsers.size || taskDoneTotal, avgTaskProgress, taskXpTotal);
   }
   
   // Otomatik sekme geçişi kaldırıldı: Bekleyen sekmesi varsayılan kalsın
@@ -15373,7 +15455,7 @@ function renderBlockHomeworkList() {
       : `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-size:11px;font-weight:700;">2D</span>`;
     const deadlineDate = a.deadline ? new Date(`${a.deadline}T${a.deadlineTime || "23:59"}`) : null;
     const isExpired = deadlineDate && deadlineDate < now;
-    if (isExpired) li.classList.add("expired");
+    if (isExpired && userRole !== "teacher") li.classList.add("expired");
     if (userRole === "teacher") {
       const assigned = allStudents.filter((s) => assignmentMatchesStudentFor(a, s)).length;
       const done = Number(blockTeacherCompletedCountMap.get(a.id) ?? a.completedCount ?? 0);
@@ -15382,11 +15464,12 @@ function renderBlockHomeworkList() {
         : `${Math.max(1, Number(a.levelStart || 1))}-${Math.max(1, Number(a.levelEnd || a.levelStart || 1))}`;
       li.innerHTML = `
         <div>
-          <div style="font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${a.title || `${appLabel} Ödevi`} ${appBadge}</div>
-          <small style="color:#666;display:block;margin-top:4px;">📅 ${a.deadline || "-"} • ${isFlowchart ? "Flowchart" : (isSilentTeacher || isLightbot) ? `Bolum ${rangeText}` : `Seviye ${rangeText}`}</small>
+          <div style="font-weight:600;">${a.title || `${appLabel} Ödevi`}</div>
+          <small style="color:#666;">📅 ${a.deadline || "-"} • ${isFlowchart ? "Flowchart" : (isSilentTeacher || isLightbot) ? `Bölüm ${rangeText}` : `Seviye ${rangeText}`}</small>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <span class="badge badge-info" style="font-size:1.02rem; padding:8px 14px;">${Math.min(assigned, done)}/${assigned} tamamlama</span>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span class="completion-badge" style="background:#dcfce7;color:#166534;border-color:#86efac;">Yayında</span>
+          <span class="completion-badge">${Math.min(assigned, done)}/${assigned} tamamlama</span>
         </div>
       `;
       li.onclick = () => {
@@ -15460,7 +15543,7 @@ function renderBlockHomeworkList() {
       li.innerHTML = `
         <div>
           <div style="font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${a.title || `${appLabel} Ödevi`} ${appBadge}</div>
-          <small style="color:#666;">📅 ${a.deadline || "-"} • ${isFlowchart ? "Flowchart Soru" : (isSilentTeacher || isLightbot) ? `Bolum ${rangeText}` : `Seviye ${rangeText}`}</small>
+          <small style="color:#666;">📅 ${a.deadline || "-"} • ${isFlowchart ? "Flowchart Soru" : (isSilentTeacher || isLightbot) ? `Bölüm ${rangeText}` : `Seviye ${rangeText}`}</small>
           ${isFlowchart ? `<small style="color:#666;display:block;">🧭 ${a.flowQuestion || "Flowchart şemasını kur"}</small>` : ""}
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
@@ -15535,7 +15618,7 @@ function renderBlockHomeworkList() {
   };
   if (userRole === "teacher") {
     const allRows = [...pendingRows, ...completedRows];
-    renderLimitedRows(pendingList, allRows, 5);
+    renderLimitedRows(pendingList, allRows, 3);
     if (completedList) completedList.innerHTML = "";
     if (noPending) noPending.style.display = allRows.length === 0 ? "block" : "none";
     if (noCompleted) noCompleted.style.display = "none";
@@ -15766,18 +15849,19 @@ function renderComputeHomeworkList() {
     li.className = "list-item";
     const deadlineDate = a.deadline ? new Date(`${a.deadline}T${a.deadlineTime || "23:59"}`) : null;
     const isExpired = deadlineDate && deadlineDate < now;
-    if (isExpired) li.classList.add("expired");
+    if (isExpired && userRole !== "teacher") li.classList.add("expired");
     if (userRole === "teacher") {
       const assigned = allStudents.filter((s) => assignmentMatchesStudentFor(a, s)).length;
       const done = Number(computeTeacherCompletedCountMap.get(a.id) ?? a.completedCount ?? 0);
       const rangeText = `${Math.max(1, Number(a.levelStart || 1))}-${Math.max(1, Number(a.levelEnd || a.levelStart || 1))}`;
       li.innerHTML = `
-        <div style="flex:1;min-width:0;">
-          <div style="font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${a.title || "Compute It Ödevi"}</div>
-          <small style="color:#666;display:block;margin-top:4px;">📅 ${a.deadline || "-"} • Seviye ${rangeText}</small>
+        <div>
+          <div style="font-weight:600;">${a.title || "Compute It Ödevi"}</div>
+          <small style="color:#666;">📅 ${a.deadline || "-"} • Seviye ${rangeText}</small>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;padding-right:4px;">
-          <span class="badge badge-info" style="font-size:1.02rem; padding:8px 14px;">${Math.min(assigned, done)}/${assigned} tamamlama</span>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span class="completion-badge" style="background:#dcfce7;color:#166534;border-color:#86efac;">Yayında</span>
+          <span class="completion-badge">${Math.min(assigned, done)}/${assigned} tamamlama</span>
         </div>
       `;
       li.onclick = () => openComputeHomeworkModalForEdit(a);
@@ -15843,13 +15927,13 @@ function renderComputeHomeworkList() {
   };
   if (userRole === "teacher") {
     const allRows = [...pendingRows, ...completedRows];
-    renderLimitedRows(pendingList, allRows, 5);
+    renderLimitedRows(pendingList, allRows, 3);
     if (completedList) completedList.innerHTML = "";
     if (noPending) noPending.style.display = allRows.length === 0 ? "block" : "none";
     if (noCompleted) noCompleted.style.display = "none";
     setShowMoreButton(
       "btn-show-all-compute-homework",
-      allRows.length > 5,
+      allRows.length > 3,
       () => openAllItemsModal(homeListCache.compute.title, homeListCache.compute.pending, homeListCache.compute.completed)
     );
   } else {
@@ -16095,6 +16179,10 @@ function renderLessonsList() {
   const completedRows = [];
   let pendingCount = 0;
   let completedCount = 0;
+  const lessonCompletedUsers = new Set();
+  let lessonAssignedTotal = 0;
+  let lessonDoneTotal = 0;
+  let lessonXpTotal = 0;
 
   items.forEach((lesson) => {
     const li = document.createElement("li");
@@ -16107,8 +16195,14 @@ function renderLessonsList() {
       lessonProgressMap.forEach((p) => {
         if (p.lessonId !== lesson.id) return;
         const isDone = !!p.completed || Number(p.percent || 0) >= 100;
-        if (isDone) done++;
+        if (isDone) {
+          done++;
+          if (p?.userId) lessonCompletedUsers.add(String(p.userId));
+        }
+        lessonXpTotal += Math.max(0, Number(p?.totalXP || 0));
       });
+      lessonAssignedTotal += Math.max(0, Number(assigned || 0));
+      lessonDoneTotal += Math.max(0, Number(done || 0));
       li.innerHTML = `
         <div>
           <div style="font-weight:600;">${lesson.title || "Ders"}</div>
@@ -16183,13 +16277,13 @@ function renderLessonsList() {
   };
   if (userRole === "teacher") {
     const allRows = [...pendingRows, ...completedRows];
-    renderLimitedRows(pendingList, allRows, 5);
+    renderLimitedRows(pendingList, allRows, 3);
     if (completedList) completedList.innerHTML = "";
     if (noPending) noPending.style.display = allRows.length === 0 ? "block" : "none";
     if (noCompleted) noCompleted.style.display = "none";
     setShowMoreButton(
       "btn-show-all-lessons",
-      allRows.length > 5,
+      allRows.length > 3,
       () => openAllItemsModal(homeListCache.lessons.title, homeListCache.lessons.pending, homeListCache.lessons.completed)
     );
   } else {
@@ -16205,6 +16299,10 @@ function renderLessonsList() {
   }
   const countEl = document.getElementById("teacher-lesson-count");
   if (countEl && userRole === "teacher") countEl.innerText = items.length;
+  if (userRole === "teacher") {
+    const avgLessonProgress = lessonAssignedTotal > 0 ? (lessonDoneTotal / lessonAssignedTotal) * 100 : 0;
+    setTeacherSectionStats("lesson", lessonCompletedUsers.size || lessonDoneTotal, avgLessonProgress, lessonXpTotal);
+  }
   if (userRole === "student") {
     const lessonStatEl = document.getElementById("stat-lessons-completed");
     if (lessonStatEl) lessonStatEl.innerText = String(completedCount);
@@ -16323,6 +16421,8 @@ function fillLessonSlideForm() {
   set("slide-type", s.type || "content");
   const editor = document.getElementById("slide-content-editor");
   if (editor) editor.innerHTML = s.content || "";
+  const codeInput = document.getElementById("slide-code-input");
+  if (codeInput) codeInput.value = s.codeSnippet || (s.layout === "code" ? (s.content || "") : "");
   set("slide-image-url", s.imageUrl || "");
   set("slide-video-url", s.videoUrl || "");
   set("slide-layout", s.layout || "text");
@@ -16342,6 +16442,7 @@ function fillLessonSlideForm() {
   const cArea = document.getElementById("slide-content-area");
   if (cArea) cArea.style.display = "block";
   updateLessonQuestionTypeUI();
+  setLessonCodeEditorVisibility();
   renderLessonThemePicker();
   renderLessonCanvasEditor();
   updateLessonSlidePreview();
@@ -16350,15 +16451,18 @@ function fillLessonSlideForm() {
 function readLessonSlideForm() {
   const get = (id) => (document.getElementById(id)?.value || "").trim();
   const type = get("slide-type") || "content";
+  const layout = get("slide-layout") || "text";
   const editor = document.getElementById("slide-content-editor");
+  const codeSnippet = document.getElementById("slide-code-input")?.value || "";
   return {
     id: lessonDraft.slides[selectedLessonSlideIndex]?.id || `s_${Date.now()}_${Math.random().toString(16).slice(2, 6)}`,
     title: get("slide-title"),
     type,
-    content: editor ? editor.innerHTML.trim() : "",
+    content: layout === "code" ? "" : (editor ? editor.innerHTML.trim() : ""),
+    codeSnippet,
     imageUrl: get("slide-image-url"),
     videoUrl: get("slide-video-url"),
-    layout: get("slide-layout") || "text",
+    layout,
     questionType: get("slide-question-type") || "multiple",
     question: get("slide-question"),
     options: [get("slide-opt-1"), get("slide-opt-2"), get("slide-opt-3"), get("slide-opt-4")].filter(Boolean),
@@ -16518,6 +16622,27 @@ function updateLessonSlidePreview() {
     return;
   }
   const html = draft.content || "<span style='color:#94a3b8;'>İçerik yok</span>";
+  if (draft.layout === "code") {
+    const codeSource = String(draft.codeSnippet || draft.content || "").trim();
+    box.innerHTML = `
+      <div style="font-weight:700;margin-bottom:6px;">Kod Önizleme</div>
+      <div id="lesson-code-preview-wrap" style="border:1px solid #cbd5e1;border-radius:10px;overflow:hidden;background:#fff;min-height:180px;"></div>
+    `;
+    const wrap = document.getElementById("lesson-code-preview-wrap");
+    if (!wrap) return;
+    if (!codeSource) {
+      wrap.innerHTML = `<div style="padding:12px;color:#64748b;">Kod yok. HTML/CSS/JS kodunu tek kutuya yazın.</div>`;
+      return;
+    }
+    const frame = document.createElement("iframe");
+    frame.style.width = "100%";
+    frame.style.minHeight = "220px";
+    frame.style.border = "0";
+    frame.setAttribute("sandbox", "allow-scripts");
+    frame.srcdoc = codeSource;
+    wrap.appendChild(frame);
+    return;
+  }
   if (draft.layout === "canvas") {
     const blocks = Array.isArray(draft.elements) ? draft.elements : [];
     box.innerHTML = `
@@ -16583,6 +16708,7 @@ function openLessonBuilderModal(lesson = null) {
   renderLessonThemePicker();
   renderLessonSlideList();
   fillLessonSlideForm();
+  setLessonCodeEditorVisibility();
   updateLessonSlidePreview();
   const delLessonBtn = document.getElementById("btn-delete-lesson");
   if (delLessonBtn) delLessonBtn.style.display = editingLessonId ? "inline-block" : "none";
@@ -16612,6 +16738,7 @@ function openLessonPlayerModal(lesson) {
   }
   const modal = document.getElementById("lesson-player-modal");
   if (modal) modal.style.display = "flex";
+  lessonPlayerZoom = 100;
   renderLessonPlayer();
 }
 
@@ -16630,7 +16757,7 @@ function renderLessonPlayer() {
       const b = document.createElement("button");
       b.className = "btn";
       b.style.cssText = `width:100%;text-align:left;margin-bottom:6px;background:${i === st.index ? "#dbeafe" : "#f8fafc"};border:1px solid #e5e7eb;`;
-      const done = st.visited.has(i) ? "? " : "";
+      const done = st.visited.has(i) ? "✓ " : "";
       b.innerText = `${done}${i + 1}. ${s.title || "Slide"}`;
       b.onclick = () => {
         st.index = i;
@@ -16642,6 +16769,8 @@ function renderLessonPlayer() {
   }
   const cur = slides[st.index];
   if (!cur || !stage) return;
+  stage.style.overflowX = "auto";
+  stage.style.overflowY = "auto";
   st.visited.add(st.index);
   const slideAnswerKey = cur.id || `slide_${st.index}`;
   stage.style.backgroundImage = lesson.bgImage ? `url('${lesson.bgImage}')` : "none";
@@ -16663,7 +16792,12 @@ function renderLessonPlayer() {
   let contentBlock = "";
   if (hasContent) {
     let bodyHtml = "";
-    if (cur.layout === "canvas") {
+    if (cur.layout === "code") {
+      const codeSource = String(cur.codeSnippet || cur.content || "").trim();
+      bodyHtml = codeSource
+        ? `<div class="lesson-code-frame-wrap"><iframe class="lesson-code-frame" sandbox="allow-scripts" srcdoc="${escapeHtmlBasic(codeSource)}"></iframe></div>`
+        : `<div style="padding:10px;border:1px dashed #94a3b8;border-radius:8px;color:#64748b;">Kod içeriği bulunamadı.</div>`;
+    } else if (cur.layout === "canvas") {
       const blocks = Array.isArray(cur.elements) ? cur.elements : [];
       bodyHtml = `
         <div style="position:relative;min-height:360px;border-radius:12px;overflow:hidden;background:rgba(255,255,255,.86);">
@@ -16697,7 +16831,7 @@ function renderLessonPlayer() {
       bodyHtml = `<div>${videoHtml}${contentHtml}</div>`;
     }
     contentBlock = `
-      <div style="background:${cardBg};color:${cardText};border:1px solid ${cardBorder};backdrop-filter: blur(3px);padding:14px;border-radius:10px;">
+      <div style="background:${cardBg};color:${cardText};border:1px solid ${cardBorder};backdrop-filter: blur(3px);padding:14px;border-radius:10px;${hasQuestion ? "" : "min-height:100%;display:flex;flex-direction:column;"}">
         <h3 style="margin-top:0;">${cur.title || "Konu"}</h3>
         ${bodyHtml}
       </div>
@@ -16764,7 +16898,17 @@ function renderLessonPlayer() {
       </div>
     `;
   }
-  stage.innerHTML = `${contentBlock}${questionBlock || ""}`;
+  const isCodeLayout = hasContent && !hasQuestion && cur.layout === "code";
+  stage.classList.toggle("lesson-code-layout", isCodeLayout);
+  stage.innerHTML = `
+    <div class="lesson-player-page">
+      <div class="lesson-player-page-zoom">
+        <div class="lesson-content-zoom">${contentBlock || ""}</div>
+        ${questionBlock || ""}
+      </div>
+    </div>
+  `;
+  applyLessonPlayerZoom(lessonPlayerZoom, { keepCenter: false });
   stage.querySelectorAll("[data-opt]").forEach((btn) => {
     btn.onclick = () => {
       const choice = btn.getAttribute("data-opt");
@@ -16808,6 +16952,34 @@ function renderLessonPlayer() {
   const nextBtn = document.getElementById("btn-lesson-next");
   if (nextBtn) nextBtn.innerText = st.index >= (slides.length - 1) ? "Bitir" : "Sonraki";
   updateLessonProgressBar();
+}
+
+function clampLessonPlayerZoom(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 100;
+  return Math.max(60, Math.min(180, Math.round(n)));
+}
+
+function applyLessonPlayerZoom(value, options = {}) {
+  const stage = document.getElementById("lesson-player-stage");
+  if (!stage) return;
+  const keepCenter = options.keepCenter !== false;
+  const next = clampLessonPlayerZoom(value);
+  const prevMaxX = Math.max(1, stage.scrollWidth - stage.clientWidth);
+  const prevMaxY = Math.max(1, stage.scrollHeight - stage.clientHeight);
+  const ratioX = stage.scrollLeft / prevMaxX;
+  const ratioY = stage.scrollTop / prevMaxY;
+  lessonPlayerZoom = next;
+  stage.style.setProperty("--lesson-player-zoom", String(next / 100));
+  const resetBtn = document.getElementById("lesson-zoom-reset");
+  if (resetBtn) resetBtn.innerText = `${next}%`;
+  if (!keepCenter) return;
+  requestAnimationFrame(() => {
+    const nextMaxX = Math.max(0, stage.scrollWidth - stage.clientWidth);
+    const nextMaxY = Math.max(0, stage.scrollHeight - stage.clientHeight);
+    stage.scrollLeft = Math.max(0, Math.min(nextMaxX, Math.round(nextMaxX * ratioX)));
+    stage.scrollTop = Math.max(0, Math.min(nextMaxY, Math.round(nextMaxY * ratioY)));
+  });
 }
 
 function isLessonAnswerCorrect(slide, answer) {
@@ -17086,6 +17258,15 @@ function renderLimitedRows(listEl, rows, limit = 3) {
   if (!listEl) return;
   listEl.innerHTML = "";
   rows.slice(0, limit).forEach((row) => listEl.appendChild(row));
+}
+
+function setTeacherSectionStats(sectionKey, completedStudents, avgProgress, totalXP) {
+  const completedEl = document.getElementById(`teacher-${sectionKey}-completed-students`);
+  const avgEl = document.getElementById(`teacher-${sectionKey}-avg-progress`);
+  const xpEl = document.getElementById(`teacher-${sectionKey}-total-xp`);
+  if (completedEl) completedEl.innerText = String(Math.max(0, Number(completedStudents || 0)));
+  if (avgEl) avgEl.innerText = `%${Math.max(0, Math.min(100, Math.round(Number(avgProgress || 0))))}`;
+  if (xpEl) xpEl.innerText = String(Math.max(0, Math.round(Number(totalXP || 0))));
 }
 
 function setShowMoreButton(buttonId, show, onClick) {
@@ -17976,6 +18157,9 @@ function updateActivityLists() {
   let completedCount = 0;
   const pendingRows = [];
   const completedRows = [];
+  let activityAssignedTotal = 0;
+  let activityDoneTotal = 0;
+  let activityXpTotal = 0;
 
   const now = new Date();
     assignments.forEach((assignment) => {
@@ -18032,6 +18216,9 @@ function updateActivityLists() {
       if (userRole === "teacher") {
         const count = activityProgressMap.get(assignment.contentId) || 0;
         const totalStudents = allStudents.filter((s) => assignmentMatchesStudentFor(assignment, s)).length;
+        activityAssignedTotal += Math.max(0, Number(totalStudents || 0));
+        activityDoneTotal += Math.max(0, Number(count || 0));
+        activityXpTotal += Math.max(0, Number(getAssignmentCompletionXP(assignment) || 0));
         rightBadges = `
           <span class="badge ${isExpired ? "badge-danger" : "badge-info"}">
             ${count}${totalStudents ? "/" + totalStudents : ""} Tamamlama
@@ -18084,11 +18271,11 @@ function updateActivityLists() {
       const allRows = [...pendingRows, ...completedRows];
       if (noPending) noPending.style.display = allRows.length === 0 ? "block" : "none";
       if (noCompleted) noCompleted.style.display = "none";
-      renderLimitedRows(pendingList, allRows, 5);
+      renderLimitedRows(pendingList, allRows, 3);
       if (completedList) completedList.innerHTML = "";
       setShowMoreButton(
         "btn-show-all-activities",
-        allRows.length > 5,
+        allRows.length > 3,
         () => openAllItemsModal(homeListCache.activities.title, homeListCache.activities.pending, homeListCache.activities.completed)
       );
     } else {
@@ -18105,6 +18292,8 @@ function updateActivityLists() {
     if (userRole === "teacher") {
       const el = document.getElementById("teacher-activity-count");
       if (el) el.innerText = assignments.length;
+      const avgActivityProgress = activityAssignedTotal > 0 ? (activityDoneTotal / activityAssignedTotal) * 100 : 0;
+      setTeacherSectionStats("activity", activityDoneTotal, avgActivityProgress, activityXpTotal);
     } else {
       const el = document.getElementById("stat-activity-completed");
       if (el) el.innerText = completedCount;
@@ -22305,26 +22494,4 @@ async function loadMyStatsModal() {
     showNotice("İstatistikler yüklenemedi. Lütfen tekrar deneyin.", "#e74c3c");
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

@@ -1179,12 +1179,51 @@
     if (data.type === "OPEN_DELETE_LEVEL") openDelete();
   });
 
+  function triggerMoveFromInput(dir) {
+    if (dir === "right" || dir === "left" || dir === "up" || dir === "down") move(dir);
+  }
+
   document.addEventListener("keydown", (e) => {
-    if (e.key === "ArrowRight") move("right");
-    else if (e.key === "ArrowLeft") move("left");
-    else if (e.key === "ArrowUp") move("up");
-    else if (e.key === "ArrowDown") move("down");
+    if (e.key === "ArrowRight") triggerMoveFromInput("right");
+    else if (e.key === "ArrowLeft") triggerMoveFromInput("left");
+    else if (e.key === "ArrowUp") triggerMoveFromInput("up");
+    else if (e.key === "ArrowDown") triggerMoveFromInput("down");
   });
+
+  let swipeStartX = 0;
+  let swipeStartY = 0;
+  let hasSwipeStart = false;
+  const SWIPE_MIN_DISTANCE = 24;
+
+  if (boardEl) {
+    boardEl.style.touchAction = "none";
+    boardEl.addEventListener("touchstart", (e) => {
+      const t = e.touches && e.touches[0];
+      if (!t) return;
+      swipeStartX = t.clientX;
+      swipeStartY = t.clientY;
+      hasSwipeStart = true;
+    }, { passive: true });
+
+    boardEl.addEventListener("touchcancel", () => {
+      hasSwipeStart = false;
+    }, { passive: true });
+
+    boardEl.addEventListener("touchend", (e) => {
+      if (!hasSwipeStart) return;
+      hasSwipeStart = false;
+      const t = e.changedTouches && e.changedTouches[0];
+      if (!t) return;
+      const dx = t.clientX - swipeStartX;
+      const dy = t.clientY - swipeStartY;
+      const absX = Math.abs(dx);
+      const absY = Math.abs(dy);
+      if (Math.max(absX, absY) < SWIPE_MIN_DISTANCE) return;
+      e.preventDefault();
+      if (absX >= absY) triggerMoveFromInput(dx >= 0 ? "right" : "left");
+      else triggerMoveFromInput(dy >= 0 ? "down" : "up");
+    }, { passive: false });
+  }
 
   btnReset.addEventListener("click", () => loadLevel(levelIndex));
   if (btnNext) {
@@ -1200,4 +1239,3 @@
 
   loadLevel(0);
 })();
-
