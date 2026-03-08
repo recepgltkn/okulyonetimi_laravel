@@ -96,6 +96,99 @@ function clampAppLevelXP(value) {
   return clampNumber(value, 0, MAX_APP_LEVEL_XP);
 }
 
+function getComputeLevelNo(level = {}, fallbackIndex = 0) {
+  const raw = Number(level?.id ?? level?.levelId ?? level?.levelNo);
+  if (Number.isFinite(raw) && raw > 0) return Math.round(raw);
+  const fallback = Number(fallbackIndex) + 1;
+  return Number.isFinite(fallback) && fallback > 0 ? Math.round(fallback) : 1;
+}
+
+function getComputeLevelXPByLevelNo(levelNo) {
+  const n = Math.max(1, Math.round(Number(levelNo || 1)));
+  if (n <= 10) return 5;
+  if (n <= 21) return 10;
+  if (n <= 35) return 17;
+  if (n <= 42) return 22;
+  return 30;
+}
+
+function getComputeLevelXP(level = {}, fallbackIndex = 0) {
+  return getComputeLevelXPByLevelNo(getComputeLevelNo(level, fallbackIndex));
+}
+
+function getComputeRangeXPByLevelNo(levelStart = 1, levelEnd = 1) {
+  const start = Math.max(1, Math.round(Number(levelStart || 1)));
+  const end = Math.max(start, Math.round(Number(levelEnd || start)));
+  let sum = 0;
+  for (let lvNo = start; lvNo <= end; lvNo++) {
+    sum += getComputeLevelXPByLevelNo(lvNo);
+  }
+  return Math.max(0, sum);
+}
+
+function normalizeComputeCompletedLevelIds(rawIds = [], levelStart = 1, levelEnd = levelStart, completedLevelsHint = 0) {
+  const start = Math.max(1, Math.round(Number(levelStart || 1)));
+  const end = Math.max(start, Math.round(Number(levelEnd || start)));
+  const inRange = Array.from(
+    new Set(
+      (Array.isArray(rawIds) ? rawIds : [])
+        .map((v) => Number(v))
+        .filter((v) => Number.isFinite(v))
+        .map((v) => Math.round(v))
+        .filter((v) => v >= start && v <= end)
+    )
+  ).sort((a, b) => a - b);
+  const total = Math.max(0, end - start + 1);
+  const hint = Math.max(0, Math.min(total, Math.round(Number(completedLevelsHint || 0))));
+  if (hint <= 0) return inRange;
+  if (inRange.length >= hint) return inRange.slice(0, hint);
+  const filled = [...inRange];
+  const has = new Set(filled);
+  for (let lv = start; lv <= end && filled.length < hint; lv++) {
+    if (!has.has(lv)) {
+      filled.push(lv);
+      has.add(lv);
+    }
+  }
+  return filled.sort((a, b) => a - b);
+}
+
+function getNormalizedComputeProgressSnapshot(progress = {}, assignment = null) {
+  const levelStart = Math.max(
+    1,
+    Number(progress?.levelStart || assignment?.levelStart || 1)
+  );
+  const levelEnd = Math.max(
+    levelStart,
+    Number(progress?.levelEnd || assignment?.levelEnd || levelStart)
+  );
+  const totalLevels = Math.max(0, levelEnd - levelStart + 1);
+  const completedLevelsHint = Math.max(
+    0,
+    Number(progress?.completedLevels || 0),
+    progress?.completed ? totalLevels : 0
+  );
+  const completedLevelIds = normalizeComputeCompletedLevelIds(
+    progress?.completedLevelIds,
+    levelStart,
+    levelEnd,
+    completedLevelsHint
+  );
+  const totalXP = completedLevelIds.reduce((sum, levelNo) => sum + getComputeLevelXPByLevelNo(levelNo), 0);
+  return {
+    levelStart,
+    levelEnd,
+    totalLevels,
+    completedLevels: completedLevelIds.length,
+    completedLevelIds,
+    totalXP: Math.max(0, totalXP)
+  };
+}
+
+function clampLessonQuestionXP(value) {
+  return clampNumber(value, 0, 200);
+}
+
 function normalizeBlockDifficultyToken(raw) {
   const v = String(raw || "").toLocaleLowerCase("tr-TR");
   if (!v) return "";
@@ -226,7 +319,7 @@ function computeRangeTotalXPFromLevels({
     const isCurrent = i === Number(currentLevelIndex || -1);
     const done = !!lv?.completed || (Number.isFinite(lvId) && completedSet.has(lvId)) || (includeCurrentLevel && isCurrent);
     if (!done) continue;
-    sum += clampAppLevelXP(lv?.xp ?? MAX_APP_LEVEL_XP);
+    sum += getComputeLevelXP(lv, i);
   }
   return Math.max(0, sum);
 }
@@ -358,16 +451,21 @@ let lessonDraft = { slides: [] };
 let selectedLessonSlideIndex = -1;
 let lessonPlayerState = null;
 let lessonPlayerZoom = 100;
+let lessonQuestionTimerInterval = null;
+let lessonSlideAutosaveTimer = null;
 let lessonCanvasElements = [];
 let lessonCanvasDrag = null;
 let selectedLessonCanvasElementId = null;
 let lessonTextModalResolve = null;
 let selectedLessonThemeId = "aurora";
+let lessonSlideDragIndex = -1;
+let lessonAnswerFxTimer = null;
 let currentTeacherLessonListFilter = "all";
 let activeHomePanelId = null;
 let classManagerSelectedId = null;
 let classManagerRows = [];
 let classSectionCatalog = [];
+let authReadyWaiters = [];
 let liveQuizItems = [];
 let liveQuizSelectedQuestionIndex = -1;
 let liveQuizEditingId = null;
@@ -404,6 +502,10 @@ let teacherLiveMonitorStudents = [];
 let teacherOwnerAliasTokens = new Set();
 let teacherLiveMonitorStudentKey = "";
 let teacherLiveMonitorOpen = false;
+let teacherLiveMonitorRenderRaf = null;
+let studentLiveSubmittingAnswerKeys = new Set();
+let studentLivePendingAnswers = new Map();
+let liveQuizResultRepairCache = new Set();
 let teacherCertificateStudents = [];
 let teacherCertificateMetricsCache = new Map();
 let flowNodes = [];
@@ -454,6 +556,7 @@ const LESSON_THEME_TEMPLATES = [
 
 function ensureLoggedOutView() {
   const loginScreen = document.getElementById("login-screen");
+  const loginBtn = document.getElementById("btn-login");
   const appScreen = document.getElementById("app-screen");
   const menuBtn = document.getElementById("open-menu");
   const sideMenu = document.getElementById("side-menu");
@@ -466,6 +569,10 @@ function ensureLoggedOutView() {
     loginScreen.classList.remove("hidden");
     loginScreen.style.display = "flex";
     loginScreen.style.pointerEvents = "auto";
+  }
+  if (loginBtn) {
+    loginBtn.disabled = false;
+    loginBtn.innerText = "Giriş Yap";
   }
   if (appScreen) appScreen.style.display = "none";
   if (menuBtn) menuBtn.style.display = "none";
@@ -645,7 +752,7 @@ window.openBlockRunner = async function(userId, options = {}){
   setActivityStartButtons(false);
   setActivityPausedUI(false);
   const timerEl = document.getElementById("activity-timer");
-  if (timerEl) timerEl.innerText = "⏱ 0 dk 0 sn";
+  if (timerEl) timerEl.innerText = "? 0 dk 0 sn";
   modal.classList.add("block-runner-mode");
   modal.classList.toggle("teacher-block-runner", userRole === "teacher");
   setComputeTeacherHeaderMode(false);
@@ -1211,6 +1318,10 @@ window.addEventListener('message', async function(e){
       if (isComputeSource) {
         const uid = activeComputeRunnerUserId || currentUserId || 'guest';
         const levelKey = String(data.levelId ?? "unknown");
+        const levelNoRaw = Number(data.levelNo ?? data.levelId);
+        const levelNo = Number.isFinite(levelNoRaw) && levelNoRaw > 0
+          ? Math.round(levelNoRaw)
+          : Math.max(1, Number(data.currentLevelIndex || 0) + 1);
         const levelRef = doc(db, "computeReports", String(uid), "levelCompletions", levelKey);
         await setDoc(doc(db, "computeStates", String(uid)), {
           updatedAt: serverTimestamp(),
@@ -1221,7 +1332,7 @@ window.addEventListener('message', async function(e){
         }, { merge: true });
         await setDoc(levelRef, {
           levelId: data.levelId,
-          xp: data.xp || 0,
+          xp: getComputeLevelXPByLevelNo(levelNo),
           percent: 100,
           durationMs: data.duration || 0,
           updatedAt: serverTimestamp()
@@ -1490,11 +1601,26 @@ window.addEventListener('message', async function(e){
         const iframe = document.getElementById("activity-iframe");
         iframe?.contentWindow?.postMessage({ type: "FORCE_ASSIGNMENT_LOCK" }, "*");
       } catch (e) {}
-      let xp = 0;
+      let xp = Math.max(0, Number(data?.xp || 0));
       let sec = getComputeRunnerElapsedSeconds();
       try {
-        const start = Math.max(1, Number(computeRunnerSession?.rangeStart || 1));
-        const end = Math.max(start, Number(computeRunnerSession?.rangeEnd || start));
+        let start = Math.max(1, Number(computeRunnerSession?.rangeStart || 1));
+        let end = Math.max(start, Number(computeRunnerSession?.rangeEnd || start));
+        if (activeComputeAssignmentId) {
+          try {
+            const asSnap = await getDoc(doc(db, "computeAssignments", activeComputeAssignmentId));
+            if (asSnap.exists()) {
+              const as = asSnap.data() || {};
+              start = Math.max(1, Number(as.levelStart || start));
+              end = Math.max(start, Number(as.levelEnd || as.levelStart || end));
+              if (computeRunnerSession) {
+                computeRunnerSession.rangeStart = start;
+                computeRunnerSession.rangeEnd = end;
+              }
+            }
+          } catch {}
+        }
+        xp = getComputeRangeXPByLevelNo(start, end);
         const computedXp = computeRangeTotalXPFromLevels({
           levels: Array.isArray(data.levels) ? data.levels : [],
           levelStart: start,
@@ -1502,7 +1628,7 @@ window.addEventListener('message', async function(e){
           currentLevelIndex: Number(data.currentLevelIndex || 0),
           includeCurrentLevel: true
         });
-        xp = Math.max(0, computedXp);
+        xp = Math.max(xp, Math.max(0, computedXp));
         await saveComputeRunnerSession({
           closeAfter: false,
           askContinue: false,
@@ -1515,7 +1641,12 @@ window.addEventListener('message', async function(e){
         const pSnap = await getDoc(pRef);
         if (pSnap.exists()) {
           const p = pSnap.data() || {};
-          xp = Math.max(xp, Math.max(0, Number(p.totalXP || 0)));
+          const normalizedProgress = getNormalizedComputeProgressSnapshot(
+            { ...p, levelStart: start, levelEnd: end },
+            { levelStart: start, levelEnd: end }
+          );
+          const normalizedProgressXp = normalizedProgress.totalXP;
+          xp = Math.max(xp, Math.max(0, normalizedProgressXp || 0));
           sec = Math.max(0, Number(p.lastSessionSeconds || sec || 0));
         }
       } catch (e) {
@@ -1529,7 +1660,10 @@ window.addEventListener('message', async function(e){
         durationSeconds: sec,
         requireAction: true,
         actionText: "Kaydet ve Çık",
-        onAction: async () => await saveAndExitCompletedRunner()
+        onAction: () => {
+          closeBlockRunnerView();
+          return true;
+        }
       });
       return;
     }
@@ -1698,8 +1832,7 @@ function computePercentFromGameStates(payload){
 function computeXPFromGameStates(payload){
   try{
     if(!payload || !Array.isArray(payload.levels)) return 0;
-    // sum xp property if present on levels
-    return payload.levels.reduce((acc,l)=> acc + (l.xp||0), 0);
+    return payload.levels.reduce((acc, l, i) => acc + getComputeLevelXP(l, i), 0);
   }catch(e){ return 0; }
 }
 
@@ -1906,7 +2039,7 @@ function showCompletionCelebration({
     `;
 
     const trophy = document.createElement("div");
-    trophy.textContent = "🏆";
+    trophy.textContent = "\u{1F3C6}";
     trophy.style.cssText = `
       font-size: 46px;
       line-height: 1;
@@ -1971,7 +2104,7 @@ function showCompletionCelebration({
       return el;
     };
     if (Number.isFinite(Number(xp))) {
-      infoRow.appendChild(infoPill(`⭐ ${Math.max(0, Number(xp))} XP`));
+      infoRow.appendChild(infoPill(`\u2B50 ${Math.max(0, Number(xp))} XP`));
     }
     if (Number.isFinite(Number(durationSeconds))) {
       const p = formatDurationParts(Number(durationSeconds));
@@ -1980,7 +2113,7 @@ function showCompletionCelebration({
         : p.hours > 0
           ? `${p.hours}s ${p.mins}dk ${p.secs}sn`
           : `${p.mins} dk ${p.secs} sn`;
-      infoRow.appendChild(infoPill(`⏱ ${txt}`));
+      infoRow.appendChild(infoPill(`\u23F1 ${txt}`));
     }
 
     const canvas = document.createElement("canvas");
@@ -2764,7 +2897,7 @@ function startTeacherHomeQuizListener() {
     const visibleRows = rows.filter((qz) => !qz?.isDeleted);
     countEl.innerText = String(visibleRows.length);
     if (!visibleRows.length) {
-      list.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📝</div>Henüz quiz eklenmedi.</div>`;
+      list.innerHTML = `<div class="empty-state"><div class="empty-state-icon">??</div>Henüz quiz eklenmedi.</div>`;
       if (completedList) completedList.innerHTML = "";
       if (noPendingEl) noPendingEl.style.display = "none";
       if (noCompletedEl) noCompletedEl.style.display = "none";
@@ -2857,6 +2990,7 @@ function startTeacherHomeQuizListener() {
     const rows = [];
     snap.forEach((d) => rows.push({ id: d.id, ...d.data() }));
     rows.sort((a, b) => Number(b.finishedAtMs || 0) - Number(a.finishedAtMs || 0));
+    repairLiveQuizResultRowsFromAnswers(rows);
     completedQuizIds = new Set(
       rows
         .map((r) => String(r?.quizId || "").trim())
@@ -3094,17 +3228,23 @@ async function syncStudentLiveQuizProgress(sessionId, finalize = false) {
   if (!sessionId || !currentUserId) return null;
   try {
     const uid = String(currentUserId);
-    const [sessionSnap, scoreSnap] = await Promise.all([
+    const [sessionSnap, scoreSnap, answersSnap] = await Promise.all([
       getDoc(doc(db, "liveQuizSessions", String(sessionId))),
-      getDoc(doc(db, "liveQuizSessions", String(sessionId), "scores", uid))
+      getDoc(doc(db, "liveQuizSessions", String(sessionId), "scores", uid)),
+      getDocs(query(collection(db, "liveQuizSessions", String(sessionId), "answers"), where("userId", "==", uid)))
     ]);
     if (!sessionSnap.exists()) return null;
     const sessionData = sessionSnap.data() || {};
     const score = scoreSnap.exists() ? (scoreSnap.data() || {}) : {};
-    const answered = Math.max(0, Number(score.answered || 0));
-    const correct = Math.max(0, Number(score.correct || 0));
+    const answerRows = [];
+    answersSnap.forEach((d) => answerRows.push(d.data() || {}));
+    const answeredByAnswers = answerRows.length;
+    const correctByAnswers = answerRows.reduce((sum, row) => sum + (row?.isCorrect ? 1 : 0), 0);
+    const xpByAnswers = answerRows.reduce((sum, row) => sum + Math.max(0, Number(row?.xp || 0)), 0);
+    const answered = Math.max(0, Number(score.answered || 0), answeredByAnswers);
+    const correct = Math.max(0, Number(score.correct || 0), correctByAnswers);
     const wrong = Math.max(0, answered - correct);
-    const xpEarned = Math.max(0, Number(score.xp || score.xpEarned || 0));
+    const xpEarned = Math.max(0, Number(score.xp || score.xpEarned || 0), xpByAnswers);
     const startedAtMs = Math.max(0, Number(sessionData.startedAtMs || 0));
     const isFinished = finalize || sessionData.status === "finished";
     const finishedAtMs = isFinished
@@ -3415,7 +3555,30 @@ function isLiveAnswerCorrect(question, selectedKey) {
   if (question.type === "truefalse") {
     return normalizeTrueFalseValue(selectedKey) === normalizeTrueFalseValue(question.correct);
   }
-  return String(selectedKey || "").toUpperCase() === String(question.correct || "").toUpperCase();
+  const opts = Array.isArray(question.options) ? question.options : [];
+  const rawSelected = String(selectedKey || "").trim();
+  const selectedUpper = rawSelected.toUpperCase();
+  const selectedText = normalizeLiveText(rawSelected);
+
+  const correctSet = new Set();
+  const rawCorrect = String(question.correct || "").trim();
+  const correctUpper = rawCorrect.toUpperCase();
+  if (/^[A-D]$/.test(correctUpper)) {
+    correctSet.add(correctUpper);
+  } else if (/^[0-3]$/.test(rawCorrect)) {
+    correctSet.add(String.fromCharCode(65 + Number(rawCorrect)));
+  } else if (/^[1-4]$/.test(rawCorrect)) {
+    correctSet.add(String.fromCharCode(64 + Number(rawCorrect)));
+  }
+  const idxByText = opts.findIndex((opt) => normalizeLiveText(opt) === normalizeLiveText(rawCorrect));
+  if (idxByText >= 0) correctSet.add(String.fromCharCode(65 + idxByText));
+  const idxBySelectedText = opts.findIndex((opt) => normalizeLiveText(opt) === selectedText);
+  const selectedAsLetter = /^[A-D]$/.test(selectedUpper)
+    ? selectedUpper
+    : (idxBySelectedText >= 0 ? String.fromCharCode(65 + idxBySelectedText) : "");
+  if (selectedAsLetter && correctSet.has(selectedAsLetter)) return true;
+  if (selectedText && normalizeLiveText(rawCorrect) === selectedText) return true;
+  return false;
 }
 
 function updateTeacherLiveMetaText(live) {
@@ -3428,7 +3591,7 @@ function updateTeacherLiveMetaText(live) {
   }
   if (metaEl) {
     metaEl.innerText = live
-      ? `Kalan: ${Math.max(0, Math.floor((Number(live.endsAtMs || 0) - Date.now()) / 1000))} sn • ${live.isLocked ? "🔒 Soru kilitli" : "🔓 Soru açık"}`
+      ? `Kalan: ${Math.max(0, Math.floor((Number(live.endsAtMs || 0) - Date.now()) / 1000))} sn • ${live.isLocked ? "?? Soru kilitli" : "?? Soru açık"}`
       : "";
   }
   const lockBtn = document.getElementById("btn-live-session-lock");
@@ -3742,6 +3905,14 @@ function renderTeacherLiveMonitor(live = activeLiveSession) {
   }).join("");
 }
 
+function scheduleTeacherLiveMonitorRender(live = activeLiveSession) {
+  if (teacherLiveMonitorRenderRaf) return;
+  teacherLiveMonitorRenderRaf = requestAnimationFrame(() => {
+    teacherLiveMonitorRenderRaf = null;
+    renderTeacherLiveMonitor(live);
+  });
+}
+
 function listenTeacherLiveSession() {
   if (liveSessionUnsub) liveSessionUnsub();
   liveSessionUnsub = null;
@@ -3765,11 +3936,11 @@ function listenTeacherLiveSession() {
       teacherLiveMonitorAnswers = [];
       teacherLiveMonitorStudents = [];
       teacherLiveMonitorStudentKey = "";
-      renderTeacherLiveMonitor(null);
+      scheduleTeacherLiveMonitorRender(null);
     } else {
       ensureTeacherLiveMonitorStudents(live)
-        .then(() => renderTeacherLiveMonitor(live))
-        .catch(() => renderTeacherLiveMonitor(live));
+        .then(() => scheduleTeacherLiveMonitorRender(live))
+        .catch(() => scheduleTeacherLiveMonitorRender(live));
     }
     if (live && Date.now() >= Number(live.endsAtMs || 0) && !liveAutoProgressing) {
       liveAutoProgressing = true;
@@ -3800,7 +3971,7 @@ function listenTeacherLiveSession() {
       rows.sort((a, b) => Number(b.xp || 0) - Number(a.xp || 0));
       teacherLiveMonitorScores = rows;
       renderLiveTeacherRank(rows);
-      renderTeacherLiveMonitor(live);
+      scheduleTeacherLiveMonitorRender(live);
     });
     const answerQuery = query(
       collection(db, "liveQuizSessions", live.id, "answers"),
@@ -3811,7 +3982,7 @@ function listenTeacherLiveSession() {
       ansSnap.forEach((d) => answers.push(d.data()));
       teacherLiveMonitorAnswers = answers;
       renderTeacherAnswerStats(live, answers);
-      renderTeacherLiveMonitor(live);
+      scheduleTeacherLiveMonitorRender(live);
     });
   });
 }
@@ -3837,19 +4008,43 @@ async function teacherNextLiveQuestion() {
 async function persistLiveQuizResultsAndAwardXP(sessionId, sessionData = {}) {
   if (!sessionId) return;
   try {
-    const scoreSnap = await getDocs(collection(db, "liveQuizSessions", sessionId, "scores"));
+    const [scoreSnap, answerSnap] = await Promise.all([
+      getDocs(collection(db, "liveQuizSessions", sessionId, "scores")),
+      getDocs(collection(db, "liveQuizSessions", sessionId, "answers"))
+    ]);
     const totalQuestions = Math.max(0, Number(Array.isArray(sessionData.questions) ? sessionData.questions.length : 0));
     const startedAtMs = Math.max(0, Number(sessionData.startedAtMs || 0));
+    const scoreByUser = new Map();
+    scoreSnap.forEach((d) => {
+      const row = d.data() || {};
+      const uid = String(row.userId || d.id || "");
+      if (!uid) return;
+      scoreByUser.set(uid, row);
+    });
+    const answerStatsByUser = new Map();
+    answerSnap.forEach((d) => {
+      const row = d.data() || {};
+      const uid = String(row.userId || "");
+      if (!uid) return;
+      const prev = answerStatsByUser.get(uid) || { answered: 0, correct: 0, xp: 0, name: "" };
+      answerStatsByUser.set(uid, {
+        answered: prev.answered + 1,
+        correct: prev.correct + (row?.isCorrect ? 1 : 0),
+        xp: prev.xp + Math.max(0, Number(row?.xp || 0)),
+        name: prev.name || String(row?.name || "")
+      });
+    });
+    const allUserIds = new Set([...scoreByUser.keys(), ...answerStatsByUser.keys()]);
     const touchedUsers = new Set();
-    for (const row of scoreSnap.docs) {
-      const score = row.data() || {};
-      const userId = String(score.userId || "");
+    for (const userId of allUserIds) {
+      const score = scoreByUser.get(userId) || {};
+      const answerStats = answerStatsByUser.get(userId) || { answered: 0, correct: 0, xp: 0, name: "" };
       if (!userId) continue;
       touchedUsers.add(userId);
-      const answered = Math.max(0, Number(score.answered || 0));
-      const correct = Math.max(0, Number(score.correct || 0));
+      const answered = Math.max(0, Number(score.answered || 0), Number(answerStats.answered || 0));
+      const correct = Math.max(0, Number(score.correct || 0), Number(answerStats.correct || 0));
       const wrong = Math.max(0, answered - correct);
-      const xpEarned = Math.max(0, Number(score.xp || 0));
+      const xpEarned = Math.max(0, Number(score.xp || 0), Number(answerStats.xp || 0));
       const xpAwardedInLive = Math.max(0, Number(score.xpAwarded || 0));
       const xpPendingGrant = Math.max(0, xpEarned - xpAwardedInLive);
       const successRate = answered > 0 ? Math.round((correct / answered) * 100) : 0;
@@ -3875,7 +4070,7 @@ async function persistLiveQuizResultsAndAwardXP(sessionId, sessionData = {}) {
         quizTitle: sessionData.quizTitle || "Quiz",
         teacherId: sessionData.teacherId || currentUserId || "",
         userId,
-        studentName: score.name || userId,
+        studentName: score.name || answerStats.name || userId,
         totalQuestions,
         answered,
         correct,
@@ -3899,7 +4094,7 @@ async function persistLiveQuizResultsAndAwardXP(sessionId, sessionData = {}) {
         quizTitle: sessionData.quizTitle || "Quiz",
         teacherId: sessionData.teacherId || currentUserId || "",
         userId,
-        studentName: score.name || userId,
+        studentName: score.name || answerStats.name || userId,
         totalQuestions,
         answered,
         correct,
@@ -3933,6 +4128,63 @@ async function persistLiveQuizResultsAndAwardXP(sessionId, sessionData = {}) {
     }
   } catch (e) {
     console.warn("persistLiveQuizResultsAndAwardXP", e);
+  }
+}
+
+async function repairLiveQuizResultRowsFromAnswers(rows = []) {
+  try {
+    const targets = (Array.isArray(rows) ? rows : [])
+      .filter((r) => {
+        const sessionId = String(r?.sessionId || "");
+        const userId = String(r?.userId || "");
+        if (!sessionId || !userId) return false;
+        const answered = Math.max(0, Number(r?.answered || 0));
+        const correct = Math.max(0, Number(r?.correct || 0));
+        const xp = Math.max(0, Number(r?.xpEarned ?? r?.xp ?? 0));
+        return answered <= 0 && correct <= 0 && xp <= 0;
+      })
+      .slice(0, 30);
+    for (const row of targets) {
+      const sessionId = String(row.sessionId || "");
+      const userId = String(row.userId || "");
+      const cacheKey = `${sessionId}_${userId}`;
+      if (liveQuizResultRepairCache.has(cacheKey)) continue;
+      liveQuizResultRepairCache.add(cacheKey);
+      const [scoreSnap, answersSnap] = await Promise.all([
+        getDoc(doc(db, "liveQuizSessions", sessionId, "scores", userId)),
+        getDocs(query(collection(db, "liveQuizSessions", sessionId, "answers"), where("userId", "==", userId)))
+      ]);
+      const score = scoreSnap.exists() ? (scoreSnap.data() || {}) : {};
+      const answerRows = [];
+      answersSnap.forEach((d) => answerRows.push(d.data() || {}));
+      const answered = Math.max(0, Number(score.answered || 0), answerRows.length);
+      const correct = Math.max(
+        0,
+        Number(score.correct || 0),
+        answerRows.reduce((sum, a) => sum + (a?.isCorrect ? 1 : 0), 0)
+      );
+      const xpEarned = Math.max(
+        0,
+        Number(score.xp || score.xpEarned || 0),
+        answerRows.reduce((sum, a) => sum + Math.max(0, Number(a?.xp || 0)), 0)
+      );
+      if (answered <= 0 && correct <= 0 && xpEarned <= 0) continue;
+      const wrong = Math.max(0, answered - correct);
+      const successRate = answered > 0 ? Math.round((correct / answered) * 100) : 0;
+      const patch = {
+        answered,
+        correct,
+        wrong,
+        xpEarned,
+        successRate,
+        updatedAt: serverTimestamp()
+      };
+      await setDoc(doc(db, "studentQuizResults", `${sessionId}_${userId}`), patch, { merge: true });
+      await setDoc(doc(db, "studentReports", userId, "quizSessions", sessionId), patch, { merge: true });
+      await recalculateStudentQuizSummary(userId);
+    }
+  } catch (e) {
+    console.warn("repairLiveQuizResultRowsFromAnswers", e);
   }
 }
 
@@ -4004,7 +4256,8 @@ async function teacherToggleLiveLock() {
 function startStudentLiveQuizListener() {
   if (studentLiveSessionUnsub) studentLiveSessionUnsub();
   if (userRole !== "student" || !currentUserId) return;
-  studentLiveSessionUnsub = onSnapshot(collection(db, "liveQuizSessions"), (snap) => {
+  const liveSessionsQuery = query(collection(db, "liveQuizSessions"), where("status", "==", "live"));
+  studentLiveSessionUnsub = onSnapshot(liveSessionsQuery, (snap) => {
     const all = [];
     snap.forEach((d) => all.push({ id: d.id, ...d.data() }));
     all.sort((a, b) => Number(b.startedAtMs || 0) - Number(a.startedAtMs || 0));
@@ -4025,7 +4278,11 @@ function startStudentLiveQuizListener() {
       lastStudentLiveSessionId = live.id;
       syncStudentLiveQuizProgress(live.id, false);
     }
-    if (previousSessionId !== (live?.id || "")) studentLiveAnswerCache = new Map();
+    if (previousSessionId !== (live?.id || "")) {
+      studentLiveAnswerCache = new Map();
+      studentLiveSubmittingAnswerKeys = new Set();
+      studentLivePendingAnswers = new Map();
+    }
     const invite = document.getElementById("live-quiz-invite");
     const inviteText = document.getElementById("live-quiz-invite-text");
     if (!invite || !inviteText) return;
@@ -4035,7 +4292,7 @@ function startStudentLiveQuizListener() {
       if (!playerOpen) {
         invite.style.display = "flex";
         if (lastLiveInviteSessionId !== live.id) {
-          showNotice("📣 Canlı quize katıl bildirimi", "#f97316");
+          showNotice("?? Canlı quize katıl bildirimi", "#f97316");
         }
       }
       lastLiveInviteSessionId = live.id;
@@ -4044,8 +4301,10 @@ function startStudentLiveQuizListener() {
       lastLiveInviteSessionId = null;
       lastStudentLiveSessionId = "";
       studentLiveAnswerCache = new Map();
+      studentLiveSubmittingAnswerKeys = new Set();
+      studentLivePendingAnswers = new Map();
       invite.style.display = "none";
-      closeLivePlayer();
+      closeLivePlayer(true);
     }
   });
 }
@@ -4053,6 +4312,7 @@ function startStudentLiveQuizListener() {
 async function resolveStudentLiveAnswer(sessionId, qIndex) {
   if (!sessionId || !currentUserId) return null;
   const key = `${sessionId}_${qIndex}_${currentUserId}`;
+  if (studentLivePendingAnswers.has(key)) return studentLivePendingAnswers.get(key);
   if (studentLiveAnswerCache.has(key)) return studentLiveAnswerCache.get(key);
   try {
     const ansRef = doc(db, "liveQuizSessions", sessionId, "answers", `${currentUserId}_${qIndex}`);
@@ -4101,14 +4361,18 @@ async function renderStudentLiveQuestion() {
   }
   if (info) {
     const questionXP = Math.max(0, Number(q?.xp ?? MAX_QUESTION_XP));
-    const statusText = existingAnswer
+    const statusText = existingAnswer?.pending
+      ? "Cevabın gönderiliyor..."
+      : existingAnswer
       ? `Bu soruyu cevapladın: ${existingAnswer.selectedKey || existingAnswer.selected || "Yanıt kaydedildi"}`
       : (session.isLocked ? "Bu soru öğretmen tarafından kilitlendi." : `Doğru cevap +${questionXP} XP`);
     info.innerText = statusText;
   }
   if (q.type === "matching") {
     if (info) {
-      const statusText = existingAnswer
+      const statusText = existingAnswer?.pending
+        ? "Cevabın gönderiliyor..."
+        : existingAnswer
         ? "Bu eşleştirme sorusu cevaplandı."
         : (session.isLocked ? "Bu soru öğretmen tarafından kilitlendi." : "Eşleşmeleri sürükle-bırak ile tamamlayın.");
       info.innerText = statusText;
@@ -4132,12 +4396,16 @@ async function renderStudentLiveQuestion() {
       }
       if (isSelected) {
         btn.classList.add("selected");
-        btn.classList.add(existingAnswer?.isCorrect ? "correct" : "wrong");
+        if (existingAnswer?.pending) {
+          btn.classList.add("correct");
+        } else {
+          btn.classList.add(existingAnswer?.isCorrect ? "correct" : "wrong");
+        }
       }
       const keyText = q.type === "truefalse" ? (selectedKey === "doğru" ? "D" : "Y") : String.fromCharCode(65 + i);
       const optText = q.type === "truefalse" ? (selectedKey === "doğru" ? "Doğru" : "Yanlış") : `${opt}`;
       btn.innerHTML = `<span class="opt-key">${keyText}</span><span class="opt-text">${optText}</span>`;
-      btn.disabled = !!session.isLocked || !!existingAnswer;
+      btn.disabled = !!session.isLocked || !!existingAnswer || studentLiveSubmittingAnswerKeys.has(`${session.id}_${qIndex}_${currentUserId}`);
       btn.onclick = () => submitStudentLiveAnswer(opt, i);
       oBox.appendChild(btn);
     });
@@ -4162,7 +4430,7 @@ function renderStudentMatchingQuestion(question, session, existingAnswer) {
           return {};
         }
       })();
-  const answeredPersisted = !!existingAnswer?.answeredAtMs;
+  const answeredPersisted = !!existingAnswer?.answeredAtMs || !!existingAnswer?.pending;
   const usedValues = new Set(Object.values(initialMap).map((v) => String(v || "")));
   const chips = pairs.map((p) => String(p?.right || "")).filter(Boolean);
   oBox.innerHTML = `
@@ -4249,6 +4517,66 @@ function renderStudentMatchingQuestion(question, session, existingAnswer) {
   }
 }
 
+async function upsertLiveScoreAndAwardXP(sessionId, { isCorrect = false, xp = 0, name = "" } = {}) {
+  const uid = String(currentUserId || "");
+  if (!sessionId || !uid) return false;
+  const safeXp = Math.max(0, Number(xp || 0));
+  const correctInc = isCorrect ? 1 : 0;
+  const scoreRef = doc(db, "liveQuizSessions", sessionId, "scores", uid);
+  const userRef = doc(db, "users", uid);
+  const scoreBasePayload = {
+    userId: uid,
+    name: name || getUserDisplayName(userData || {}),
+    xp: increment(safeXp),
+    correct: increment(correctInc),
+    answered: increment(1),
+    updatedAtMs: Date.now()
+  };
+  try {
+    await setDoc(scoreRef, scoreBasePayload, { merge: true });
+  } catch (e) {
+    const prevSnap = await getDoc(scoreRef);
+    const prev = prevSnap.exists() ? (prevSnap.data() || {}) : {};
+    await setDoc(scoreRef, {
+      userId: uid,
+      name: name || getUserDisplayName(userData || {}),
+      xp: Math.max(0, Number(prev.xp || 0)) + safeXp,
+      xpAwarded: Math.max(0, Number(prev.xpAwarded || 0)),
+      correct: Math.max(0, Number(prev.correct || 0)) + correctInc,
+      answered: Math.max(0, Number(prev.answered || 0)) + 1,
+      updatedAtMs: Date.now()
+    }, { merge: true });
+  }
+  if (safeXp <= 0) return true;
+  let userXpGranted = false;
+  try {
+    await updateDoc(userRef, { xp: increment(safeXp), updatedAt: serverTimestamp() });
+    userXpGranted = true;
+  } catch {
+    try {
+      const uSnap = await getDoc(userRef);
+      const prevXp = uSnap.exists() ? Math.max(0, Number((uSnap.data() || {}).xp || 0)) : 0;
+      await setDoc(userRef, { xp: prevXp + safeXp, updatedAt: serverTimestamp() }, { merge: true });
+      userXpGranted = true;
+    } catch (e) {
+      console.warn("live user xp write failed", e);
+      userXpGranted = false;
+    }
+  }
+  if (!userXpGranted) return false;
+  try {
+    await setDoc(scoreRef, { xpAwarded: increment(safeXp), updatedAtMs: Date.now() }, { merge: true });
+  } catch {
+    const scoreSnap = await getDoc(scoreRef);
+    const prevScore = scoreSnap.exists() ? (scoreSnap.data() || {}) : {};
+    await setDoc(scoreRef, {
+      xpAwarded: Math.max(0, Number(prevScore.xpAwarded || 0)) + safeXp,
+      updatedAtMs: Date.now()
+    }, { merge: true });
+  }
+  return true;
+}
+
 async function submitStudentLiveAnswer(opt, idx) {
   const session = activeStudentLiveSession;
   if (!session?.id) return;
@@ -4256,73 +4584,81 @@ async function submitStudentLiveAnswer(opt, idx) {
     showNotice("Bu soru kilitli. Öğretmenin açmasını bekleyin.", "#f39c12");
     return;
   }
-  const sessionRef = doc(db, "liveQuizSessions", session.id);
-  const sessionSnap = await getDoc(sessionRef);
-  if (!sessionSnap.exists() || sessionSnap.data()?.isLocked) {
-    showNotice("Bu soru şu anda kilitli.", "#f39c12");
-    return;
-  }
   const qIndex = Number(session.currentIndex || 0);
   const q = session.questions?.[qIndex];
   if (!q) return;
-  const answerId = `${currentUserId}_${qIndex}`;
-  const ansRef = doc(db, "liveQuizSessions", session.id, "answers", answerId);
-  const already = await getDoc(ansRef);
-  if (already.exists()) {
-    showNotice("Bu soruyu zaten cevapladın.", "#f39c12");
-    const key = `${session.id}_${qIndex}_${currentUserId}`;
-    studentLiveAnswerCache.set(key, already.data());
-    renderStudentLiveQuestion();
-    return;
-  }
-  let isCorrect = false;
-  if (q.type === "truefalse") {
-    isCorrect = isLiveAnswerCorrect(q, opt);
-  } else {
-    const key = String.fromCharCode(65 + Number(idx || 0));
-    isCorrect = isLiveAnswerCorrect(q, key);
-  }
-  const questionXP = Math.max(0, Number(q?.xp ?? MAX_QUESTION_XP));
-  const xp = isCorrect ? questionXP : 0;
+  const submitKey = `${session.id}_${qIndex}_${currentUserId}`;
+  if (studentLiveSubmittingAnswerKeys.has(submitKey)) return;
+  studentLiveSubmittingAnswerKeys.add(submitKey);
   const selectedKey = q.type === "truefalse"
     ? normalizeTrueFalseValue(opt)
     : String.fromCharCode(65 + Number(idx || 0));
-  const answerPayload = {
+  const pendingPayload = {
     userId: currentUserId,
     name: getUserDisplayName(userData || {}),
     qIndex,
     selectedKey,
     selected: opt,
-    isCorrect,
-    xp,
-    answeredAtMs: Date.now()
+    pending: true,
+    answeredAtMs: 0
   };
-  await setDoc(ansRef, answerPayload);
-  studentLiveAnswerCache.set(`${session.id}_${qIndex}_${currentUserId}`, answerPayload);
-  const scoreRef = doc(db, "liveQuizSessions", session.id, "scores", currentUserId);
-  const scoreSnap = await getDoc(scoreRef);
-  const prev = scoreSnap.exists() ? scoreSnap.data() : { xp: 0, correct: 0, answered: 0, xpAwarded: 0 };
-  await setDoc(scoreRef, {
-    userId: currentUserId,
-    name: getUserDisplayName(userData || {}),
-    xp: Number(prev.xp || 0) + xp,
-    xpAwarded: Math.max(0, Number(prev.xpAwarded || 0)) + xp,
-    correct: Number(prev.correct || 0) + (isCorrect ? 1 : 0),
-    answered: Number(prev.answered || 0) + 1,
-    updatedAtMs: Date.now()
-  }, { merge: true });
-  if (xp > 0) {
-    try {
-      await updateDoc(doc(db, "users", String(currentUserId)), { xp: increment(xp), updatedAt: serverTimestamp() });
-    } catch {
-      await setDoc(doc(db, "users", String(currentUserId)), { xp: increment(xp), updatedAt: serverTimestamp() }, { merge: true });
-    }
-    if (userData) userData.xp = Math.max(0, Number(userData.xp || 0)) + xp;
-    updateUserXPDisplay();
-  }
-  await syncStudentLiveQuizProgress(session.id, false);
-  showNotice(isCorrect ? `Doğru! +${questionXP} XP` : "Yanlış cevap.", isCorrect ? "#2ecc71" : "#e74c3c");
+  studentLivePendingAnswers.set(submitKey, pendingPayload);
   renderStudentLiveQuestion();
+  const answerId = `${currentUserId}_${qIndex}`;
+  const ansRef = doc(db, "liveQuizSessions", session.id, "answers", answerId);
+  try {
+    const already = await getDoc(ansRef);
+    if (already.exists()) {
+      studentLivePendingAnswers.delete(submitKey);
+      showNotice("Bu soruyu zaten cevapladın.", "#f39c12");
+      studentLiveAnswerCache.set(submitKey, already.data());
+      renderStudentLiveQuestion();
+      return;
+    }
+    const isCorrect = isLiveAnswerCorrect(q, selectedKey);
+    const questionXP = Math.max(0, Number(q?.xp ?? MAX_QUESTION_XP));
+    const xp = isCorrect ? questionXP : 0;
+    const answerPayload = {
+      userId: currentUserId,
+      name: getUserDisplayName(userData || {}),
+      qIndex,
+      selectedKey,
+      selected: opt,
+      isCorrect,
+      xp,
+      answeredAtMs: Date.now()
+    };
+
+    // Öğretmen paneline düşen asıl veri answers koleksiyonudur; önce bunu yazıp UI'ı anında güncelle.
+    await setDoc(ansRef, answerPayload);
+    studentLivePendingAnswers.delete(submitKey);
+    studentLiveAnswerCache.set(submitKey, answerPayload);
+    showNotice(isCorrect ? `Doğru! +${questionXP} XP` : "Yanlış cevap.", isCorrect ? "#2ecc71" : "#e74c3c");
+    renderStudentLiveQuestion();
+
+    const writes = [
+      upsertLiveScoreAndAwardXP(session.id, {
+        isCorrect,
+        xp,
+        name: getUserDisplayName(userData || {})
+      })
+    ];
+    const [xpGranted] = await Promise.all(writes);
+    if (xp > 0 && xpGranted) {
+      if (userData) userData.xp = Math.max(0, Number(userData.xp || 0)) + xp;
+      updateUserXPDisplay();
+      addStudentQuizPoints(xp);
+    } else if (xp > 0 && !xpGranted) {
+      showNotice("XP şu an kaydedilemedi, quiz sonunda tekrar denenecek.", "#f39c12");
+    }
+    await syncStudentLiveQuizProgress(session.id, false);
+  } catch (e) {
+    studentLivePendingAnswers.delete(submitKey);
+    showNotice("Cevap/XP kaydedilemedi, tekrar deneyin.", "#e74c3c");
+    renderStudentLiveQuestion();
+  } finally {
+    studentLiveSubmittingAnswerKeys.delete(submitKey);
+  }
 }
 
 async function submitStudentLiveMatchingAnswer(selectedMap = {}) {
@@ -4332,66 +4668,80 @@ async function submitStudentLiveMatchingAnswer(selectedMap = {}) {
     showNotice("Bu soru kilitli. Öğretmenin açmasını bekleyin.", "#f39c12");
     return;
   }
-  const sessionRef = doc(db, "liveQuizSessions", session.id);
-  const sessionSnap = await getDoc(sessionRef);
-  if (!sessionSnap.exists() || sessionSnap.data()?.isLocked) {
-    showNotice("Bu soru şu anda kilitli.", "#f39c12");
-    return;
-  }
   const qIndex = Number(session.currentIndex || 0);
   const q = session.questions?.[qIndex];
   if (!q || q.type !== "matching") return;
-  const answerId = `${currentUserId}_${qIndex}`;
-  const ansRef = doc(db, "liveQuizSessions", session.id, "answers", answerId);
-  const already = await getDoc(ansRef);
-  if (already.exists()) {
-    showNotice("Bu soruyu zaten cevapladın.", "#f39c12");
-    const key = `${session.id}_${qIndex}_${currentUserId}`;
-    studentLiveAnswerCache.set(key, already.data());
-    renderStudentLiveQuestion();
-    return;
-  }
+  const submitKey = `${session.id}_${qIndex}_${currentUserId}`;
+  if (studentLiveSubmittingAnswerKeys.has(submitKey)) return;
+  studentLiveSubmittingAnswerKeys.add(submitKey);
   const normalizedMap = normalizeLiveMatchingMap(selectedMap);
-  const isCorrect = isLiveAnswerCorrect(q, normalizedMap);
-  const questionXP = Math.max(0, Number(q?.xp ?? MAX_QUESTION_XP));
-  const xp = isCorrect ? questionXP : 0;
-  const answerPayload = {
+  const pendingPayload = {
     userId: currentUserId,
     name: getUserDisplayName(userData || {}),
     qIndex,
     selectedKey: serializeLiveMatchingMap(normalizedMap),
     selectedMap: normalizedMap,
     selected: "Eşleştirme",
-    isCorrect,
-    xp,
-    answeredAtMs: Date.now()
+    pending: true,
+    answeredAtMs: 0
   };
-  await setDoc(ansRef, answerPayload);
-  studentLiveAnswerCache.set(`${session.id}_${qIndex}_${currentUserId}`, answerPayload);
-  const scoreRef = doc(db, "liveQuizSessions", session.id, "scores", currentUserId);
-  const scoreSnap = await getDoc(scoreRef);
-  const prev = scoreSnap.exists() ? scoreSnap.data() : { xp: 0, correct: 0, answered: 0, xpAwarded: 0 };
-  await setDoc(scoreRef, {
-    userId: currentUserId,
-    name: getUserDisplayName(userData || {}),
-    xp: Number(prev.xp || 0) + xp,
-    xpAwarded: Math.max(0, Number(prev.xpAwarded || 0)) + xp,
-    correct: Number(prev.correct || 0) + (isCorrect ? 1 : 0),
-    answered: Number(prev.answered || 0) + 1,
-    updatedAtMs: Date.now()
-  }, { merge: true });
-  if (xp > 0) {
-    try {
-      await updateDoc(doc(db, "users", String(currentUserId)), { xp: increment(xp), updatedAt: serverTimestamp() });
-    } catch {
-      await setDoc(doc(db, "users", String(currentUserId)), { xp: increment(xp), updatedAt: serverTimestamp() }, { merge: true });
-    }
-    if (userData) userData.xp = Math.max(0, Number(userData.xp || 0)) + xp;
-    updateUserXPDisplay();
-  }
-  await syncStudentLiveQuizProgress(session.id, false);
-  showNotice(isCorrect ? `Eşleştirme doğru! +${questionXP} XP` : "Eşleştirme yanlış.", isCorrect ? "#2ecc71" : "#e74c3c");
+  studentLivePendingAnswers.set(submitKey, pendingPayload);
   renderStudentLiveQuestion();
+  const answerId = `${currentUserId}_${qIndex}`;
+  const ansRef = doc(db, "liveQuizSessions", session.id, "answers", answerId);
+  try {
+    const already = await getDoc(ansRef);
+    if (already.exists()) {
+      studentLivePendingAnswers.delete(submitKey);
+      showNotice("Bu soruyu zaten cevapladın.", "#f39c12");
+      studentLiveAnswerCache.set(submitKey, already.data());
+      renderStudentLiveQuestion();
+      return;
+    }
+    const isCorrect = isLiveAnswerCorrect(q, normalizedMap);
+    const questionXP = Math.max(0, Number(q?.xp ?? MAX_QUESTION_XP));
+    const xp = isCorrect ? questionXP : 0;
+    const answerPayload = {
+      userId: currentUserId,
+      name: getUserDisplayName(userData || {}),
+      qIndex,
+      selectedKey: serializeLiveMatchingMap(normalizedMap),
+      selectedMap: normalizedMap,
+      selected: "Eşleştirme",
+      isCorrect,
+      xp,
+      answeredAtMs: Date.now()
+    };
+
+    await setDoc(ansRef, answerPayload);
+    studentLivePendingAnswers.delete(submitKey);
+    studentLiveAnswerCache.set(submitKey, answerPayload);
+    showNotice(isCorrect ? `Eşleştirme doğru! +${questionXP} XP` : "Eşleştirme yanlış.", isCorrect ? "#2ecc71" : "#e74c3c");
+    renderStudentLiveQuestion();
+
+    const writes = [
+      upsertLiveScoreAndAwardXP(session.id, {
+        isCorrect,
+        xp,
+        name: getUserDisplayName(userData || {})
+      })
+    ];
+    const [xpGranted] = await Promise.all(writes);
+    if (xp > 0 && xpGranted) {
+      if (userData) userData.xp = Math.max(0, Number(userData.xp || 0)) + xp;
+      updateUserXPDisplay();
+      addStudentQuizPoints(xp);
+    } else if (xp > 0 && !xpGranted) {
+      showNotice("XP şu an kaydedilemedi, quiz sonunda tekrar denenecek.", "#f39c12");
+    }
+    await syncStudentLiveQuizProgress(session.id, false);
+  } catch (e) {
+    studentLivePendingAnswers.delete(submitKey);
+    showNotice("Cevap/XP kaydedilemedi, tekrar deneyin.", "#e74c3c");
+    renderStudentLiveQuestion();
+  } finally {
+    studentLiveSubmittingAnswerKeys.delete(submitKey);
+  }
 }
 
 function renderStudentLiveRank(rows = []) {
@@ -4441,6 +4791,8 @@ function openLivePlayer() {
   const modal = document.getElementById("live-quiz-player");
   if (!modal || !activeStudentLiveSession) return;
   modal.style.display = "flex";
+  const closeBtn = document.getElementById("btn-close-live-player");
+  if (closeBtn) closeBtn.style.display = "none";
   syncStudentLiveQuizProgress(activeStudentLiveSession.id, false);
   renderStudentLiveQuestion();
   const rankBox = document.getElementById("live-player-rank");
@@ -4459,7 +4811,11 @@ function openLivePlayer() {
   }, 500);
 }
 
-function closeLivePlayer() {
+function closeLivePlayer(force = false) {
+  if (!force && activeStudentLiveSession?.status === "live") {
+    showNotice("Canlı quiz bitmeden çıkamazsın. 'Katıl' ile devam et.", "#f39c12");
+    return;
+  }
   const modal = document.getElementById("live-quiz-player");
   if (modal) modal.style.display = "none";
   if (livePlayerTick) clearInterval(livePlayerTick);
@@ -4511,8 +4867,9 @@ async function handleUserLogout({ closeSideMenu = true, closeDropdown = true } =
   }
   if (closeSideMenu) {
     const sideMenu = document.getElementById("side-menu");
-    if (sideMenu) sideMenu.style.width = "0";
-  }
+  if (sideMenu) sideMenu.style.width = "0";
+  updateStudentQuizPointsDisplay(0);
+}
   closeAvatarShopModal();
   closeAppsHubModal();
   try {
@@ -4863,7 +5220,7 @@ function getComputeXPFromProgressMap() {
   let total = 0;
   assignments.forEach((a) => {
     const p = computeAssignmentProgressMap.get(String(a.id || "")) || {};
-    total += Math.max(0, Number(p?.totalXP || 0));
+    total += getNormalizedComputeProgressSnapshot(p, a).totalXP;
   });
   return total;
 }
@@ -4950,9 +5307,10 @@ function normalizeOwnedAvatarIds(rawIds) {
 }
 
 function getEffectiveStudentXP() {
-  const fromHeader = Number(String(document.getElementById("user-xp")?.innerText || "0").replace(/[^\d.-]/g, "")) || 0;
-  const fromData = Math.max(0, Number(userData?.xp || 0));
-  return Math.max(fromHeader, fromData);
+  const rawHeader = String(document.getElementById("user-xp")?.innerText || "");
+  const fromHeader = parseXPValue(rawHeader);
+  if (/\d/.test(rawHeader)) return fromHeader;
+  return parseXPValue(userData?.xp);
 }
 
 function renderHeaderAvatar() {
@@ -4996,16 +5354,22 @@ function renderAvatarShop() {
   }).join("");
 }
 
+let avatarActionBusy = false;
 async function handleAvatarAction(avatarId, action) {
   if (!currentUserId || userRole !== "student") return;
+  if (avatarActionBusy) return;
+  avatarActionBusy = true;
   const avatar = getAvatarById(avatarId);
+  const avatarCost = parseXPValue(avatar?.cost);
   const userRef = doc(db, "users", currentUserId);
   try {
     const snap = await getDoc(userRef);
     const src = snap.exists() ? snap.data() : (userData || {});
     const owned = normalizeOwnedAvatarIds(src?.ownedAvatarIds);
     const selectedId = String(src?.selectedAvatarId || AVATAR_DEFAULT_ID);
-    const currentXP = Math.max(0, Number(src?.xp || 0));
+    const storedXP = parseXPValue(src?.xp);
+    const uiXP = getEffectiveStudentXP();
+    const currentXP = Math.min(storedXP, uiXP);
 
     if (action === "select") {
       if (!owned.includes(avatar.id)) {
@@ -5029,21 +5393,42 @@ async function handleAvatarAction(avatarId, action) {
       return;
     }
 
-    if (currentXP < avatar.cost) {
-      const missing = Math.max(0, avatar.cost - currentXP);
-      await infoDialog(`Yetersiz XP.\nGerekli: ${avatar.cost} XP\nSende: ${currentXP} XP\nEksik: ${missing} XP`, { okText: "Tamam" });
+    if (currentXP < avatarCost) {
+      const missing = Math.max(0, avatarCost - currentXP);
+      await infoDialog(`Yetersiz XP.\nGerekli: ${avatarCost} XP\nSende: ${currentXP} XP\nEksik: ${missing} XP`, { okText: "Tamam" });
       return;
     }
 
-    const ok = await confirmDialog(`"${avatar.name}" için ${avatar.cost} XP harcansın mı?`, {
+    const ok = await confirmDialog(`"${avatar.name}" için ${avatarCost} XP harcansın mı?`, {
       yesText: "Evet, Satın Al",
       noText: "Vazgeç",
       yesClass: "btn btn-success"
     });
     if (!ok) return;
 
-    const nextXP = Math.max(0, currentXP - avatar.cost);
-    const nextOwned = normalizeOwnedAvatarIds([...owned, avatar.id]);
+    // Satın alma anında tekrar doğrula: stale XP ile alımı engeller.
+    const latestSnap = await getDoc(userRef);
+    const latest = latestSnap.exists() ? latestSnap.data() : (src || {});
+    const latestOwned = normalizeOwnedAvatarIds(latest?.ownedAvatarIds);
+    const storedLatestXP = parseXPValue(latest?.xp);
+    const uiLatestXP = getEffectiveStudentXP();
+    const latestXP = Math.min(storedLatestXP, uiLatestXP);
+    if (latestOwned.includes(avatar.id)) {
+      await setDoc(userRef, { selectedAvatarId: avatar.id, updatedAt: serverTimestamp() }, { merge: true });
+      userData = { ...(userData || {}), selectedAvatarId: avatar.id, ownedAvatarIds: latestOwned, xp: latestXP };
+      updateUserXPDisplay();
+      renderHeaderAvatar();
+      renderAvatarShop();
+      return;
+    }
+    if (latestXP < avatarCost) {
+      const missing = Math.max(0, avatarCost - latestXP);
+      await infoDialog(`Yetersiz XP.\nGerekli: ${avatarCost} XP\nSende: ${latestXP} XP\nEksik: ${missing} XP`, { okText: "Tamam" });
+      return;
+    }
+
+    const nextXP = Math.max(0, latestXP - avatarCost);
+    const nextOwned = normalizeOwnedAvatarIds([...latestOwned, avatar.id]);
     await setDoc(userRef, {
       xp: nextXP,
       ownedAvatarIds: nextOwned,
@@ -5058,6 +5443,8 @@ async function handleAvatarAction(avatarId, action) {
   } catch (e) {
     showNotice("Avatar işlemi sırasında hata oluştu.", "#e74c3c");
     console.error("avatar action error:", e);
+  } finally {
+    avatarActionBusy = false;
   }
 }
 
@@ -5075,25 +5462,7 @@ function closeAvatarShopModal() {
 }
 
 function updateUserXPDisplay(taskXP) {
-  if (typeof taskXP === "number" && Number.isFinite(taskXP)) {
-    lastTaskXP = Math.max(0, taskXP);
-  }
-  const toSafeNum = (v) => {
-    const n = Number(v);
-    return Number.isFinite(n) ? n : 0;
-  };
-  const computedTotal = (lastTaskXP || 0)
-    + getActivityXPFromProgressMap()
-    + getBlockXPFromProgressMap()
-    + getComputeXPFromProgressMap()
-    + getLessonXPFromProgressMap();
-  const persistedTotal = Math.max(0, toSafeNum(userData?.xp));
-  const hasLiveXpData = computedTotal > 0
-    || contentProgressMap.size > 0
-    || blockAssignmentProgressMap.size > 0
-    || computeAssignmentProgressMap.size > 0
-    || lessonProgressMap.size > 0;
-  const total = hasLiveXpData ? computedTotal : persistedTotal;
+  const total = parseXPValue(userData?.xp);
   if (userData && Number.isFinite(Number(total))) {
     userData.xp = Number(total);
   }
@@ -5121,6 +5490,21 @@ function updateUserXPDisplay(taskXP) {
   if (userRole === "student" && certificatesModal && certificatesModal.style.display === "flex") {
     renderStudentCertificateCard();
   }
+}
+
+function updateStudentQuizPointsDisplay(points = 0) {
+  const el = document.getElementById("stat-quiz-points");
+  if (!el) return;
+  const safePoints = Math.max(0, Number(points || 0));
+  el.innerText = `${safePoints} Puan`;
+}
+
+function addStudentQuizPoints(delta = 0) {
+  const step = Math.max(0, Number(delta || 0));
+  if (!step) return;
+  const el = document.getElementById("stat-quiz-points");
+  const current = el ? Number(String(el.innerText || "0").replace(/[^\d.-]/g, "")) : 0;
+  updateStudentQuizPointsDisplay(Math.max(0, Number.isFinite(current) ? current : 0) + step);
 }
 
 function buildMiniChartSvg(scores) {
@@ -5275,7 +5659,7 @@ function updateBlockRunnerTimerUI() {
   const mins = Math.floor(sec / 60);
   const secs = sec % 60;
   const el = document.getElementById("block-runner-timer");
-  if (el) el.innerText = `⏱ ${mins} dk ${secs} sn`;
+  if (el) el.innerText = `? ${mins} dk ${secs} sn`;
 }
 
 function setBlockRunnerHeaderByRole() {
@@ -5372,7 +5756,7 @@ function updateComputeRunnerTimerUI() {
   const mins = Math.floor(sec / 60);
   const secs = sec % 60;
   const el = document.getElementById("block-runner-timer");
-  if (el) el.innerText = `⏱ ${mins} dk ${secs} sn`;
+  if (el) el.innerText = `? ${mins} dk ${secs} sn`;
 }
 
 function pauseComputeRunnerTimer({ showPauseUI = true, markDialogPause = true } = {}) {
@@ -5453,9 +5837,14 @@ async function saveComputeRunnerSession({
   const assignment = assignmentSnap.data() || {};
   const levelStart = Math.max(1, Number(assignment.levelStart || 1));
   const levelEnd = Math.max(levelStart, Number(assignment.levelEnd || levelStart));
+  const expectedTotalLevels = Math.max(0, levelEnd - levelStart + 1);
   const rangeLevels = levels.slice(levelStart - 1, levelEnd);
-  const totalLevels = rangeLevels.length;
-  const completedIds = rangeLevels.filter((l) => !!l?.completed).map((l) => Number(l?.id)).filter((v) => Number.isFinite(v));
+  const totalLevels = Math.max(expectedTotalLevels, rangeLevels.length);
+  const completedIds = rangeLevels
+    .map((lv, idx) => ({ lv, idx }))
+    .filter((row) => !!row.lv?.completed)
+    .map((row) => getComputeLevelNo(row.lv, levelStart - 1 + row.idx))
+    .filter((v) => Number.isFinite(v));
   const completedLevels = completedIds.length;
   const percent = totalLevels > 0 ? Math.round((completedLevels / totalLevels) * 100) : 0;
   const completed = forceComplete || (totalLevels > 0 && completedLevels >= totalLevels);
@@ -5470,14 +5859,9 @@ async function saveComputeRunnerSession({
   const prevIds = Array.isArray(prev.completedLevelIds) ? prev.completedLevelIds : [];
   const mergedSeed = Array.from(new Set([...prevIds, ...completedIds]));
   if (forceComplete) {
-    rangeLevels.forEach((lv, idx) => {
-      const lid = Number(lv?.id);
-      if (Number.isFinite(lid)) {
-        mergedSeed.push(lid);
-      } else {
-        mergedSeed.push(levelStart + idx);
-      }
-    });
+    for (let lvNo = levelStart; lvNo <= levelEnd; lvNo++) {
+      mergedSeed.push(lvNo);
+    }
   }
   const mergedIds = Array.from(new Set(mergedSeed));
   const mergedCompleted = Math.min(Math.max(totalLevels, prevTotalLevels), mergedIds.length);
@@ -5498,13 +5882,27 @@ async function saveComputeRunnerSession({
     || mergedDone
     || effectivePercent >= 100
     || (effectiveTotalLevels > 0 && effectiveCompletedLevels >= effectiveTotalLevels);
-  const totalXP = rangeLevels.reduce((sum, lv) => {
-    const lid = Number(lv?.id);
-    const includeLevel = forceComplete || (Number.isFinite(lid) && mergedIds.includes(lid));
-    if (!includeLevel) return sum;
-    return sum + clampAppLevelXP(lv?.xp ?? MAX_APP_LEVEL_XP);
-  }, 0);
-  const prevAwardedXP = Math.max(0, Number(prev.awardedXP || 0));
+  const normalizedMergedIds = normalizeComputeCompletedLevelIds(
+    mergedIds,
+    levelStart,
+    levelEnd,
+    forceComplete ? totalLevels : mergedCompleted
+  );
+  const totalXP = normalizedMergedIds.reduce((sum, levelNo) => sum + getComputeLevelXPByLevelNo(levelNo), 0);
+  let prevAwardedXP = Math.max(0, Number(prev.awardedXP || 0));
+  if (prevAwardedXP > totalXP) {
+    const rollback = prevAwardedXP - totalXP;
+    try {
+      const userRef = doc(db, "users", uid);
+      const uSnap = await getDoc(userRef);
+      const currentXp = uSnap.exists() ? Math.max(0, Number((uSnap.data() || {}).xp || 0)) : 0;
+      await setDoc(userRef, { xp: Math.max(0, currentXp - rollback), updatedAt: serverTimestamp() }, { merge: true });
+      if (uid === currentUserId && userData) userData.xp = Math.max(0, Number(userData.xp || 0) - rollback);
+      prevAwardedXP = totalXP;
+    } catch (e) {
+      console.warn("compute awardedXP rollback failed", e);
+    }
+  }
 
   await setDoc(progressRef, {
     assignmentId: activeComputeAssignmentId,
@@ -5514,28 +5912,16 @@ async function saveComputeRunnerSession({
     userId: uid,
     percent: effectivePercent,
     completed: effectiveCompleted,
-    completedLevelIds: mergedIds,
-    totalXP: Math.max(Number(prev.totalXP || 0), totalXP),
-    awardedXP: prevAwardedXP,
-    completedLevels: Math.max(prevCompletedLevels, effectiveCompletedLevels),
+    completedLevelIds: normalizedMergedIds,
+    totalXP,
+    awardedXP: Math.min(prevAwardedXP, totalXP),
+    completedLevels: Math.max(prevCompletedLevels, normalizedMergedIds.length, effectiveCompletedLevels),
     totalLevels: Math.max(effectiveTotalLevels, Math.max(prevCompletedLevels, effectiveCompletedLevels)),
     currentLevelIndex: Math.max(0, Number(state.currentLevelIndex || 0)),
     lastSessionSeconds: elapsed,
     lastSessionMinutes: Math.floor(elapsed / 60),
     updatedAt: serverTimestamp()
   }, { merge: true });
-
-  const xpDelta = effectiveCompleted ? Math.max(0, totalXP - prevAwardedXP) : 0;
-  if (xpDelta > 0 && userRole === "student") {
-    try {
-      await updateDoc(doc(db, "users", uid), { xp: increment(xpDelta), updatedAt: serverTimestamp() });
-    } catch (e) {
-      await setDoc(doc(db, "users", uid), { xp: increment(xpDelta), updatedAt: serverTimestamp() }, { merge: true });
-    }
-    await setDoc(progressRef, { awardedXP: prevAwardedXP + xpDelta, updatedAt: serverTimestamp() }, { merge: true });
-    if (uid === currentUserId && userData) userData.xp = Math.max(0, Number(userData.xp || 0)) + xpDelta;
-    if (uid === currentUserId) updateUserXPDisplay();
-  }
 
   if (!wasCompleted && effectiveCompleted) {
     await updateDoc(doc(db, "computeAssignments", activeComputeAssignmentId), {
@@ -5837,7 +6223,7 @@ function closeBlockRunnerView() {
   setBlockRunnerStartButton(false);
   setActivityPausedUI(false);
   const timerLabel = document.getElementById("block-runner-timer");
-  if (timerLabel) timerLabel.innerText = "⏱ 0 dk 0 sn";
+  if (timerLabel) timerLabel.innerText = "? 0 dk 0 sn";
 }
 
 function taskMatchesStudent(task) {
@@ -5877,6 +6263,30 @@ function normalizeUserRole(rawRole) {
     return "student";
   }
   return role;
+}
+
+function getStrictUserRole(rawRole) {
+  const role = String(rawRole || "").trim().toLowerCase();
+  if (role === "teacher" || role === "ogretmen" || role === "öğretmen" || role === "admin" || role === "administrator") {
+    return "teacher";
+  }
+  if (role === "student" || role === "ogrenci" || role === "öğrenci") {
+    return "student";
+  }
+  return "";
+}
+
+function isProtectedUserAccount(row = {}) {
+  const strictRole = getStrictUserRole(row?.role);
+  if (strictRole === "teacher") return true;
+  if (row?.isTeacher === true || row?.isAdmin === true) return true;
+  if (String(row?.id || "") === String(currentUserId || "")) return true;
+  return false;
+}
+
+function isStrictStudentRow(row = {}) {
+  if (isProtectedUserAccount(row)) return false;
+  return getStrictUserRole(row?.role) === "student";
 }
 
 const FORCED_TEACHER_ALIASES = new Set(["dogu", "dogu2"]);
@@ -5946,7 +6356,8 @@ async function resolveLoginEmails(identifier) {
   };
   const candidates = raw.includes("@")
     ? [raw]
-    : [raw, `${raw}@okul.com`, `${raw}@gmail.com`];
+    : [raw, `${raw}@okul.com`, `${raw}@okul.local`, `${raw}@gmail.com`];
+  candidates.forEach((c) => pushUnique(c));
   try {
     for (const candidate of candidates) {
       const [byUsername, byEmail] = await Promise.all([
@@ -6177,21 +6588,27 @@ window.openComputeItRunner = async function(userId, options = {}){
     if (computeRunnerTimerInterval) clearInterval(computeRunnerTimerInterval);
     computeRunnerTimerInterval = null;
   } else {
+    const rangeStart = Math.max(1, Number(options?.levelStart || 1));
+    const rangeEnd = Math.max(rangeStart, Number(options?.levelEnd || rangeStart));
     computeRunnerSession = {
       userId: activeComputeRunnerUserId || currentUserId,
+      assignmentId: options?.assignmentId || activeComputeAssignmentId || null,
+      assignmentTitle: options?.title || "Compute It Ödevi",
       running: false,
       startAt: null,
       savedElapsedSeconds: 0,
       wasPausedByDialog: false,
       hasTriggeredRun: false,
-      completionHandled: false
+      completionHandled: false,
+      rangeStart,
+      rangeEnd
     };
     setActivityPausedUI(true);
   }
   const fullBar = document.getElementById("activity-fullbar");
   if (fullBar) fullBar.style.display = "none";
   const timerEl = document.getElementById("block-runner-timer");
-  if (timerEl) timerEl.innerText = "⏱ 0 dk 0 sn";
+  if (timerEl) timerEl.innerText = "? 0 dk 0 sn";
   const sendComputeRunnerRoleState = () => {
     try {
       if (!iframe.contentWindow) return;
@@ -6355,7 +6772,7 @@ window.openLineTraceRunner = function(options = {}) {
   if (fullStartBtn) fullStartBtn.style.display = "none";
   if (fullSaveBtn) fullSaveBtn.style.display = "none";
   if (fullExitBtn) {
-    fullExitBtn.innerText = "✕";
+    fullExitBtn.innerText = "?";
     fullExitBtn.title = "Çık";
     fullExitBtn.classList.add("line-trace-close-btn");
   }
@@ -6413,7 +6830,7 @@ window.openSilentTeacherRunner = function(options = {}) {
   if (fullStartBtn) fullStartBtn.style.display = "none";
   if (fullSaveBtn) fullSaveBtn.style.display = "none";
   if (fullExitBtn) {
-    fullExitBtn.innerText = "✕";
+    fullExitBtn.innerText = "?";
     fullExitBtn.title = "Çık";
     fullExitBtn.classList.add("line-trace-close-btn");
   }
@@ -6471,7 +6888,7 @@ window.openLightbotRunner = function(options = {}) {
   if (fullStartBtn) fullStartBtn.style.display = "none";
   if (fullSaveBtn) fullSaveBtn.style.display = "none";
   if (fullExitBtn) {
-    fullExitBtn.innerText = "✕";
+    fullExitBtn.innerText = "?";
     fullExitBtn.title = "Çık";
     fullExitBtn.classList.add("line-trace-close-btn");
   }
@@ -7115,7 +7532,7 @@ function renderFlowAssignmentTimer() {
   const sec = getFlowAssignmentElapsedSeconds();
   const mins = Math.floor(sec / 60);
   const secs = sec % 60;
-  timerEl.innerText = `⏱ ${mins} dk ${secs} sn`;
+  timerEl.innerText = `? ${mins} dk ${secs} sn`;
 }
 
 function startFlowAssignmentTimer(initialSeconds = 0) {
@@ -8071,6 +8488,41 @@ function applyStudentSidebarMinimalMode() {
   setSidebarSubmenuState("submenu-student-data", "btn-toggle-student-data-menu", false);
 }
 
+function flushAuthReadyWaiters(ok = true) {
+  const waiters = Array.isArray(authReadyWaiters) ? authReadyWaiters.slice() : [];
+  authReadyWaiters = [];
+  waiters.forEach((fn) => {
+    try { fn(!!ok); } catch {}
+  });
+}
+
+function waitForAuthReady(timeoutMs = 12000) {
+  const maxWait = Math.max(1500, Number(timeoutMs || 12000));
+  return new Promise((resolve) => {
+    let done = false;
+    const timer = setTimeout(() => {
+      if (done) return;
+      done = true;
+      resolve(false);
+    }, maxWait);
+    authReadyWaiters.push((ok) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      resolve(!!ok);
+    });
+  });
+}
+
+function restoreLoginButtonState() {
+  const loginBtn = document.getElementById("btn-login");
+  const loginScreen = document.getElementById("login-screen");
+  const stillOnLogin = !!loginScreen && !loginScreen.classList.contains("hidden");
+  if (!loginBtn || !stillOnLogin) return;
+  loginBtn.disabled = false;
+  loginBtn.innerText = "Giriş Yap";
+}
+
 function applyUserDropdownMenuByRole(isTeacher) {
   const profileMenuItem = document.getElementById("btn-open-profile-menu");
   if (profileMenuItem) profileMenuItem.style.display = "block";
@@ -8209,7 +8661,9 @@ const avatarShopModal = document.getElementById("avatar-shop-modal");
 document.getElementById("btn-open-create").onclick = function() {
   if (userRole !== "teacher") return;
   populateTaskTargets();
+  populateTaskTargetClassSection();
   loadBooksForTeacher();
+  taskQuestions = [];
   if (createModal) createModal.style.display = "flex";
   document.getElementById("side-menu").style.width = "0";
 };
@@ -8265,7 +8719,7 @@ if (resetAllStudentsPasswordsBtn) {
       const studentsSnap = await getDocs(query(collection(db, "users"), where("role", "==", "student")));
       const allRows = [];
       studentsSnap.forEach((docSnap) => allRows.push({ id: docSnap.id, ...docSnap.data() }));
-      const rows = getUniqueStudents(getTeacherManagedStudents(allRows));
+      const rows = getUniqueStudents(getTeacherManagedStudents(allRows)).filter((row) => isStrictStudentRow(row));
       if (!rows.length) {
         showNotice("Sıfırlanacak öğrenci bulunamadı.", "#f39c12");
         return;
@@ -8322,10 +8776,17 @@ if (deleteAllStudentsBtn) {
       const studentsSnap = await getDocs(query(collection(db, "users"), where("role", "==", "student")));
       const allRows = [];
       studentsSnap.forEach((docSnap) => allRows.push({ id: docSnap.id, ...docSnap.data() }));
-      const rows = getUniqueStudents(getTeacherManagedStudents(allRows));
+      const managedRows = getUniqueStudents(getTeacherManagedStudents(allRows));
+      const rows = managedRows.filter((row) => isStrictStudentRow(row));
+      const skippedProtected = Math.max(0, managedRows.length - rows.length);
       if (!rows.length) {
         hideOverlay();
-        await infoDialog("Silinecek öğrenci bulunamadı.", { okText: "Tamam" });
+        await infoDialog(
+          skippedProtected > 0
+            ? "Silinecek öğrenci bulunamadı. Öğretmen/admin hesapları koruma nedeniyle işlem dışı bırakıldı."
+            : "Silinecek öğrenci bulunamadı.",
+          { okText: "Tamam" }
+        );
         return;
       }
 
@@ -8350,13 +8811,13 @@ if (deleteAllStudentsBtn) {
       hideOverlay();
       if (failed.length === 0) {
         await infoDialog(
-          `Toplu silme tamamlandı.\nSilinen öğrenci: ${success}\nAuth uyarısı: ${authWarningCount}`,
+          `Toplu silme tamamlandı.\nSilinen öğrenci: ${success}\nKorunan hesap: ${skippedProtected}\nAuth uyarısı: ${authWarningCount}`,
           { okText: "Tamam" }
         );
       } else {
         const sample = failed.slice(0, 8).join("\n");
         await infoDialog(
-          `Toplu silme tamamlandı.\nBaşarılı: ${success}/${rows.length}\nBaşarısız: ${failed.length}\nAuth uyarısı: ${authWarningCount}\n\n${sample}`,
+          `Toplu silme tamamlandı.\nBaşarılı: ${success}/${rows.length}\nBaşarısız: ${failed.length}\nKorunan hesap: ${skippedProtected}\nAuth uyarısı: ${authWarningCount}\n\n${sample}`,
           { okText: "Tamam" }
         );
       }
@@ -8370,8 +8831,9 @@ if (deleteAllStudentsBtn) {
   };
 }
 
-document.getElementById("btn-open-add-student").onclick = function() {
+document.getElementById("btn-open-add-student").onclick = async function() {
   if (userRole !== "teacher") return;
+  await refreshAndApplyClassSectionDropdowns();
   if (addStudentModal) addStudentModal.style.display = "flex";
   document.getElementById("side-menu").style.width = "0";
 };
@@ -9021,10 +9483,6 @@ document.getElementById("btn-join-live-quiz")?.addEventListener("click", () => {
   if (invite) invite.style.display = "none";
   openLivePlayer();
 });
-document.getElementById("btn-close-live-invite")?.addEventListener("click", () => {
-  const invite = document.getElementById("live-quiz-invite");
-  if (invite) invite.style.display = "none";
-});
 document.getElementById("btn-close-live-player")?.addEventListener("click", closeLivePlayer);
 
 const closeLessonBuilderBtn = document.getElementById("btn-close-lesson-builder");
@@ -9062,11 +9520,10 @@ if (addLessonSlideBtn) {
 const slideTypeEl = document.getElementById("slide-type");
 if (slideTypeEl) {
   slideTypeEl.onchange = function () {
-    const qArea = document.getElementById("slide-question-area");
+    const type = this.value || "content";
     const cArea = document.getElementById("slide-content-area");
-    const isQuestion = this.value === "question" || this.value === "mixed";
-    if (qArea) qArea.style.display = isQuestion ? "block" : "none";
-    if (cArea) cArea.style.display = "block";
+    if (cArea) cArea.style.display = (type === "question") ? "none" : "block";
+    setLessonQuestionEditorVisibility();
     updateLessonSlidePreview();
   };
 }
@@ -9095,24 +9552,24 @@ if (insertLessonImageBtn) {
   };
 }
 
-["slide-title","slide-image-url","slide-video-url","slide-layout","slide-question","slide-question-type","slide-opt-1","slide-opt-2","slide-opt-3","slide-opt-4","slide-correct"].forEach((id) => {
+["slide-title","slide-image-url","slide-video-url","slide-layout","slide-question-text","slide-question-xp","slide-question-duration","slide-correct-choice","slide-correct-boolean","slide-dragdrop-pairs","slide-option-0","slide-option-1","slide-option-2","slide-option-3"].forEach((id) => {
   const el = document.getElementById(id);
-  if (el) el.addEventListener("input", updateLessonSlidePreview);
+  if (!el) return;
+  el.addEventListener("input", updateLessonSlidePreview);
+  el.addEventListener("change", updateLessonSlidePreview);
 });
+const slideQuestionTypeEl = document.getElementById("slide-question-type");
+if (slideQuestionTypeEl) {
+  slideQuestionTypeEl.addEventListener("change", () => {
+    setLessonQuestionEditorVisibility();
+    updateLessonSlidePreview();
+  });
+}
 const slideLayoutEl = document.getElementById("slide-layout");
 if (slideLayoutEl) {
   slideLayoutEl.addEventListener("change", () => {
     setLessonCodeEditorVisibility();
     renderLessonCanvasEditor();
-    updateLessonSlidePreview();
-  });
-}
-const slideFillAnswersEl = document.getElementById("slide-fill-answers");
-if (slideFillAnswersEl) slideFillAnswersEl.addEventListener("input", updateLessonSlidePreview);
-const qTypeEl = document.getElementById("slide-question-type");
-if (qTypeEl) {
-  qTypeEl.addEventListener("change", () => {
-    updateLessonQuestionTypeUI();
     updateLessonSlidePreview();
   });
 }
@@ -9272,18 +9729,48 @@ if (saveSlideBtn) {
   };
 }
 
+const previewLessonBtn = document.getElementById("btn-preview-lesson");
+if (previewLessonBtn) {
+  previewLessonBtn.onclick = function () {
+    if (userRole !== "teacher") return;
+    syncCurrentLessonSlideFromForm();
+    const title = (document.getElementById("lesson-title")?.value || "").trim();
+    const description = (document.getElementById("lesson-desc")?.value || "").trim();
+    const targetClass = (document.getElementById("lesson-class")?.value || "").trim();
+    const targetSection = (document.getElementById("lesson-section")?.value || "").trim();
+    const bgImage = (document.getElementById("lesson-bg")?.value || "").trim();
+    const slides = Array.isArray(lessonDraft.slides)
+      ? lessonDraft.slides.map((slide) => ({ ...slide }))
+      : [];
+    if (!slides.length) {
+      showNotice("Önizleme için en az bir slide ekleyin.", "#f39c12");
+      return;
+    }
+    const previewLesson = {
+      id: `preview_${Date.now()}`,
+      title: title || "Önizleme Dersi",
+      description,
+      targetClass,
+      targetSection,
+      bgImage,
+      slides
+    };
+    openLessonPlayerModal(previewLesson);
+  };
+}
+
 function setLessonEditorType(type, layout) {
   const typeEl = document.getElementById("slide-type");
   const layoutEl = document.getElementById("slide-layout");
-  if (typeEl && type) {
-    typeEl.value = type;
+  if (typeEl) {
+    typeEl.value = normalizeLessonSlideType(type || "content");
     typeEl.dispatchEvent(new Event("change"));
   }
   if (layoutEl && layout) {
     layoutEl.value = layout;
     layoutEl.dispatchEvent(new Event("change"));
   }
-  if (typeof updateLessonQuestionTypeUI === "function") updateLessonQuestionTypeUI();
+  setLessonQuestionEditorVisibility();
   setLessonCodeEditorVisibility();
   updateLessonSlidePreview();
 }
@@ -9299,6 +9786,56 @@ function setLessonCodeEditorVisibility() {
   if (contentEditor) contentEditor.style.display = isCode ? "none" : "block";
   if (mediaRow) mediaRow.style.display = isCode ? "none" : "grid";
   if (toolbar) toolbar.style.display = isCode ? "none" : "flex";
+}
+
+function normalizeLessonSlideType(raw) {
+  const t = String(raw || "").trim().toLowerCase();
+  if (t === "question" || t === "mixed") return t;
+  return "content";
+}
+
+function parseLessonDragdropPairsText(raw) {
+  return String(raw || "")
+    .split(/\r?\n/)
+    .map((line) => String(line || "").trim())
+    .filter(Boolean)
+    .map((line) => {
+      const match = line.match(/^(.+?)\s*(?:[:=>-]{1,2})\s*(.+)$/);
+      if (!match) return "";
+      const left = String(match[1] || "").trim();
+      const right = String(match[2] || "").trim();
+      if (!left || !right) return "";
+      return `${left}:${right}`;
+    })
+    .filter(Boolean);
+}
+
+function formatLessonDragdropPairsText(fillAnswers = []) {
+  return (Array.isArray(fillAnswers) ? fillAnswers : [])
+    .map((pair) => String(pair || "").trim())
+    .filter(Boolean)
+    .map((pair) => {
+      const parts = pair.split(":");
+      if (parts.length < 2) return pair;
+      const left = String(parts[0] || "").trim();
+      const right = String(parts.slice(1).join(":") || "").trim();
+      return `${left}:${right}`;
+    })
+    .join("\n");
+}
+
+function setLessonQuestionEditorVisibility() {
+  const slideType = normalizeLessonSlideType(document.getElementById("slide-type")?.value || "content");
+  const questionWrap = document.getElementById("lesson-question-builder");
+  if (questionWrap) questionWrap.style.display = slideType === "content" ? "none" : "grid";
+
+  const qType = normalizeLessonQuestionType(document.getElementById("slide-question-type")?.value || "multiple");
+  const multiWrap = document.getElementById("lesson-question-multiple-fields");
+  const boolWrap = document.getElementById("lesson-question-boolean-fields");
+  const dragWrap = document.getElementById("lesson-question-dragdrop-fields");
+  if (multiWrap) multiWrap.style.display = qType === "multiple" ? "block" : "none";
+  if (boolWrap) boolWrap.style.display = qType === "boolean" ? "block" : "none";
+  if (dragWrap) dragWrap.style.display = qType === "dragdrop" ? "block" : "none";
 }
 
 const quickTextBtn = document.getElementById("btn-lesson-quick-text");
@@ -9331,15 +9868,6 @@ if (quickCodeBtn) {
       codeInput.focus();
     }
     updateLessonSlidePreview();
-  });
-}
-
-const quickQuestionBtn = document.getElementById("btn-lesson-quick-question");
-if (quickQuestionBtn) {
-  quickQuestionBtn.addEventListener("click", () => {
-    setLessonEditorType("question", "text");
-    const questionInput = document.getElementById("slide-question");
-    if (questionInput) questionInput.focus();
   });
 }
 
@@ -9469,6 +9997,16 @@ if (saveLessonBtn) {
       showNotice("En az bir slide ekleyin.", "#e74c3c");
       return;
     }
+    const sanitizedSlides = lessonDraft.slides.map((slide) => ({
+      ...slide,
+      type: normalizeLessonSlideType(slide?.type || "content"),
+      questionType: normalizeLessonQuestionType(slide?.questionType || "multiple"),
+      questionXP: clampLessonQuestionXP(slide?.questionXP ?? slide?.xp ?? MAX_QUESTION_XP),
+      questionDurationSec: Math.max(5, Number(slide?.questionDurationSec ?? slide?.durationSec ?? 30) || 30),
+      options: Array.isArray(slide?.options) ? slide.options.map((opt) => String(opt || "").trim()).filter(Boolean) : [],
+      fillAnswers: Array.isArray(slide?.fillAnswers) ? slide.fillAnswers.map((pair) => String(pair || "").trim()).filter(Boolean) : []
+    }));
+    lessonDraft.slides = sanitizedSlides;
     try {
       const payload = {
         title,
@@ -9476,7 +10014,7 @@ if (saveLessonBtn) {
         targetClass,
         targetSection,
         bgImage,
-        slides: lessonDraft.slides,
+        slides: sanitizedSlides,
         isPublished: editingLessonId ? !!editingLessonIsPublished : false,
         userId: currentUserId,
         updatedAt: serverTimestamp()
@@ -9519,7 +10057,10 @@ if (deleteLessonBtn) {
 }
 
 const closeLessonPlayerBtn = document.getElementById("btn-close-lesson-player");
-if (closeLessonPlayerBtn) closeLessonPlayerBtn.onclick = async () => { await persistLessonProgress(true); };
+if (closeLessonPlayerBtn) closeLessonPlayerBtn.onclick = () => {
+  clearLessonQuestionTimer();
+  persistLessonProgress(true).catch((e) => console.warn("lesson close persist failed", e));
+};
 
 const lessonZoomOutBtn = document.getElementById("lesson-zoom-out");
 if (lessonZoomOutBtn) {
@@ -9560,7 +10101,7 @@ if (lessonNextBtn) lessonNextBtn.onclick = async function () {
     await persistLessonProgress(false);
     return;
   }
-  await persistLessonProgress(true);
+  persistLessonProgress(true).catch((e) => console.warn("lesson finish persist failed", e));
   showNotice("Ders ilerlemesi kaydedildi.", "#2ecc71");
 };
 
@@ -10645,16 +11186,227 @@ function parseXPValue(value) {
 
 function getStudentXPValue(student, externalXPMap = null) {
   if (!student) return 0;
-  let xp = 0;
-  xp = Math.max(xp, parseXPValue(student.xp));
-  xp = Math.max(xp, parseXPValue(student.totalXP));
-  xp = Math.max(xp, parseXPValue(student.totalXp));
-  xp = Math.max(xp, parseXPValue(student.xpTotal));
+  const directXp = parseXPValue(student.xp);
+  if (directXp > 0) return directXp;
+  let fallbackXp = 0;
+  fallbackXp = Math.max(fallbackXp, parseXPValue(student.totalXP));
+  fallbackXp = Math.max(fallbackXp, parseXPValue(student.totalXp));
+  fallbackXp = Math.max(fallbackXp, parseXPValue(student.xpTotal));
   if (externalXPMap && student.id && externalXPMap.has(student.id)) {
-    xp = Math.max(xp, parseXPValue(externalXPMap.get(student.id)));
+    fallbackXp = Math.max(fallbackXp, parseXPValue(externalXPMap.get(student.id)));
   }
-  return xp;
+  return fallbackXp;
 }
+
+function normalizeNameToken(value) {
+  return String(value || "")
+    .trim()
+    .toLocaleLowerCase("tr-TR")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ");
+}
+
+async function resolveStudentByLabel(labelOrId) {
+  const raw = String(labelOrId || "").trim();
+  if (!raw) return null;
+  const usersSnap = await getDocs(query(collection(db, "users"), where("role", "==", "student")));
+  const rows = [];
+  usersSnap.forEach((d) => rows.push({ id: d.id, ...(d.data() || {}) }));
+  if (!rows.length) return null;
+  const token = normalizeNameToken(raw);
+  const byId = rows.find((u) => String(u.id) === raw);
+  if (byId) return byId;
+  const byUsername = rows.find((u) => normalizeNameToken(u.username) === token);
+  if (byUsername) return byUsername;
+  const byEmail = rows.find((u) => normalizeNameToken(u.email) === token);
+  if (byEmail) return byEmail;
+  const byFullName = rows.find((u) => normalizeNameToken(getUserDisplayName(u)) === token);
+  if (byFullName) return byFullName;
+  const byContains = rows.find((u) => normalizeNameToken(getUserDisplayName(u)).includes(token));
+  return byContains || null;
+}
+
+async function buildStudentXPAudit(labelOrId) {
+  const student = await resolveStudentByLabel(labelOrId);
+  if (!student?.id) return null;
+  const uid = String(student.id);
+
+  const [
+    completionsSnap,
+    contentProgressSnap,
+    blockProgSnap,
+    computeProgSnap,
+    lessonProgSnap,
+    bookTaskSnap,
+    quizResultSnap,
+    liveScoresSnap
+  ] = await Promise.all([
+    getDocs(query(collection(db, "completions"), where("userId", "==", uid))),
+    getDocs(query(collection(db, "contentProgress"), where("userId", "==", uid))),
+    getDocs(query(collection(db, "blockAssignmentProgress"), where("userId", "==", uid))),
+    getDocs(query(collection(db, "computeAssignmentProgress"), where("userId", "==", uid))),
+    getDocs(query(collection(db, "lessonProgress"), where("userId", "==", uid))),
+    getDocs(query(collection(db, "bookTaskProgress"), where("userId", "==", uid))),
+    getDocs(query(collection(db, "studentQuizResults"), where("userId", "==", uid))),
+    getDocs(query(collectionGroup(db, "scores"), where("userId", "==", uid)))
+  ]);
+
+  const completionsXP = completionsSnap.docs.reduce((sum, d) => sum + parseXPValue(d.data()?.xpEarned), 0);
+  const contentXP = contentProgressSnap.docs.reduce((sum, d) => sum + parseXPValue(d.data()?.totalXP), 0);
+  const blockXP = blockProgSnap.docs.reduce((sum, d) => sum + parseXPValue(d.data()?.totalXP), 0);
+  const computeXP = computeProgSnap.docs.reduce((sum, d) => sum + getNormalizedComputeProgressSnapshot(d.data() || {}, null).totalXP, 0);
+  const lessonXP = lessonProgSnap.docs.reduce((sum, d) => sum + parseXPValue(d.data()?.totalXP), 0);
+  const bookXP = bookTaskSnap.docs.reduce((sum, d) => {
+    const row = d.data() || {};
+    const explicit = parseXPValue(row?.xpEarned ?? row?.xp);
+    if (explicit > 0) return sum + explicit;
+    return sum + (row?.approved ? MANUAL_TASK_APPROVAL_XP : 0);
+  }, 0);
+  const quizResultsXP = quizResultSnap.docs.reduce((sum, d) => sum + parseXPValue(d.data()?.xpEarned), 0);
+  const liveScoresXP = liveScoresSnap.docs.reduce((sum, d) => sum + parseXPValue(d.data()?.xp), 0);
+  const liveScoresAwardedXP = liveScoresSnap.docs.reduce((sum, d) => sum + parseXPValue(d.data()?.xpAwarded), 0);
+
+  const breakdown = [
+    { source: "users.xp (ekranda görünen ana değer)", xp: parseXPValue(student?.xp) },
+    { source: "completions.xpEarned", xp: completionsXP },
+    { source: "contentProgress.totalXP", xp: contentXP },
+    { source: "blockAssignmentProgress.totalXP", xp: blockXP },
+    { source: "computeAssignmentProgress.totalXP", xp: computeXP },
+    { source: "lessonProgress.totalXP", xp: lessonXP },
+    { source: "bookTaskProgress (onay/explicit)", xp: bookXP },
+    { source: "studentQuizResults.xpEarned", xp: quizResultsXP },
+    { source: "liveQuizSessions/*/scores.xp", xp: liveScoresXP },
+    { source: "liveQuizSessions/*/scores.xpAwarded", xp: liveScoresAwardedXP }
+  ];
+
+  return {
+    student: {
+      id: uid,
+      name: getUserDisplayName(student),
+      username: student.username || "",
+      className: student.className || "",
+      section: student.section || ""
+    },
+    breakdown
+  };
+}
+
+window.debugStudentXPBreakdown = async function(labelOrId) {
+  if (userRole !== "teacher") {
+    showNotice("Bu araç sadece öğretmen hesabında kullanılabilir.", "#f39c12");
+    return null;
+  }
+  const report = await buildStudentXPAudit(labelOrId);
+  if (!report) {
+    showNotice("Öğrenci bulunamadı.", "#e74c3c");
+    return null;
+  }
+  try {
+    console.group(`XP Audit • ${report.student.name} (${report.student.id})`);
+    console.table(report.breakdown);
+    console.groupEnd();
+  } catch {}
+  const userXp = report.breakdown.find((x) => x.source.startsWith("users.xp"))?.xp || 0;
+  showNotice(`XP denetimi hazır: ${report.student.name} • users.xp=${userXp}`, "#2ecc71");
+  return report;
+};
+
+async function repairComputeXPData(targetUserId = "") {
+  const uidFilter = String(targetUserId || "").trim();
+  const assignmentSnap = await getDocs(collection(db, "computeAssignments"));
+  const assignmentMap = new Map();
+  assignmentSnap.forEach((d) => assignmentMap.set(String(d.id), d.data() || {}));
+  const progressQuery = uidFilter
+    ? query(collection(db, "computeAssignmentProgress"), where("userId", "==", uidFilter))
+    : collection(db, "computeAssignmentProgress");
+  const progressSnap = await getDocs(progressQuery);
+  const userDeltaMap = new Map();
+  const writes = [];
+  let repairedRows = 0;
+  progressSnap.forEach((docSnap) => {
+    const row = docSnap.data() || {};
+    const uid = String(row.userId || "");
+    if (!uid) return;
+    const assignment = assignmentMap.get(String(row.assignmentId || "")) || null;
+    const normalized = getNormalizedComputeProgressSnapshot(row, assignment);
+    const oldTotalXP = parseXPValue(row.totalXP);
+    const oldAwardedXP = parseXPValue(row.awardedXP);
+    const completed = !!row.completed
+      || Number(row.percent || 0) >= 100
+      || (normalized.totalLevels > 0 && normalized.completedLevels >= normalized.totalLevels);
+    const desiredAwardedXP = completed
+      ? normalized.totalXP
+      : Math.min(oldAwardedXP, normalized.totalXP);
+    const changed = oldTotalXP !== normalized.totalXP
+      || oldAwardedXP !== desiredAwardedXP
+      || Number(row.levelStart || 0) !== normalized.levelStart
+      || Number(row.levelEnd || 0) !== normalized.levelEnd
+      || Number(row.totalLevels || 0) !== normalized.totalLevels
+      || Number(row.completedLevels || 0) !== normalized.completedLevels
+      || JSON.stringify(Array.isArray(row.completedLevelIds) ? row.completedLevelIds : []) !== JSON.stringify(normalized.completedLevelIds);
+    if (!changed) return;
+    repairedRows += 1;
+    writes.push({
+      ref: docSnap.ref,
+      data: {
+        levelStart: normalized.levelStart,
+        levelEnd: normalized.levelEnd,
+        totalLevels: normalized.totalLevels,
+        completedLevels: normalized.completedLevels,
+        completedLevelIds: normalized.completedLevelIds,
+        totalXP: normalized.totalXP,
+        awardedXP: desiredAwardedXP,
+        updatedAt: serverTimestamp()
+      }
+    });
+    const delta = desiredAwardedXP - oldAwardedXP;
+    if (delta !== 0) userDeltaMap.set(uid, (userDeltaMap.get(uid) || 0) + delta);
+  });
+  for (let i = 0; i < writes.length; i += 400) {
+    const batch = writeBatch(db);
+    writes.slice(i, i + 400).forEach((w) => batch.set(w.ref, w.data, { merge: true }));
+    await batch.commit();
+  }
+  const userDeltas = Array.from(userDeltaMap.entries());
+  for (let i = 0; i < userDeltas.length; i += 100) {
+    const chunk = userDeltas.slice(i, i + 100);
+    await Promise.all(chunk.map(async ([uid, delta]) => {
+      try {
+        const userRef = doc(db, "users", String(uid));
+        const uSnap = await getDoc(userRef);
+        const currentXP = uSnap.exists() ? parseXPValue((uSnap.data() || {}).xp) : 0;
+        const nextXP = Math.max(0, currentXP + Number(delta || 0));
+        await setDoc(userRef, { xp: nextXP, updatedAt: serverTimestamp() }, { merge: true });
+        if (String(uid) === String(currentUserId) && userData) {
+          userData.xp = nextXP;
+          updateUserXPDisplay();
+        }
+      } catch (e) {
+        console.warn("repairComputeXPData user xp fix failed", uid, e);
+      }
+    }));
+  }
+  return {
+    repairedRows,
+    affectedUsers: userDeltas.length,
+    totalUserDelta: userDeltas.reduce((sum, row) => sum + Number(row[1] || 0), 0)
+  };
+}
+
+window.repairComputeXPData = async function(targetUserId = "") {
+  if (userRole !== "teacher") {
+    showNotice("Bu araç sadece öğretmen hesabında kullanılabilir.", "#f39c12");
+    return null;
+  }
+  const report = await repairComputeXPData(targetUserId);
+  const msg = `Compute XP onarıldı • kayıt: ${report.repairedRows}, öğrenci: ${report.affectedUsers}, toplam düzeltme: ${report.totalUserDelta}`;
+  showNotice(msg, "#2ecc71");
+  try {
+    console.log("repairComputeXPData", report);
+  } catch {}
+  return report;
+};
 
 document.getElementById("bulk-students-file").onchange = async function (e) {
   if (userRole !== "teacher") return;
@@ -11131,6 +11883,7 @@ onAuthStateChanged(auth, (user) => {
   const appScreen = document.getElementById("app-screen");
 
   if (!user) {
+    flushAuthReadyWaiters(false);
     logoutInProgress = false;
     stopProfileChangeApprovalsListener();
     if (userProfileUnsub) {
@@ -11141,6 +11894,7 @@ onAuthStateChanged(auth, (user) => {
     currentUserId = null;
     userRole = null;
     userData = null;
+    lastTaskXP = 0;
     teacherOwnerAliasTokens = new Set();
     if (progressUnsub) progressUnsub();
     progressUnsub = null;
@@ -11182,7 +11936,7 @@ onAuthStateChanged(auth, (user) => {
     studentLiveSessionUnsub = null;
     stopStudentLiveScoresListener();
     lastLiveInviteSessionId = null;
-    closeLivePlayer();
+    closeLivePlayer(true);
     const invite = document.getElementById("live-quiz-invite");
     if (invite) invite.style.display = "none";
     if (activityProgressUnsub) activityProgressUnsub();
@@ -11283,8 +12037,13 @@ onAuthStateChanged(auth, (user) => {
     return;
   }
 
-  if (logoutInProgress) return;
+  // Kullanici geldiginde logout kilidi aktif kalmamalidir; aksi halde profil akisina girilmez.
+  if (logoutInProgress) {
+    console.warn("logoutInProgress kilidi kullanici ile birlikte sifirlandi.");
+    logoutInProgress = false;
+  }
   currentUserId = user.uid;
+  lastTaskXP = 0;
   contentProgressMap.clear();
   blockAssignmentProgressMap.clear();
   computeAssignmentProgressMap.clear();
@@ -11302,6 +12061,7 @@ onAuthStateChanged(auth, (user) => {
     userProfileUnsub = null;
   }
   userProfileUnsub = onSnapshot(doc(db, "users", user.uid), async (snap) => {
+    try {
     if (logoutInProgress) return;
     if (!auth.currentUser || auth.currentUser.uid !== user.uid) return;
     if (!snap.exists()) {
@@ -11423,14 +12183,14 @@ onAuthStateChanged(auth, (user) => {
     document.getElementById("student-tabs").style.display = "flex";
     document.getElementById("teacher-stats").style.display = isTeacher ? "block" : "none";
     document.getElementById("teacher-filters").style.display = "none";
-    document.getElementById("tasks-title").innerText = isTeacher ? "📚 Verilen Ödevler" : "📚 Ödevlerim";
+    document.getElementById("tasks-title").innerText = isTeacher ? "Verilen Ödevler" : "Ödevlerim";
     document.getElementById("leaderboard-section").style.display = isTeacher ? "none" : "block";
-    document.getElementById("activities-title").innerText = isTeacher ? "🧩 Verilen Etkinlikler" : "🧩 Etkinliklerim";
+    document.getElementById("activities-title").innerText = isTeacher ? "Verilen Etkinlikler" : "Etkinliklerim";
     document.getElementById("activities-tabs").style.display = "flex";
     document.getElementById("activities-teacher-stats").style.display = isTeacher ? "block" : "none";
     const blockTitle = document.getElementById("block-homework-title");
     if (blockTitle) {
-      blockTitle.innerText = isTeacher ? "" : "🧱 Blok Kodlama Ödevim";
+      blockTitle.innerText = isTeacher ? "" : "Blok Kodlama Ödevim";
       blockTitle.style.display = isTeacher ? "none" : "";
     }
     const blockAssignTabs = document.getElementById("block-homework-assign-tabs");
@@ -11452,7 +12212,7 @@ onAuthStateChanged(auth, (user) => {
       setBlockAssignCreateButton("block2d");
     }
     const computeTitle = document.getElementById("compute-homework-title");
-    if (computeTitle) computeTitle.innerText = isTeacher ? "🧮 Verilen Compute It Ödevleri" : "🧮 Compute It Ödevim";
+    if (computeTitle) computeTitle.innerText = isTeacher ? "Verilen Compute It Ödevleri" : "Compute It Ödevim";
     const computeTabs = document.getElementById("compute-homework-tabs");
     if (computeTabs) computeTabs.style.display = "flex";
     const computeTeacherStats = document.getElementById("compute-homework-teacher-stats");
@@ -11566,6 +12326,7 @@ onAuthStateChanged(auth, (user) => {
       applyStudentSidebarMinimalMode();
       setSidebarSubmenuState("submenu-student-data", "btn-toggle-student-data-menu", false);
     }
+    flushAuthReadyWaiters(true);
     if (isTeacher && certificatesModal) certificatesModal.style.display = "none";
     if (!isTeacher && teacherCertificatesModal) teacherCertificatesModal.style.display = "none";
     if (!isTeacher) {
@@ -11583,7 +12344,7 @@ onAuthStateChanged(auth, (user) => {
     const topStudentsCard = document.getElementById("top-students-card");
     if (topStudentsCard) topStudentsCard.style.display = isTeacher ? "block" : "none";
     const lessonsTitle = document.getElementById("lessons-title");
-    if (lessonsTitle) lessonsTitle.innerText = isTeacher ? "📖 Verilen Dersler" : "📖 Derslerim";
+    if (lessonsTitle) lessonsTitle.innerText = isTeacher ? "Verilen Dersler" : "Derslerim";
     const lessonsTabs = document.getElementById("lessons-tabs");
     if (lessonsTabs) lessonsTabs.style.display = "flex";
     const lessonsTeacherStats = document.getElementById("lessons-teacher-stats");
@@ -11614,6 +12375,7 @@ onAuthStateChanged(auth, (user) => {
       startContentProgressListener();
       startBookTaskProgressListener();
       startStudentLiveQuizListener();
+      refreshStudentQuizPointsStat();
     } else {
       if (studentLiveSessionUnsub) studentLiveSessionUnsub();
       studentLiveSessionUnsub = null;
@@ -11667,6 +12429,7 @@ onAuthStateChanged(auth, (user) => {
     else {
       classSectionCatalog = [];
       applyClassSectionDropdownBindings();
+      repairComputeXPData(user.uid).catch((e) => console.warn("student compute xp repair skipped", e));
     }
     loadTasks();
     loadContentAssignments();
@@ -11675,6 +12438,19 @@ onAuthStateChanged(auth, (user) => {
     loadLessons();
     if (!isTeacher) loadLeaderboard();
     if (isTeacher) loadStatsPage();
+    } catch (e) {
+      console.error("Profil yükleme akışı hatası:", e);
+      flushAuthReadyWaiters(false);
+      ensureLoggedOutView();
+      restoreLoginButtonState();
+      showNotice("Profil yüklenemedi. Lütfen tekrar giriş yapın.", "#e74c3c");
+    }
+  }, (error) => {
+    console.error("Kullanıcı profil dinleyici hatası:", error);
+    flushAuthReadyWaiters(false);
+    ensureLoggedOutView();
+    restoreLoginButtonState();
+    showNotice("Profil verisi alınamadı. Lütfen tekrar deneyin.", "#e74c3c");
   });
 });
 
@@ -11860,23 +12636,23 @@ function updateTaskLists() {
   };
   if (userRole === "teacher") {
     const allRows = [...pendingRows, ...completedRows];
-    renderLimitedRows(pendingList, allRows, 3);
+    renderLimitedRows(pendingList, allRows, HOME_PREVIEW_LIMIT);
     if (completedList) completedList.innerHTML = "";
     if (noPending) noPending.style.display = allRows.length === 0 ? "block" : "none";
     if (noCompleted) noCompleted.style.display = "none";
     setShowMoreButton(
       "btn-show-all-tasks",
-      allRows.length > 3,
+      allRows.length > HOME_PREVIEW_LIMIT,
       () => openAllItemsModal(homeListCache.tasks.title, homeListCache.tasks.pending, homeListCache.tasks.completed)
     );
   } else {
-    renderLimitedRows(pendingList, pendingRows, 3);
-    renderLimitedRows(completedList, completedRows, 3);
+    renderLimitedRows(pendingList, pendingRows, HOME_PREVIEW_LIMIT);
+    renderLimitedRows(completedList, completedRows, HOME_PREVIEW_LIMIT);
     if (noPending) noPending.style.display = pendingCount === 0 ? "block" : "none";
     if (noCompleted) noCompleted.style.display = completedCount === 0 ? "block" : "none";
     setShowMoreButton(
       "btn-show-all-tasks",
-      pendingRows.length > 3 || completedRows.length > 3,
+      pendingRows.length > HOME_PREVIEW_LIMIT || completedRows.length > HOME_PREVIEW_LIMIT,
       () => openAllItemsModal(homeListCache.tasks.title, homeListCache.tasks.pending, homeListCache.tasks.completed)
     );
   }
@@ -11933,7 +12709,7 @@ function createTaskElement(task, isCompleted, completionData, manualProgress) {
       if (completionData.duration) {
         const mins = Math.floor(completionData.duration / 60);
         const secs = completionData.duration % 60;
-        timeInfo = `<small style="color:#666;display:block;margin-top:4px;">⏱ ${mins}dk ${secs}sn</small>`;
+        timeInfo = `<small style="color:#666;display:block;margin-top:4px;">? ${mins}dk ${secs}sn</small>`;
       }
     } else {
       if (isExpired) {
@@ -11947,7 +12723,7 @@ function createTaskElement(task, isCompleted, completionData, manualProgress) {
         if (daysLeft > 0) {
           deadlineInfo = `<small style="color:${daysLeft <= 2 ? '#e74c3c' : '#f39c12'};display:block;margin-top:4px;">? ${daysLeft} gün kaldı</small>`;
         } else if (daysLeft === 0) {
-          deadlineInfo = `<small style="color:#e74c3c;display:block;margin-top:4px;">⚠️ Bugün son gün!</small>`;
+          deadlineInfo = `<small style="color:#e74c3c;display:block;margin-top:4px;">?? Bugün son gün!</small>`;
         }
       }
     }
@@ -11964,10 +12740,10 @@ function createTaskElement(task, isCompleted, completionData, manualProgress) {
     const totalStudents = studentIdSet.size || allStudents.length || 0;
     const suffix = totalStudents ? `/${totalStudents}` : "";
     const controlBadge = requiresTeacherApprovalTask(task)
-      ? `<span class="badge badge-danger">⚠️ Kontrol Gerekli</span> `
+      ? `<span class="badge badge-danger">?? Kontrol Gerekli</span> `
       : "";
     const rewardXP = getTaskRewardXP(task);
-    const dateInline = deadline ? ` • 📅 ${deadline.toLocaleDateString('tr-TR')}` : "";
+    const dateInline = deadline ? ` • ?? ${deadline.toLocaleDateString('tr-TR')}` : "";
     const xpInfo = requiresTeacherApprovalTask(task)
       ? `<small style="color:#7c2d12;display:block;margin-top:4px;">? Onaylanınca +${rewardXP} XP${dateInline}</small>`
       : `<small style="color:#1e40af;display:block;margin-top:4px;">? Tamamlayınca +${rewardXP} XP${dateInline}</small>`;
@@ -12106,6 +12882,7 @@ document.getElementById("btn-login").onclick = async function () {
   const email = document.getElementById("email").value;
   const pass = document.getElementById("password").value;
   const loginBtn = document.getElementById("btn-login");
+  const loginScreen = document.getElementById("login-screen");
 
   if (!email || !pass) {
     showNotice("E-posta ve şifre girin!", "#e74c3c");
@@ -12116,25 +12893,23 @@ document.getElementById("btn-login").onclick = async function () {
     loginBtn.disabled = true;
     loginBtn.innerText = "Giriş yapılıyor...";
   }
+  // Bazi oturum cikis race senaryolarinda bu bayrak acik kalabiliyor ve profil yuklemesini bloke ediyor.
+  logoutInProgress = false;
   try {
-    const candidates = await resolveLoginEmails(email);
-    if (!candidates.length) {
-      showNotice("Bu kullanıcı sistemde kayıtlı değil.", "#e74c3c");
-      return;
+    await signInWithEmailAndPassword(auth, String(email || "").trim(), pass);
+    showNotice("Giriş başarılı, profil yükleniyor...", "#2ecc71");
+    if (loginBtn) loginBtn.innerText = "Profil yükleniyor...";
+    const ready = await waitForAuthReady(12000);
+    if (!ready) {
+      showNotice("Giriş yapıldı, profil yüklenmesi gecikiyor. Lütfen birkaç saniye bekleyin.", "#f39c12");
+      restoreLoginButtonState();
     }
-    let lastErr = null;
-    for (const candidate of candidates) {
-      try {
-        await signInWithEmailAndPassword(auth, candidate, pass);
-        showNotice("Giriş başarılı!", "#2ecc71");
-        return;
-      } catch (err) {
-        lastErr = err;
-      }
-    }
-    showNotice("Giriş Hatalı: " + (lastErr?.message || "Kullanıcı adı/şifre hatalı"), "#e74c3c");
+    return;
+  } catch (err) {
+    showNotice("Giriş Hatalı: " + (err?.message || "Kullanıcı adı/şifre hatalı"), "#e74c3c");
   } finally {
-    if (loginBtn) {
+    const stillOnLogin = !!loginScreen && !loginScreen.classList.contains("hidden");
+    if (loginBtn && stillOnLogin) {
       loginBtn.disabled = false;
       loginBtn.innerText = "Giriş Yap";
     }
@@ -12142,24 +12917,32 @@ document.getElementById("btn-login").onclick = async function () {
 };
 
 /* ================= SORU EKLEME ================= */
-document.getElementById("task-type").onchange = function (e) {
-  document.getElementById("options-area").style.display = e.target.value === "quiz" ? "flex" : "none";
-};
-
-document.getElementById("question-image").onchange = function (e) {
-  const file = e.target.files && e.target.files[0];
-  if (!file) {
-    currentQuestionImage = "";
-    return;
-  }
-  const reader = new FileReader();
-  reader.onload = function () {
-    currentQuestionImage = reader.result;
+const taskTypeInput = document.getElementById("task-type");
+if (taskTypeInput) {
+  taskTypeInput.onchange = function (e) {
+    const optionsArea = document.getElementById("options-area");
+    if (optionsArea) optionsArea.style.display = e.target.value === "quiz" ? "flex" : "none";
   };
-  reader.readAsDataURL(file);
-};
+}
 
-document.getElementById("btn-add-q").onclick = function () {
+const questionImageInput = document.getElementById("question-image");
+if (questionImageInput) {
+  questionImageInput.onchange = function (e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) {
+      currentQuestionImage = "";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = function () {
+      currentQuestionImage = reader.result;
+    };
+    reader.readAsDataURL(file);
+  };
+}
+
+const addQuestionBtn = document.getElementById("btn-add-q");
+if (addQuestionBtn) addQuestionBtn.onclick = function () {
   const text = document.getElementById("main-question").value;
   const correct = document.getElementById("correct-answer").value;
   const type = document.getElementById("task-type").value;
@@ -12173,7 +12956,8 @@ document.getElementById("btn-add-q").onclick = function () {
   for (let i = 0; i < count; i++) {
     const q = {
       question: count > 1 ? text + " (" + (i + 1) + ")" : text,
-      correct: correct.trim().toLowerCase(),
+      // temporarily store raw correct value; will normalize below for quiz type
+      correct: correct.trim(),
       type: type,
       id: Date.now() + i,
       image: currentQuestionImage || ""
@@ -12186,6 +12970,21 @@ document.getElementById("btn-add-q").onclick = function () {
         document.getElementById("opt-3").value || "C",
         document.getElementById("opt-4").value || "D"
       ];
+
+      // normalize correct value: allow teacher to enter 'A'/'B'/'C'/'D' or the full option text
+      const raw = String(correct || "").trim();
+      const letterMap = { a: 0, b: 1, c: 2, d: 3 };
+      if (raw.length === 1 && letterMap.hasOwnProperty(raw.toLowerCase())) {
+        const idx = letterMap[raw.toLowerCase()];
+        q.correct = String(q.options[idx] || "").trim().toLowerCase();
+      } else {
+        // if teacher entered the option text, try to match one of options (case-insensitive)
+        const found = q.options.find(opt => String(opt || "").trim().toLowerCase() === raw.toLowerCase());
+        q.correct = String(found || raw).trim().toLowerCase();
+      }
+    } else {
+      // non-quiz types store lowercase normalized correct answer
+      q.correct = String(q.correct || "").trim().toLowerCase();
     }
 
     taskQuestions.push(q);
@@ -12203,6 +13002,7 @@ document.getElementById("btn-add-q").onclick = function () {
 function updatePreview() {
   const preview = document.getElementById("added-questions-preview");
   const counter = document.getElementById("q-counter-display");
+  if (!preview || !counter) return;
   preview.innerHTML = "";
 
   taskQuestions.forEach((q, i) => {
@@ -12258,6 +13058,7 @@ document.getElementById("btn-save-task").onclick = async function () {
   try {
     saveBtn.disabled = true;
     saveBtn.innerText = "Yayınlanıyor...";
+    syncTaskTargetFromClassSection();
 
     const targetValue = document.getElementById("task-target")?.value || "all";
     let targetClass = null;
@@ -12275,7 +13076,7 @@ document.getElementById("btn-save-task").onclick = async function () {
     const taskData = {
       title: titleInput.value,
       description: descInput.value || "",
-      questions: taskQuestions,
+      questions: [],
       bookId: selectedBookId || null,
       bookName: selectedBook?.name || null,
       bookTest: selectedTest || null,
@@ -12297,6 +13098,12 @@ document.getElementById("btn-save-task").onclick = async function () {
     if(descInput) descInput.value = "";
     deadlineInput.value = "";
     deadlineTimeInput.value = "";
+    const taskTarget = document.getElementById("task-target");
+    if (taskTarget) taskTarget.value = "all";
+    const taskTargetClass = document.getElementById("task-target-class");
+    const taskTargetSection = document.getElementById("task-target-section");
+    if (taskTargetClass) taskTargetClass.value = "";
+    if (taskTargetSection) taskTargetSection.value = "";
     if (bookSelect) bookSelect.value = "";
     if (testSelect) {
       testSelect.innerHTML = `<option value="">Test seçiniz</option>`;
@@ -12358,8 +13165,8 @@ async function openTaskModal(id, data, isCompleted = false) {
       if (bookApproval) bookApproval.style.display = "block";
       if (bookApprovalTitle) {
         bookApprovalTitle.innerText = isBookOnlyTask(data)
-          ? "📘 Kitap/Test Ödevi Onayı"
-          : "📝 Sorusuz Ödev Onayı";
+          ? "?? Kitap/Test Ödevi Onayı"
+          : "?? Sorusuz Ödev Onayı";
       }
       await populateClassSectionFilters(
         document.getElementById("book-approve-class"),
@@ -12407,7 +13214,7 @@ async function openTaskModal(id, data, isCompleted = false) {
       const prog = await getBookTaskProgress(id, currentUserId);
       const approved = !!prog?.approved;
       startBtn.style.display = "none";
-      if (bookTaskTitle) bookTaskTitle.innerText = isBookOnlyTask(data) ? "📘 Kitap/Test Ödevi" : "📝 Sorusuz Ödev";
+      if (bookTaskTitle) bookTaskTitle.innerText = isBookOnlyTask(data) ? "?? Kitap/Test Ödevi" : "?? Sorusuz Ödev";
       if (bookTaskNote) {
         bookTaskNote.innerText = isBookOnlyTask(data)
           ? "Not: Bitirdim dediğinizde öğretmen onayı gerekir."
@@ -12756,7 +13563,7 @@ function updateGameTimer() {
   const elapsed = Math.floor((Date.now() - gameStartTime) / 1000);
   const mins = Math.floor(elapsed / 60).toString().padStart(2, '0');
   const secs = (elapsed % 60).toString().padStart(2, '0');
-  document.getElementById("game-timer").innerText = `⏱ ${mins}:${secs}`;
+  document.getElementById("game-timer").innerText = `? ${mins}:${secs}`;
 }
 
 function showQuestion() {
@@ -12982,7 +13789,7 @@ function backToMain() {
   document.getElementById("dynamic-game-container").innerHTML = "";
   document.getElementById("game-results").style.display = "none";
   document.getElementById("btn-complete").style.display = "none";
-  document.getElementById("game-timer").innerText = "⏱ 00:00";
+  document.getElementById("game-timer").innerText = "? 00:00";
   
   updateTaskLists();
   
@@ -13026,7 +13833,7 @@ function renderLeaderboardPreview(rows = []) {
     const isMe = u.id === currentUserId;
     const rankBadge = String(Number(u.rank || 0));
     const rankNum = Number(u.rank || 0);
-    const medal = rankNum === 1 ? "🥇" : rankNum === 2 ? "🥈" : rankNum === 3 ? "🥉" : "";
+    const medal = rankNum === 1 ? "\u{1F947}" : rankNum === 2 ? "\u{1F948}" : rankNum === 3 ? "\u{1F949}" : "";
     const avatar = getAvatarById(u.selectedAvatarId || AVATAR_DEFAULT_ID);
     const avatarImg = buildAvatarImageDataUri(avatar);
     li.innerHTML = `
@@ -13114,7 +13921,7 @@ function renderLeaderboardModalList() {
     return;
   }
   box.innerHTML = rows.map((u) => {
-    const rankBadge = u.rank <= 3 ? ["🥇", "🥈", "🥉"][u.rank - 1] : `#${u.rank}`;
+    const rankBadge = u.rank <= 3 ? ["\u{1F947}", "\u{1F948}", "\u{1F949}"][u.rank - 1] : `#${u.rank}`;
     const isMe = u.id === currentUserId;
     return `
       <div class="list-item" style="cursor:default;${isMe ? "border-left-color:#16a34a;background:#f0fdf4;" : ""}">
@@ -13157,8 +13964,12 @@ function loadLeaderboard() {
     const liveXP = isCurrentStudent
       ? parseXPValue(String(document.getElementById("user-xp")?.innerText || "0"))
       : 0;
-    const baseXP = Math.max(getStudentXPValue({ id: docSnap.id, ...data }), fallbackXP);
-    const rowXP = isCurrentStudent && liveXP > 0 ? liveXP : Math.max(baseXP, liveXP);
+    const directXp = parseXPValue(data?.xp);
+    const reportXP = parseXPValue(fallbackXP);
+    const baseXP = reportXP > 0
+      ? reportXP
+      : (directXp > 0 ? directXp : getStudentXPValue({ id: docSnap.id, ...data }));
+    const rowXP = isCurrentStudent && liveXP > 0 ? liveXP : baseXP;
     users.push({
       id: docSnap.id,
       name: getUserDisplayName(data),
@@ -13236,8 +14047,21 @@ function updateSectionDatalistForPair(classInputEl, sectionListId) {
   setDatalistValues(sectionListId, sectionValues);
 }
 
+function buildClassSectionMap() {
+  const classMap = new Map();
+  (Array.isArray(classSectionCatalog) ? classSectionCatalog : []).forEach((row) => {
+    const className = normalizeClassSectionText(row?.className);
+    const section = normalizeClassSectionText(row?.section);
+    if (!className) return;
+    if (!classMap.has(className)) classMap.set(className, new Set());
+    if (section) classMap.get(className).add(section);
+  });
+  return classMap;
+}
+
 function applyClassSectionDropdownBindings() {
   const classValues = classSectionCatalog.map((row) => row.className);
+  const classMap = buildClassSectionMap();
   setDatalistValues("global-class-options", classValues);
   const pairs = [
     ["content-target-class", "content-target-section"],
@@ -13253,14 +14077,58 @@ function applyClassSectionDropdownBindings() {
   pairs.forEach(([classId, sectionId]) => {
     const classEl = document.getElementById(classId);
     const sectionEl = document.getElementById(sectionId);
-    if (!(classEl instanceof HTMLInputElement) || !(sectionEl instanceof HTMLInputElement)) return;
-    classEl.setAttribute("list", "global-class-options");
-    const sectionListId = `global-section-options-${classId}`;
-    sectionEl.setAttribute("list", sectionListId);
-    updateSectionDatalistForPair(classEl, sectionListId);
+    if (!classEl || !sectionEl) return;
+    const classIsInput = classEl instanceof HTMLInputElement;
+    const classIsSelect = classEl instanceof HTMLSelectElement;
+    const sectionIsInput = sectionEl instanceof HTMLInputElement;
+    const sectionIsSelect = sectionEl instanceof HTMLSelectElement;
+    if ((!classIsInput && !classIsSelect) || (!sectionIsInput && !sectionIsSelect)) return;
+
+    const syncSectionOptions = () => {
+      const selectedClass = normalizeClassSectionText(classEl.value || "");
+      const sections = Array.from(classMap.get(selectedClass) || []).sort((a, b) => a.localeCompare(b, "tr"));
+      if (sectionIsSelect) {
+        const currentSection = normalizeClassSectionText(sectionEl.value || "");
+        sectionEl.innerHTML = `<option value="">Şube seçin</option>`;
+        sections.forEach((sec) => {
+          const opt = document.createElement("option");
+          opt.value = sec;
+          opt.textContent = sec;
+          sectionEl.appendChild(opt);
+        });
+        if (currentSection && sections.includes(currentSection)) {
+          sectionEl.value = currentSection;
+        } else if (!selectedClass) {
+          sectionEl.value = "";
+        }
+        return;
+      }
+      const sectionListId = `global-section-options-${classId}`;
+      sectionEl.setAttribute("list", sectionListId);
+      updateSectionDatalistForPair(classEl, sectionListId);
+    };
+
+    if (classIsSelect) {
+      const currentClass = normalizeClassSectionText(classEl.value || "");
+      const sortedClasses = Array.from(classMap.keys()).sort((a, b) => a.localeCompare(b, "tr"));
+      classEl.innerHTML = `<option value="">Sınıf seçin</option>`;
+      sortedClasses.forEach((cls) => {
+        const opt = document.createElement("option");
+        opt.value = cls;
+        opt.textContent = cls;
+        classEl.appendChild(opt);
+      });
+      if (currentClass && sortedClasses.includes(currentClass)) {
+        classEl.value = currentClass;
+      }
+    } else {
+      classEl.setAttribute("list", "global-class-options");
+    }
+
+    syncSectionOptions();
     if (!classEl.dataset.classDropdownBound) {
-      classEl.addEventListener("input", () => updateSectionDatalistForPair(classEl, sectionListId));
-      classEl.addEventListener("change", () => updateSectionDatalistForPair(classEl, sectionListId));
+      if (classIsInput) classEl.addEventListener("input", syncSectionOptions);
+      classEl.addEventListener("change", syncSectionOptions);
       classEl.dataset.classDropdownBound = "1";
     }
   });
@@ -13517,11 +14385,11 @@ function renderLoginCardsModal() {
           </div>
         <div class="login-card-fields">
           <div class="login-card-field">
-            <span class="icon">👤</span>
+            <span class="icon">??</span>
             <span class="val">${escapeHtmlBasic(username)}</span>
           </div>
           <div class="login-card-field">
-            <span class="icon">🏫</span>
+            <span class="icon">??</span>
             <span class="val">${escapeHtmlBasic(pass)}</span>
           </div>
         </div>
@@ -13580,11 +14448,11 @@ function openLoginCardsPrintPreview() {
             </div>
           </div>
           <div class="print-row">
-            <div class="print-icon">👤</div>
+            <div class="print-icon">??</div>
             <div class="print-val">${username}</div>
           </div>
           <div class="print-row">
-            <div class="print-icon">🏫</div>
+            <div class="print-icon">??</div>
             <div class="print-val">${pass}</div>
           </div>
           <div class="print-foot">Öğrenci Giriş Kartı</div>
@@ -13712,14 +14580,18 @@ function populateStudentFilters(students) {
   
   const classes = new Set();
   const sections = new Set();
-  
-  students.forEach(s => {
-    if (s.className) classes.add(s.className);
-    if (s.section) sections.add(s.section);
+
+  (Array.isArray(classSectionCatalog) ? classSectionCatalog : []).forEach((row) => {
+    if (row?.className) classes.add(String(row.className));
+    if (row?.section) sections.add(String(row.section));
+  });
+  (Array.isArray(students) ? students : []).forEach((s) => {
+    if (s.className) classes.add(String(s.className));
+    if (s.section) sections.add(String(s.section));
   });
   
   classSelect.innerHTML = "<option value=\"\">Sınıf</option>";
-  Array.from(classes).sort().forEach(c => {
+  Array.from(classes).sort((a, b) => String(a).localeCompare(String(b), "tr")).forEach(c => {
     const opt = document.createElement("option");
     opt.value = c;
     opt.textContent = c;
@@ -13727,7 +14599,7 @@ function populateStudentFilters(students) {
   });
   
   sectionSelect.innerHTML = "<option value=\"\">Şube</option>";
-  Array.from(sections).sort().forEach(s => {
+  Array.from(sections).sort((a, b) => String(a).localeCompare(String(b), "tr")).forEach(s => {
     const opt = document.createElement("option");
     opt.value = s;
     opt.textContent = s;
@@ -14011,6 +14883,9 @@ function showBulkStudentsDeleteOverlay(message = "Tüm öğrenciler siliniyor l�
 }
 
 async function deleteStudentAndLinkedData(student, options = {}) {
+  if (!isStrictStudentRow(student)) {
+    throw new Error("Sadece öğrenci rolündeki hesaplar silinebilir.");
+  }
   const hints = Array.isArray(options.currentPasswordHints) ? options.currentPasswordHints : [];
   let authDeleteResult = { authDeleted: true };
   try {
@@ -14376,18 +15251,15 @@ async function openStudentReportWindow(detail) {
   const blockCompletedCount = Math.max(0, Number(blockAssignmentCounts.completedCount || 0));
   const blockTotalCount = Math.max(0, Number(blockAssignmentCounts.totalCount || 0));
   const blockPendingCount = Math.max(0, blockTotalCount - blockCompletedCount);
-  const computeCompletedCount = Math.min(Math.max(0, computeStats.completedLevels || 0), Math.max(0, computeStats.totalLevels || 0));
-  const computeTotalCount = Math.max(0, computeStats.totalLevels || 0);
+  const computeAssignmentCounts = getComputeHomeworkAssignmentCounts(computeStats);
+  const computeCompletedCount = Math.max(0, Number(computeAssignmentCounts.completedCount || 0));
+  const computeTotalCount = Math.max(0, Number(computeAssignmentCounts.totalCount || 0));
   const computePendingCount = Math.max(0, computeTotalCount - computeCompletedCount);
   const combinedTotal = (stats.totalTasks || 0) + totalActivities + blockTotalCount + computeTotalCount + (quizStats.totalQuizzes || 0);
   const combinedCompleted = (stats.completedCount || 0) + activityCompleted + blockCompletedCount + computeCompletedCount + (quizStats.totalQuizzes || 0);
   const combinedCompletionRate = combinedTotal > 0 ? Math.round((combinedCompleted / combinedTotal) * 100) : 0;
   const combinedAvgScore = combinedCompletionRate;
-  const totalXPCombined = (stats.totalXP || 0)
-    + contentStats.appList.reduce((sum, a) => sum + (a.xp || 0), 0)
-    + (blockStats.totalXP || 0)
-    + (computeStats.totalXP || 0)
-    + (quizStats.totalXP || 0);
+  const totalXPCombined = Math.max(0, Number(stats.totalXP || getStudentXPValue(detail.student) || 0));
   
   const reportWindow = window.open("", "_blank");
   if (!reportWindow) {
@@ -14880,18 +15752,15 @@ async function buildStudentReportHtml(detail) {
   const blockCompletedCount = Math.max(0, Number(blockAssignmentCounts.completedCount || 0));
   const blockTotalCount = Math.max(0, Number(blockAssignmentCounts.totalCount || 0));
   const blockPendingCount = Math.max(0, blockTotalCount - blockCompletedCount);
-  const computeCompletedCount = Math.min(Math.max(0, computeStats.completedLevels || 0), Math.max(0, computeStats.totalLevels || 0));
-  const computeTotalCount = Math.max(0, computeStats.totalLevels || 0);
+  const computeAssignmentCounts = getComputeHomeworkAssignmentCounts(computeStats);
+  const computeCompletedCount = Math.max(0, Number(computeAssignmentCounts.completedCount || 0));
+  const computeTotalCount = Math.max(0, Number(computeAssignmentCounts.totalCount || 0));
   const computePendingCount = Math.max(0, computeTotalCount - computeCompletedCount);
   const combinedTotal = (stats.totalTasks || 0) + totalActivities + blockTotalCount + computeTotalCount + (quizStats.totalQuizzes || 0);
   const combinedCompleted = (stats.completedCount || 0) + activityCompleted + blockCompletedCount + computeCompletedCount + (quizStats.totalQuizzes || 0);
   const combinedCompletionRate = combinedTotal > 0 ? Math.round((combinedCompleted / combinedTotal) * 100) : 0;
   const combinedAvgScore = combinedCompletionRate;
-  const totalXPCombined = (stats.totalXP || 0)
-    + contentStats.appList.reduce((sum, a) => sum + (a.xp || 0), 0)
-    + (blockStats.totalXP || 0)
-    + (computeStats.totalXP || 0)
-    + (quizStats.totalXP || 0);
+  const totalXPCombined = Math.max(0, Number(stats.totalXP || getStudentXPValue(detail.student) || 0));
   const taskPie = buildPieSvg(taskCompletedCount, taskTotalCount, "Ödev", "#3b82f6");
   const activityPie = buildPieSvg(activityCompletedCount, activityTotalCount, "Etkinlik", "#22c55e");
   const blockPie = buildPieSvg(blockCompletedCount, blockTotalCount, "Blok", "#f59e0b");
@@ -15411,6 +16280,13 @@ function renderBlockHomeworkList() {
   const noPending = document.getElementById("no-block-homework-pending");
   const noCompleted = document.getElementById("no-block-homework-completed");
   if (!pendingList || !completedList) return;
+  const activeBlockLabel = getBlockHomeworkTypeLabel(currentBlockAssignType || "block2d");
+  if (noPending) {
+    noPending.innerHTML = `<div class="empty-state-icon">🧩</div>Bekleyen ${activeBlockLabel} ödevi yok.`;
+  }
+  if (noCompleted) {
+    noCompleted.innerHTML = `<div class="empty-state-icon">✅</div>Tamamlanan ${activeBlockLabel} ödevi yok.`;
+  }
 
   pendingList.innerHTML = "";
   completedList.innerHTML = "";
@@ -15544,7 +16420,7 @@ function renderBlockHomeworkList() {
         <div>
           <div style="font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${a.title || `${appLabel} Ödevi`} ${appBadge}</div>
           <small style="color:#666;">📅 ${a.deadline || "-"} • ${isFlowchart ? "Flowchart Soru" : (isSilentTeacher || isLightbot) ? `Bölüm ${rangeText}` : `Seviye ${rangeText}`}</small>
-          ${isFlowchart ? `<small style="color:#666;display:block;">🧭 ${a.flowQuestion || "Flowchart şemasını kur"}</small>` : ""}
+          ${isFlowchart ? `<small style="color:#666;display:block;">🧩 ${a.flowQuestion || "Flowchart şemasını kur"}</small>` : ""}
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
           <span class="completion-badge">%${percent}</span>
@@ -15612,19 +16488,19 @@ function renderBlockHomeworkList() {
   });
 
   homeListCache.block = {
-    title: userRole === "teacher" ? "Verilen Blok Kodlama Ödevleri" : "Blok Kodlama Ödevim",
+    title: userRole === "teacher" ? `Verilen ${activeBlockLabel} Ödevleri` : `${activeBlockLabel} Ödevim`,
     pending: pendingRows.slice(),
     completed: completedRows.slice()
   };
   if (userRole === "teacher") {
     const allRows = [...pendingRows, ...completedRows];
-    renderLimitedRows(pendingList, allRows, 3);
+    renderLimitedRows(pendingList, allRows, HOME_PREVIEW_LIMIT);
     if (completedList) completedList.innerHTML = "";
     if (noPending) noPending.style.display = allRows.length === 0 ? "block" : "none";
     if (noCompleted) noCompleted.style.display = "none";
   } else {
-    renderLimitedRows(pendingList, pendingRows, 3);
-    renderLimitedRows(completedList, completedRows, 3);
+    renderLimitedRows(pendingList, pendingRows, HOME_PREVIEW_LIMIT);
+    renderLimitedRows(completedList, completedRows, HOME_PREVIEW_LIMIT);
     if (noPending) noPending.style.display = pendingCount === 0 ? "block" : "none";
     if (noCompleted) noCompleted.style.display = completedCount === 0 ? "block" : "none";
   }
@@ -15665,6 +16541,7 @@ function renderBlockHomeworkList() {
     let block2DCompletedAssignmentTotal = 0;
     let block3DCompletedAssignmentTotal = 0;
     let flowchartCompletedTotal = 0;
+    let pythonCompletedTotal = 0;
     blockAssignmentProgressMap.forEach((p, assignmentId) => {
       const assignmentType = assignmentTypeById.get(String(assignmentId));
       if (!assignmentType) return;
@@ -15674,6 +16551,10 @@ function renderBlockHomeworkList() {
       const isCompleted = !!p?.completed || percent >= 100 || (totalLevels > 0 && completedLevels >= totalLevels);
       if (assignmentType === "flowchart") {
         if (isCompleted) flowchartCompletedTotal += 1;
+        return;
+      }
+      if (assignmentType === "silentteacher") {
+        if (isCompleted) pythonCompletedTotal += 1;
         return;
       }
       if (assignmentType === "block3d") {
@@ -15688,6 +16569,8 @@ function renderBlockHomeworkList() {
     if (block3DEl) block3DEl.innerText = String(block3DCompletedAssignmentTotal);
     const flowchartEl = document.getElementById("stat-flowchart-completed");
     if (flowchartEl) flowchartEl.innerText = String(flowchartCompletedTotal);
+    const pythonEl = document.getElementById("stat-python-completed");
+    if (pythonEl) pythonEl.innerText = String(pythonCompletedTotal);
   }
   renderStudentCombinedSections();
   renderHomeOverviewStrip();
@@ -15875,8 +16758,9 @@ function renderComputeHomeworkList() {
       }
     } else {
       const p = computeAssignmentProgressMap.get(a.id) || {};
+      const normalizedCompute = getNormalizedComputeProgressSnapshot(p, a);
       const percent = Number(p.percent || 0);
-      const xp = Number(p.totalXP || 0);
+      const xp = normalizedCompute.totalXP;
       const isCompleted = isComputeProgressCompleted(p, a);
       const rangeText = `${Math.max(1, Number(a.levelStart || 1))}-${Math.max(1, Number(a.levelEnd || a.levelStart || 1))}`;
       li.classList.toggle("completed", isCompleted);
@@ -15927,23 +16811,23 @@ function renderComputeHomeworkList() {
   };
   if (userRole === "teacher") {
     const allRows = [...pendingRows, ...completedRows];
-    renderLimitedRows(pendingList, allRows, 3);
+    renderLimitedRows(pendingList, allRows, HOME_PREVIEW_LIMIT);
     if (completedList) completedList.innerHTML = "";
     if (noPending) noPending.style.display = allRows.length === 0 ? "block" : "none";
     if (noCompleted) noCompleted.style.display = "none";
     setShowMoreButton(
       "btn-show-all-compute-homework",
-      allRows.length > 3,
+      allRows.length > HOME_PREVIEW_LIMIT,
       () => openAllItemsModal(homeListCache.compute.title, homeListCache.compute.pending, homeListCache.compute.completed)
     );
   } else {
-    renderLimitedRows(pendingList, pendingRows, 3);
-    renderLimitedRows(completedList, completedRows, 3);
+    renderLimitedRows(pendingList, pendingRows, HOME_PREVIEW_LIMIT);
+    renderLimitedRows(completedList, completedRows, HOME_PREVIEW_LIMIT);
     if (noPending) noPending.style.display = pendingCount === 0 ? "block" : "none";
     if (noCompleted) noCompleted.style.display = completedCount === 0 ? "block" : "none";
     setShowMoreButton(
       "btn-show-all-compute-homework",
-      pendingRows.length > 3 || completedRows.length > 3,
+      pendingRows.length > HOME_PREVIEW_LIMIT || completedRows.length > HOME_PREVIEW_LIMIT,
       () => openAllItemsModal(homeListCache.compute.title, homeListCache.compute.pending, homeListCache.compute.completed)
     );
   }
@@ -15954,6 +16838,7 @@ function renderComputeHomeworkList() {
     const avgProgressEl = document.getElementById("teacher-compute-homework-avg-progress");
     const totalXpEl = document.getElementById("teacher-compute-homework-total-xp");
     const visibleIds = new Set(items.map((a) => String(a.id)));
+    const visibleComputeAssignmentMap = new Map(items.map((a) => [String(a.id || ""), a]));
     const progressRows = [];
     computeTeacherProgressRowsByAssignment.forEach((rows, assignmentId) => {
       if (!visibleIds.has(String(assignmentId))) return;
@@ -15969,7 +16854,8 @@ function renderComputeHomeworkList() {
       const isCompleted = !!row?.completed || percent >= 100 || (totalLevels > 0 && completedLevels >= totalLevels);
       if (isCompleted && row?.userId) completedStudentIds.add(String(row.userId));
       percentSum += percent;
-      xpSum += Math.max(0, Number(row?.totalXP || 0));
+      const assignment = visibleComputeAssignmentMap.get(String(row?.assignmentId || "")) || null;
+      xpSum += getNormalizedComputeProgressSnapshot(row || {}, assignment).totalXP;
     });
     const avgPercent = progressRows.length ? Math.round(percentSum / progressRows.length) : 0;
     if (completedStudentsEl) completedStudentsEl.innerText = String(completedStudentIds.size);
@@ -16088,7 +16974,7 @@ function renderTeacherLessonsModalList() {
     li.innerHTML = `
       <div>
         <div style="font-weight:700;">${lesson.title || "Ders"}</div>
-        <small style="color:#64748b;">📄 ${slides.length} slide • Hedef: ${lesson.targetClass || "Seçilmedi"}${lesson.targetSection ? "/" + lesson.targetSection : ""}</small>
+        <small style="color:#64748b;">🧩 ${slides.length} slide • Hedef: ${lesson.targetClass || "Seçilmedi"}${lesson.targetSection ? "/" + lesson.targetSection : ""}</small>
       </div>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
         <span class="completion-badge" style="background:${isPublished ? "#dcfce7" : "#fff7ed"};color:${isPublished ? "#166534" : "#9a3412"};border-color:${isPublished ? "#86efac" : "#fdba74"};">${isPublished ? "Yayında" : "Taslak"}</span>
@@ -16170,6 +17056,10 @@ function renderLessonsList() {
   const noPending = document.getElementById("no-lessons-pending");
   const noCompleted = document.getElementById("no-lessons-completed");
   if (!pendingList || !completedList) return;
+  const setEmptyState = (listEl, emptyEl, isEmpty) => {
+    if (listEl) listEl.style.display = isEmpty ? "none" : "";
+    if (emptyEl) emptyEl.style.display = isEmpty ? "block" : "none";
+  };
   pendingList.innerHTML = "";
   completedList.innerHTML = "";
 
@@ -16206,7 +17096,7 @@ function renderLessonsList() {
       li.innerHTML = `
         <div>
           <div style="font-weight:600;">${lesson.title || "Ders"}</div>
-          <small style="color:#666;">📄 ${slides.length} slide • Hedef: ${lesson.targetClass || "Seçilmedi"}${lesson.targetSection ? "/" + lesson.targetSection : ""}</small>
+          <small style="color:#666;">🧩 ${slides.length} slide • Hedef: ${lesson.targetClass || "Seçilmedi"}${lesson.targetSection ? "/" + lesson.targetSection : ""}</small>
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
           <span class="completion-badge" style="background:${isPublished ? "#dcfce7" : "#fff7ed"};color:${isPublished ? "#166534" : "#9a3412"};border-color:${isPublished ? "#86efac" : "#fdba74"};">${isPublished ? "Yayında" : "Taslak"}</span>
@@ -16239,7 +17129,7 @@ function renderLessonsList() {
       li.innerHTML = `
         <div>
           <div style="font-weight:600;">${lesson.title || "Ders"}</div>
-          <small style="color:#666;">📄 ${slides.length} slide</small>
+          <small style="color:#666;">🧩 ${slides.length} slide</small>
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
           <span class="completion-badge">%${percent}</span>
@@ -16277,23 +17167,23 @@ function renderLessonsList() {
   };
   if (userRole === "teacher") {
     const allRows = [...pendingRows, ...completedRows];
-    renderLimitedRows(pendingList, allRows, 3);
+    renderLimitedRows(pendingList, allRows, HOME_PREVIEW_LIMIT);
     if (completedList) completedList.innerHTML = "";
-    if (noPending) noPending.style.display = allRows.length === 0 ? "block" : "none";
-    if (noCompleted) noCompleted.style.display = "none";
+    setEmptyState(pendingList, noPending, allRows.length === 0);
+    setEmptyState(completedList, noCompleted, true);
     setShowMoreButton(
       "btn-show-all-lessons",
-      allRows.length > 3,
+      allRows.length > HOME_PREVIEW_LIMIT,
       () => openAllItemsModal(homeListCache.lessons.title, homeListCache.lessons.pending, homeListCache.lessons.completed)
     );
   } else {
-    renderLimitedRows(pendingList, pendingRows, 3);
-    renderLimitedRows(completedList, completedRows, 3);
-    if (noPending) noPending.style.display = pendingCount === 0 ? "block" : "none";
-    if (noCompleted) noCompleted.style.display = completedCount === 0 ? "block" : "none";
+    renderLimitedRows(pendingList, pendingRows, HOME_PREVIEW_LIMIT);
+    renderLimitedRows(completedList, completedRows, HOME_PREVIEW_LIMIT);
+    setEmptyState(pendingList, noPending, pendingCount === 0);
+    setEmptyState(completedList, noCompleted, completedCount === 0);
     setShowMoreButton(
       "btn-show-all-lessons",
-      pendingRows.length > 3 || completedRows.length > 3,
+      pendingRows.length > HOME_PREVIEW_LIMIT || completedRows.length > HOME_PREVIEW_LIMIT,
       () => openAllItemsModal(homeListCache.lessons.title, homeListCache.lessons.pending, homeListCache.lessons.completed)
     );
   }
@@ -16368,6 +17258,21 @@ function syncCurrentLessonSlideFromForm() {
   lessonDraft.slides[selectedLessonSlideIndex] = readLessonSlideForm();
 }
 
+function autoSaveCurrentLessonSlideFromForm() {
+  if (selectedLessonSlideIndex < 0) return;
+  if (!Array.isArray(lessonDraft.slides) || !lessonDraft.slides[selectedLessonSlideIndex]) return;
+  lessonDraft.slides[selectedLessonSlideIndex] = readLessonSlideForm();
+  renderLessonSlideList();
+}
+
+function scheduleLessonSlideAutosave() {
+  if (lessonSlideAutosaveTimer) clearTimeout(lessonSlideAutosaveTimer);
+  lessonSlideAutosaveTimer = setTimeout(() => {
+    autoSaveCurrentLessonSlideFromForm();
+    lessonSlideAutosaveTimer = null;
+  }, 120);
+}
+
 function openLessonTextModal(options = {}) {
   const modal = document.getElementById("lesson-text-modal");
   const titleEl = document.getElementById("lesson-text-modal-title");
@@ -16396,10 +17301,50 @@ function renderLessonSlideList() {
     const row = document.createElement("button");
     const typeLabel = s.type === "question" ? "Soru" : s.type === "mixed" ? "Karma" : "Konu";
     row.className = `lesson-frame-item${i === selectedLessonSlideIndex ? " active" : ""}`;
+    row.draggable = true;
+    row.dataset.slideIndex = String(i);
     row.innerHTML = `
       <div class="lesson-frame-title">${i + 1}. ${s.title || "Başlıksız Slide"}</div>
       <div class="lesson-frame-meta">${typeLabel} • ${s.layout || "text"}</div>
     `;
+    row.addEventListener("dragstart", (ev) => {
+      lessonSlideDragIndex = i;
+      row.classList.add("dragging");
+      if (ev.dataTransfer) {
+        ev.dataTransfer.effectAllowed = "move";
+        ev.dataTransfer.setData("text/lesson-slide-index", String(i));
+      }
+    });
+    row.addEventListener("dragend", () => {
+      row.classList.remove("dragging");
+      lessonSlideDragIndex = -1;
+      wrap.querySelectorAll(".lesson-frame-item.drag-over").forEach((el) => el.classList.remove("drag-over"));
+    });
+    row.addEventListener("dragover", (ev) => {
+      ev.preventDefault();
+      row.classList.add("drag-over");
+    });
+    row.addEventListener("dragleave", () => row.classList.remove("drag-over"));
+    row.addEventListener("drop", (ev) => {
+      ev.preventDefault();
+      row.classList.remove("drag-over");
+      const fromData = Number(ev.dataTransfer?.getData("text/lesson-slide-index"));
+      const from = Number.isFinite(fromData) ? fromData : lessonSlideDragIndex;
+      const to = i;
+      if (!Number.isFinite(from) || from < 0 || from >= lessonDraft.slides.length || from === to) return;
+      syncCurrentLessonSlideFromForm();
+      const moved = lessonDraft.slides.splice(from, 1)[0];
+      lessonDraft.slides.splice(to, 0, moved);
+      if (selectedLessonSlideIndex === from) {
+        selectedLessonSlideIndex = to;
+      } else if (from < selectedLessonSlideIndex && to >= selectedLessonSlideIndex) {
+        selectedLessonSlideIndex -= 1;
+      } else if (from > selectedLessonSlideIndex && to <= selectedLessonSlideIndex) {
+        selectedLessonSlideIndex += 1;
+      }
+      renderLessonSlideList();
+      fillLessonSlideForm();
+    });
     row.onclick = () => {
       syncCurrentLessonSlideFromForm();
       selectedLessonSlideIndex = i;
@@ -16418,7 +17363,7 @@ function fillLessonSlideForm() {
   }
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ""; };
   set("slide-title", s.title);
-  set("slide-type", s.type || "content");
+  set("slide-type", normalizeLessonSlideType(s.type || "content"));
   const editor = document.getElementById("slide-content-editor");
   if (editor) editor.innerHTML = s.content || "";
   const codeInput = document.getElementById("slide-code-input");
@@ -16426,22 +17371,36 @@ function fillLessonSlideForm() {
   set("slide-image-url", s.imageUrl || "");
   set("slide-video-url", s.videoUrl || "");
   set("slide-layout", s.layout || "text");
-  set("slide-question-type", s.questionType || "multiple");
-  set("slide-question", s.question);
-  set("slide-opt-1", s.options?.[0] || "");
-  set("slide-opt-2", s.options?.[1] || "");
-  set("slide-opt-3", s.options?.[2] || "");
-  set("slide-opt-4", s.options?.[3] || "");
-  set("slide-correct", s.correct || "");
-  set("slide-fill-answers", Array.isArray(s.fillAnswers) ? s.fillAnswers.join(",") : "");
+  const qType = resolveLessonQuestionType(s, s.questionType || "multiple");
+  set("slide-question-type", qType);
+  set("slide-question-text", s.question || "");
+  set("slide-question-xp", clampLessonQuestionXP(s.questionXP ?? s.xp ?? MAX_QUESTION_XP));
+  set("slide-question-duration", Math.max(5, Number(s.questionDurationSec ?? s.durationSec ?? 30) || 30));
+  set("slide-option-0", "");
+  set("slide-option-1", "");
+  set("slide-option-2", "");
+  set("slide-option-3", "");
+  set("slide-dragdrop-pairs", "");
+  if (qType === "multiple") {
+    const options = Array.isArray(s.options) ? s.options : [];
+    set("slide-option-0", options[0] || "");
+    set("slide-option-1", options[1] || "");
+    set("slide-option-2", options[2] || "");
+    set("slide-option-3", options[3] || "");
+    const correctIdx = Math.max(0, getMultipleChoiceIndex(s.correct, options));
+    set("slide-correct-choice", String(correctIdx));
+  } else if (qType === "boolean") {
+    const boolCorrect = normalizeBooleanToken(s.correct);
+    set("slide-correct-boolean", boolCorrect === false ? "yanlis" : "dogru");
+  } else if (qType === "dragdrop") {
+    set("slide-dragdrop-pairs", formatLessonDragdropPairsText(s.fillAnswers || []));
+  }
   lessonCanvasElements = Array.isArray(s.elements) ? JSON.parse(JSON.stringify(s.elements)) : [];
   selectedLessonCanvasElementId = null;
   selectedLessonThemeId = s.themeId || selectedLessonThemeId || LESSON_THEME_TEMPLATES[0].id;
-  const qArea = document.getElementById("slide-question-area");
-  if (qArea) qArea.style.display = (s.type === "question" || s.type === "mixed") ? "block" : "none";
   const cArea = document.getElementById("slide-content-area");
-  if (cArea) cArea.style.display = "block";
-  updateLessonQuestionTypeUI();
+  if (cArea) cArea.style.display = normalizeLessonSlideType(s.type || "content") === "question" ? "none" : "block";
+  setLessonQuestionEditorVisibility();
   setLessonCodeEditorVisibility();
   renderLessonThemePicker();
   renderLessonCanvasEditor();
@@ -16450,24 +17409,47 @@ function fillLessonSlideForm() {
 
 function readLessonSlideForm() {
   const get = (id) => (document.getElementById(id)?.value || "").trim();
-  const type = get("slide-type") || "content";
+  const type = normalizeLessonSlideType(get("slide-type") || "content");
   const layout = get("slide-layout") || "text";
   const editor = document.getElementById("slide-content-editor");
   const codeSnippet = document.getElementById("slide-code-input")?.value || "";
+  const questionType = normalizeLessonQuestionType(get("slide-question-type") || "multiple");
+  const questionXP = clampLessonQuestionXP(get("slide-question-xp") || MAX_QUESTION_XP);
+  const questionDurationSec = Math.max(5, Number(get("slide-question-duration") || 30) || 30);
+  const questionText = get("slide-question-text");
+  let options = [];
+  let correct = "";
+  let fillAnswers = [];
+  if (type === "question" || type === "mixed") {
+    if (questionType === "multiple") {
+      options = [get("slide-option-0"), get("slide-option-1"), get("slide-option-2"), get("slide-option-3")]
+        .map((opt) => String(opt || "").trim())
+        .filter((opt) => opt.length > 0);
+      correct = String(get("slide-correct-choice") || "0");
+    } else if (questionType === "boolean") {
+      options = ["Doğru", "Yanlış"];
+      correct = get("slide-correct-boolean") === "yanlis" ? "yanlis" : "dogru";
+    } else if (questionType === "dragdrop") {
+      fillAnswers = parseLessonDragdropPairsText(get("slide-dragdrop-pairs"));
+      correct = fillAnswers.join(",");
+    }
+  }
   return {
     id: lessonDraft.slides[selectedLessonSlideIndex]?.id || `s_${Date.now()}_${Math.random().toString(16).slice(2, 6)}`,
     title: get("slide-title"),
     type,
-    content: layout === "code" ? "" : (editor ? editor.innerHTML.trim() : ""),
+    content: (layout === "code" || type === "question") ? "" : (editor ? editor.innerHTML.trim() : ""),
     codeSnippet,
     imageUrl: get("slide-image-url"),
     videoUrl: get("slide-video-url"),
     layout,
-    questionType: get("slide-question-type") || "multiple",
-    question: get("slide-question"),
-    options: [get("slide-opt-1"), get("slide-opt-2"), get("slide-opt-3"), get("slide-opt-4")].filter(Boolean),
-    correct: get("slide-correct"),
-    fillAnswers: get("slide-fill-answers").split(",").map((x) => x.trim()).filter(Boolean),
+    questionType: (type === "question" || type === "mixed") ? questionType : "",
+    question: (type === "question" || type === "mixed") ? questionText : "",
+    questionXP: (type === "question" || type === "mixed") ? questionXP : 0,
+    questionDurationSec: (type === "question" || type === "mixed") ? questionDurationSec : 0,
+    options: (type === "question" || type === "mixed") ? options : [],
+    correct: (type === "question" || type === "mixed") ? correct : "",
+    fillAnswers: (type === "question" || type === "mixed") ? fillAnswers : [],
     elements: JSON.parse(JSON.stringify(lessonCanvasElements || [])),
     themeId: selectedLessonThemeId || LESSON_THEME_TEMPLATES[0].id,
     theme: { ...(getLessonThemeById(selectedLessonThemeId || LESSON_THEME_TEMPLATES[0].id).style || {}) }
@@ -16558,65 +17540,35 @@ document.addEventListener("mouseup", () => {
   lessonCanvasDrag = null;
 });
 
-function updateLessonQuestionTypeUI() {
-  const qType = (document.getElementById("slide-question-type")?.value || "multiple").trim();
-  const opt3 = document.getElementById("slide-opt-3");
-  const opt4 = document.getElementById("slide-opt-4");
-  const opt1 = document.getElementById("slide-opt-1");
-  const opt2 = document.getElementById("slide-opt-2");
-  const correct = document.getElementById("slide-correct");
-  const fillAnswers = document.getElementById("slide-fill-answers");
-  if (fillAnswers) fillAnswers.style.display = "none";
-  if (qType === "boolean") {
-    if (opt1) opt1.value = "Doğru";
-    if (opt2) opt2.value = "Yanlış";
-    if (opt3) opt3.value = "";
-    if (opt4) opt4.value = "";
-    if (opt3) opt3.style.display = "none";
-    if (opt4) opt4.style.display = "none";
-    if (opt1) opt1.style.display = "block";
-    if (opt2) opt2.style.display = "block";
-    if (correct && !correct.value) correct.value = "doğru";
-  } else if (qType === "short") {
-    if (opt1) opt1.value = "";
-    if (opt2) opt2.value = "";
-    if (opt3) opt3.value = "";
-    if (opt4) opt4.value = "";
-    if (opt1) opt1.style.display = "none";
-    if (opt2) opt2.style.display = "none";
-    if (opt3) opt3.style.display = "none";
-    if (opt4) opt4.style.display = "none";
-    if (fillAnswers) fillAnswers.style.display = "none";
-    if (correct) correct.style.display = "block";
-  } else if (qType === "fill") {
-    if (opt1) opt1.style.display = "none";
-    if (opt2) opt2.style.display = "none";
-    if (opt3) opt3.style.display = "none";
-    if (opt4) opt4.style.display = "none";
-    if (correct) correct.style.display = "none";
-    if (fillAnswers) fillAnswers.style.display = "block";
-  } else {
-    if (opt1) opt1.style.display = "block";
-    if (opt2) opt2.style.display = "block";
-    if (opt3) opt3.style.display = "block";
-    if (opt4) opt4.style.display = "block";
-    if (correct) correct.style.display = "block";
-  }
-}
-
 function updateLessonSlidePreview() {
   const box = document.getElementById("lesson-slide-preview");
   if (!box) return;
+  scheduleLessonSlideAutosave();
   const draft = readLessonSlideForm();
   const themeStyle = getSlideThemeStyle(draft);
   const cardBg = themeStyle.cardBg || "rgba(15,23,42,0.78)";
   const cardText = themeStyle.text || "#e2e8f0";
   const cardBorder = themeStyle.border || "rgba(148,163,184,0.4)";
   if ((draft.type || "content") === "question" || (draft.type || "content") === "mixed") {
+    const questionXP = clampLessonQuestionXP(draft.questionXP ?? draft.xp ?? MAX_QUESTION_XP);
+    const draftQType = resolveLessonQuestionType(draft, draft.questionType || "multiple");
+    const questionDurationSec = Math.max(5, Number(draft.questionDurationSec ?? draft.durationSec ?? 30) || 30);
+    const draftOptions = Array.isArray(draft.options) ? draft.options : [];
+    let correctLabel = draft.correct || "-";
+    if (draftQType === "multiple") {
+      const idx = getMultipleChoiceIndex(draft.correct, draftOptions);
+      if (idx >= 0) {
+        const letter = ["A", "B", "C", "D"][idx] || `${idx + 1}`;
+        correctLabel = `${letter}`;
+      }
+    } else if (draftQType === "boolean") {
+      const b = normalizeBooleanToken(draft.correct);
+      correctLabel = b === false ? "Yanlış" : "Doğru";
+    }
     box.innerHTML = `
       <div style="font-weight:700;margin-bottom:6px;">Soru Önizleme</div>
       <div style="margin-bottom:6px;padding:8px;border-radius:8px;background:${cardBg};color:${cardText};border:1px solid ${cardBorder};">${draft.question || "-"}</div>
-      <div style="font-size:12px;color:#475569;">Tür: ${draft.questionType || "multiple"}${draft.questionType === "fill" ? ` • Boşluk: ${(draft.fillAnswers || []).length}` : ` • Doğru: ${draft.correct || "-"}`}</div>
+      <div style="font-size:12px;color:#475569;">Tür: ${draftQType}${draftQType === "fill" || draftQType === "dragdrop" ? ` • Alan: ${(draft.fillAnswers || []).length}` : ` • Doğru: ${correctLabel || "-"}`} • XP: ${questionXP} • Süre: ${questionDurationSec} sn</div>
       ${(draft.type || "content") === "mixed" ? `<hr style="border:none;border-top:1px solid #e5e7eb;margin:8px 0;"><div>${draft.content || "<span style='color:#94a3b8;'>İçerik yok</span>"}</div>` : ""}
     `;
     return;
@@ -16672,7 +17624,7 @@ function updateLessonSlidePreview() {
     `;
     return;
   }
-  box.innerHTML = `<div style="padding:8px;border-radius:8px;background:${cardBg};color:${cardText};border:1px solid ${cardBorder};">${draft.videoUrl ? `<div style="font-size:12px;color:#93c5fd;margin-bottom:6px;">🎬 Video eklendi</div>` : ""}${html}</div>`;
+  box.innerHTML = `<div style="padding:8px;border-radius:8px;background:${cardBg};color:${cardText};border:1px solid ${cardBorder};">${draft.videoUrl ? `<div style="font-size:12px;color:#93c5fd;margin-bottom:6px;">?? Video eklendi</div>` : ""}${html}</div>`;
 }
 
 function openLessonBuilderModal(lesson = null) {
@@ -16717,17 +17669,32 @@ function openLessonBuilderModal(lesson = null) {
 }
 
 function closeLessonBuilderModal() {
+  if (lessonSlideAutosaveTimer) {
+    clearTimeout(lessonSlideAutosaveTimer);
+    lessonSlideAutosaveTimer = null;
+  }
+  autoSaveCurrentLessonSlideFromForm();
   const modal = document.getElementById("lesson-builder-modal");
   if (modal) modal.style.display = "none";
 }
 
+function clearLessonQuestionTimer() {
+  if (lessonQuestionTimerInterval) {
+    clearInterval(lessonQuestionTimerInterval);
+    lessonQuestionTimerInterval = null;
+  }
+}
+
 function openLessonPlayerModal(lesson) {
+  clearLessonQuestionTimer();
   lessonPlayerState = {
     lesson,
     index: 0,
     visited: new Set(),
     answered: {},
-    correctCount: 0
+    correctCount: 0,
+    questionTimers: {},
+    questionExpired: {}
   };
   const saved = lessonProgressMap.get(lesson.id);
   if (saved) {
@@ -16737,12 +17704,16 @@ function openLessonPlayerModal(lesson) {
     lessonPlayerState.correctCount = Number(saved.correctCount || 0);
   }
   const modal = document.getElementById("lesson-player-modal");
-  if (modal) modal.style.display = "flex";
+  if (modal) {
+    modal.style.zIndex = "24080";
+    modal.style.display = "flex";
+  }
   lessonPlayerZoom = 100;
   renderLessonPlayer();
 }
 
 function renderLessonPlayer() {
+  clearLessonQuestionTimer();
   const st = lessonPlayerState;
   if (!st) return;
   const lesson = st.lesson;
@@ -16757,8 +17728,10 @@ function renderLessonPlayer() {
       const b = document.createElement("button");
       b.className = "btn";
       b.style.cssText = `width:100%;text-align:left;margin-bottom:6px;background:${i === st.index ? "#dbeafe" : "#f8fafc"};border:1px solid #e5e7eb;`;
-      const done = st.visited.has(i) ? "✓ " : "";
-      b.innerText = `${done}${i + 1}. ${s.title || "Slide"}`;
+      const done = st.visited.has(i)
+        ? '<span style="color:#16a34a;font-weight:900;margin-right:6px;">✓</span>'
+        : "";
+      b.innerHTML = `${done}${i + 1}. ${escapeHtmlBasic(s.title || "Slide")}`;
       b.onclick = () => {
         st.index = i;
         renderLessonPlayer();
@@ -16840,9 +17813,29 @@ function renderLessonPlayer() {
   let questionBlock = "";
   if (hasQuestion) {
     const selected = st.answered[slideAnswerKey];
-    const qType = cur.questionType || "multiple";
+    const qType = resolveLessonQuestionType(cur, cur.questionType || "multiple");
+    const questionXP = clampLessonQuestionXP(cur.questionXP ?? cur.xp ?? MAX_QUESTION_XP);
+    const questionDurationSec = Math.max(5, Number(cur.questionDurationSec ?? cur.durationSec ?? 30) || 30);
+    if (!st.questionTimers) st.questionTimers = {};
+    if (!st.questionExpired) st.questionExpired = {};
+    if (!st.questionTimers[slideAnswerKey]) st.questionTimers[slideAnswerKey] = Date.now();
+    const elapsedNow = Math.max(0, Date.now() - Number(st.questionTimers[slideAnswerKey] || Date.now()));
+    const remainingNow = Math.max(0, questionDurationSec - (elapsedNow / 1000));
+    const timeExpired = remainingNow <= 0;
+    if (timeExpired) st.questionExpired[slideAnswerKey] = true;
+    const isLockedByTime = !!st.questionExpired[slideAnswerKey] && !hasLessonAnswerValue(cur, selected);
+    const qTypeLabelMap = {
+      multiple: "Coktan Secmeli",
+      boolean: "Dogru / Yanlis",
+      short: "Kisa Cevap",
+      fill: "Bosluk Doldurma",
+      dragdrop: "Surukle Birak"
+    };
+    const qTypeLabel = qTypeLabelMap[qType] || "Soru";
     const hasAnswered = (qType === "fill")
       ? (Array.isArray(selected) && selected.some((v) => String(v || "").trim().length > 0))
+      : (qType === "dragdrop")
+        ? (!!selected && typeof selected === "object" && Object.values(selected).some((v) => String(v || "").trim().length > 0))
       : (typeof selected === "string"
         ? String(selected).trim().length > 0
         : !!selected);
@@ -16850,51 +17843,118 @@ function renderLessonPlayer() {
     const optSource = qType === "boolean" ? ["Doğru", "Yanlış"] : (cur.options || []);
     const fillCount = Array.isArray(cur.fillAnswers) ? cur.fillAnswers.length : 0;
     const isOptionCorrect = (key, optionText, idx) => {
-      const normalizedCorrect = String(cur?.correct || "").trim().toLowerCase();
-      if (qType === "boolean") return normalizedCorrect === String(key || "").trim().toLowerCase();
+      if (qType === "boolean") return normalizeChoiceToken(cur?.correct) === normalizeChoiceToken(key);
       if (qType !== "multiple") return false;
-      const letter = (["a", "b", "c", "d"][idx] || String(idx + 1)).toLowerCase();
-      if (normalizedCorrect === letter) return true;
-      const optText = String(optionText || "").trim().toLowerCase();
-      return !!optText && normalizedCorrect === optText;
+      const options = Array.isArray(cur?.options) ? cur.options : [];
+      const correctCandidates = getMultipleChoiceCandidateIndices(cur?.correct, options);
+      return correctCandidates.has(Number(idx));
     };
+    const ddPairs = qType === "dragdrop"
+      ? (Array.isArray(cur.fillAnswers) ? cur.fillAnswers : [])
+          .map((raw) => String(raw || "").split(":"))
+          .filter((arr) => arr.length >= 2)
+          .map((arr) => ({ left: String(arr[0] || "").trim(), right: String(arr.slice(1).join(":") || "").trim() }))
+          .filter((p) => p.left && p.right)
+      : [];
     const opts = qType === "short"
-      ? `<input id="lesson-short-answer" class="form-control" value="${typeof selected === "string" ? selected : ""}" placeholder="Cevabınızı yazın">`
+      ? `<input id="lesson-short-answer" class="form-control lesson-q-input" value="${typeof selected === "string" ? selected : ""}" placeholder="Cevabınızı yazın" ${isLockedByTime ? "disabled" : ""}>`
       : qType === "fill"
         ? Array.from({ length: Math.max(1, fillCount) }).map((_, i) => {
             const val = Array.isArray(selected) ? (selected[i] || "") : "";
-            return `<input class="form-control lesson-fill-input" data-fill-index="${i}" value="${val}" placeholder="Boşluk ${i + 1}">`;
+            return `<input class="form-control lesson-fill-input lesson-q-input" data-fill-index="${i}" value="${val}" placeholder="Boşluk ${i + 1}" ${isLockedByTime ? "disabled" : ""}>`;
           }).join("")
-        : optSource.map((o, idx) => {
-            const letter = ["A", "B", "C", "D"][idx] || `${idx + 1}`;
-            const key = qType === "boolean" ? String(o).toLowerCase() : letter;
-            const chosen = selected === key;
-            const optionIsCorrect = isOptionCorrect(key, o, idx);
-            let style = "background:#fff;border:1px solid #e5e7eb;color:#0f172a;";
-            if (chosen && hasAnswered) {
-              style = answeredCorrect
-                ? "background:#dcfce7;border:1px solid #22c55e;color:#166534;font-weight:700;"
-                : "background:#fee2e2;border:1px solid #ef4444;color:#991b1b;font-weight:700;";
-            } else if (hasAnswered && !answeredCorrect && optionIsCorrect) {
-              style = "background:#ecfccb;border:1px solid #84cc16;color:#365314;";
-            } else if (chosen) {
-              style = "background:#dbeafe;border:1px solid #3b82f6;color:#1e3a8a;";
-            }
-            return `<button class="btn" data-opt="${key}" style="width:100%;text-align:left;margin-bottom:6px;${style}">${qType === "boolean" ? o : `${letter}) ${o}`}</button>`;
-          }).join("");
-    const saveBtn = (qType === "short" || qType === "fill")
-      ? '<button id="btn-save-question-answer" class="btn btn-primary" style="margin-top:8px;">Cevabı Kaydet</button>'
+        : qType === "dragdrop"
+          ? (() => {
+              const selectedMap = (selected && typeof selected === "object") ? selected : {};
+              const leftBank = ddPairs.map((p) => p.left);
+              return `
+                <div class="lesson-dd-board">
+                  <div class="lesson-dd-bank">
+                    <div style="font-size:12px;font-weight:700;color:#334155;margin-bottom:6px;">Sürükle</div>
+                    ${leftBank.map((label, idx) => `<span class="lesson-dd-chip" draggable="true" data-dd-drag="${escapeHtmlBasic(label)}">${idx + 1}. ${escapeHtmlBasic(label)}</span>`).join("")}
+                  </div>
+                  <div class="lesson-dd-targets">
+                    <div style="font-size:12px;font-weight:700;color:#334155;margin-bottom:6px;">Bırak</div>
+                    ${ddPairs.map((pair, idx) => {
+                      const val = String(selectedMap[idx] || "");
+                      return `
+                        <div class="lesson-dd-drop" data-dd-drop="${idx}">
+                          <div style="font-size:12px;color:#64748b;">${idx + 1}. ${escapeHtmlBasic(pair.right)}</div>
+                          <div class="drop-answer">${val ? escapeHtmlBasic(val) : "<span style='opacity:.6'>Buraya bırak</span>"}</div>
+                        </div>
+                      `;
+                    }).join("")}
+                  </div>
+                </div>
+              `;
+            })()
+        : `<div class="lesson-q-options">${
+            optSource.map((o, idx) => {
+              const letter = ["A", "B", "C", "D"][idx] || `${idx + 1}`;
+              const key = qType === "boolean" ? String(o).toLowerCase() : String(idx);
+              const selectedIdx = qType === "multiple" ? getMultipleChoiceIndex(selected, optSource) : -1;
+              const chosen = qType === "multiple"
+                ? selectedIdx === idx
+                : (normalizeChoiceToken(selected) === normalizeChoiceToken(key));
+              const optionIsCorrect = isOptionCorrect(key, o, idx);
+              const colorClass = qType === "boolean"
+                ? (String(o).toLowerCase() === "doğru" || String(o).toLowerCase() === "dogru" ? "q-t" : "q-f")
+                : (idx === 0 ? "q-a" : idx === 1 ? "q-b" : idx === 2 ? "q-c" : "q-d");
+              const classes = ["lesson-q-option", colorClass];
+              if (chosen && hasAnswered) classes.push(answeredCorrect ? "is-correct" : "is-wrong");
+              else if (hasAnswered && !answeredCorrect && optionIsCorrect) classes.push("is-reveal-correct");
+              const label = qType === "boolean" ? String(o || "") : String(letter);
+              return `
+                <button class="btn ${classes.join(" ")}" data-opt="${key}" ${isLockedByTime ? "disabled" : ""}>
+                  <span class="opt-key">${escapeHtmlBasic(label)}</span>
+                  <span class="opt-text">${escapeHtmlBasic(String(o || ""))}</span>
+                </button>
+              `;
+            }).join("")
+          }</div>`;
+    const saveBtn = (qType === "short" || qType === "fill" || qType === "dragdrop")
+      ? `<button id="btn-save-question-answer" class="btn btn-primary" style="margin-top:10px;" ${isLockedByTime ? "disabled" : ""}>Cevabı Kaydet</button>`
       : "";
     const statusHtml = hasAnswered
-      ? `<div style="margin-top:8px;font-size:12px;font-weight:700;color:${answeredCorrect ? "#22c55e" : "#ef4444"};">${answeredCorrect ? "? Doğru cevap" : "? Yanlış cevap"}</div>`
-      : "";
-    questionBlock = `
-      <div style="background:${cardBg};color:${cardText};padding:14px;border-radius:10px;border:1px solid ${cardBorder};margin-top:${hasContent ? "10px" : "0"};">
-        <h3 style="margin-top:0;">${hasContent ? "Soru" : (cur.title || "Soru")}</h3>
-        <p>${cur.question || ""}</p>
+      ? `<div class="lesson-answer-status ${answeredCorrect ? "is-correct" : "is-wrong"}">${answeredCorrect ? "? Doğru cevap" : "? Yanlış cevap"}</div>`
+      : (isLockedByTime ? `<div class="lesson-answer-status is-wrong">Süre doldu.</div>` : "");
+    const hasChoiceGrid = qType === "multiple" || qType === "boolean";
+    const questionBody = hasChoiceGrid
+      ? `
+        <div class="lesson-question-layout">
+          <div class="lesson-question-prompt">
+            <p class="lesson-question-text">${escapeHtmlBasic(cur.question || "")}</p>
+          </div>
+          <div>
+            ${opts}
+            ${saveBtn}
+            ${statusHtml}
+          </div>
+        </div>
+      `
+      : `
+        <p class="lesson-question-text" style="font-size:20px;font-weight:700;">${escapeHtmlBasic(cur.question || "")}</p>
         ${opts}
         ${saveBtn}
         ${statusHtml}
+      `;
+    questionBlock = `
+      <div class="lesson-question-card" style="background:${cardBg};color:${cardText};border-color:${cardBorder};margin-top:${hasContent ? "10px" : "0"};">
+        <div class="lesson-question-head">
+          <span class="lesson-question-tag">${qTypeLabel}</span>
+          <span class="lesson-question-xp">+${questionXP} XP</span>
+        </div>
+        <h3 class="lesson-question-title">${escapeHtmlBasic(hasContent ? "Soru" : (cur.title || "Soru"))}</h3>
+        ${questionBody}
+        <div class="lesson-question-timer" data-question-key="${escapeHtmlBasic(String(slideAnswerKey))}">
+          <div class="lesson-question-timer-head">
+            <span>Süre</span>
+            <span data-lesson-question-time>${Math.max(0, Math.ceil(remainingNow))} sn</span>
+          </div>
+          <div class="lesson-question-timer-track">
+            <div class="lesson-question-timer-fill" data-lesson-question-progress style="width:${Math.min(100, Math.max(0, (elapsedNow / (questionDurationSec * 1000)) * 100))}%;"></div>
+          </div>
+        </div>
       </div>
     `;
   }
@@ -16909,34 +17969,116 @@ function renderLessonPlayer() {
     </div>
   `;
   applyLessonPlayerZoom(lessonPlayerZoom, { keepCenter: false });
-  stage.querySelectorAll("[data-opt]").forEach((btn) => {
-    btn.onclick = () => {
-      const choice = btn.getAttribute("data-opt");
+  const questionCardEl = stage.querySelector(".lesson-question-card");
+  if (questionCardEl) {
+    const submitChoice = (choice) => {
+      if (choice === null || choice === undefined) return;
       st.answered[slideAnswerKey] = choice;
       const ok = isLessonAnswerCorrect(cur, choice);
-      showNotice(ok ? "Doğru cevap kaydedildi." : "Cevap kaydedildi.", ok ? "#2ecc71" : "#4a90e2");
+      showNotice(ok ? `Doğru cevap! +${questionXP} XP` : "Cevap kaydedildi.", ok ? "#2ecc71" : "#4a90e2");
       renderLessonPlayer();
+      animateLessonAnswerFeedback(ok);
       persistLessonProgress(false);
     };
+    stage.querySelectorAll(".lesson-q-option[data-opt]").forEach((optBtn) => {
+      optBtn.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (optBtn.disabled) return;
+        submitChoice(optBtn.getAttribute("data-opt"));
+      });
+    });
+    const timerFillEl = stage.querySelector("[data-lesson-question-progress]");
+    const timerLabelEl = stage.querySelector("[data-lesson-question-time]");
+    const qDuration = Math.max(5, Number(cur.questionDurationSec ?? cur.durationSec ?? 30) || 30);
+    const startedAt = Number(st.questionTimers?.[slideAnswerKey] || Date.now());
+    const tickTimer = () => {
+      const elapsed = Math.max(0, Date.now() - startedAt);
+      const ratio = Math.min(1, elapsed / (qDuration * 1000));
+      const remainingSec = Math.max(0, qDuration - (elapsed / 1000));
+      if (timerFillEl) timerFillEl.style.width = `${Math.round(ratio * 100)}%`;
+      if (timerLabelEl) timerLabelEl.textContent = `${Math.ceil(remainingSec)} sn`;
+      if (ratio >= 1) {
+        clearLessonQuestionTimer();
+        const answered = hasLessonAnswerValue(cur, st.answered[slideAnswerKey]);
+        if (!answered) {
+          st.questionExpired[slideAnswerKey] = true;
+          renderLessonPlayer();
+        }
+      }
+    };
+    tickTimer();
+    lessonQuestionTimerInterval = setInterval(tickTimer, 120);
+  }
+  stage.querySelectorAll("[data-dd-drag]").forEach((chip) => {
+    chip.addEventListener("dragstart", (ev) => {
+      const label = chip.getAttribute("data-dd-drag") || "";
+      if (!ev.dataTransfer) return;
+      ev.dataTransfer.effectAllowed = "move";
+      ev.dataTransfer.setData("text/plain", label);
+      ev.dataTransfer.setData("text/lesson-dd-label", label);
+    });
+  });
+  stage.querySelectorAll("[data-dd-drop]").forEach((drop) => {
+    drop.addEventListener("dragover", (ev) => {
+      ev.preventDefault();
+      drop.classList.add("drag-over");
+    });
+    drop.addEventListener("dragleave", () => drop.classList.remove("drag-over"));
+    drop.addEventListener("drop", (ev) => {
+      ev.preventDefault();
+      drop.classList.remove("drag-over");
+      if (st.questionExpired?.[slideAnswerKey]) return;
+      const label = String(
+        ev.dataTransfer?.getData("text/lesson-dd-label")
+        || ev.dataTransfer?.getData("text/plain")
+        || ""
+      ).trim();
+      const dropIndex = Number(drop.getAttribute("data-dd-drop"));
+      if (!label || !Number.isFinite(dropIndex)) return;
+      const prev = (st.answered[slideAnswerKey] && typeof st.answered[slideAnswerKey] === "object")
+        ? { ...st.answered[slideAnswerKey] }
+        : {};
+      prev[dropIndex] = label;
+      st.answered[slideAnswerKey] = prev;
+      renderLessonPlayer();
+    });
   });
   const saveQaBtn = document.getElementById("btn-save-question-answer");
   if (saveQaBtn) {
     saveQaBtn.onclick = () => {
-      const qType = cur.questionType || "multiple";
+      if (st.questionExpired?.[slideAnswerKey]) return;
+      const qType = resolveLessonQuestionType(cur, cur.questionType || "multiple");
       if (qType === "fill") {
         const arr = Array.from(stage.querySelectorAll(".lesson-fill-input")).map((el) => (el.value || "").trim());
         st.answered[slideAnswerKey] = arr;
         const ok = isLessonAnswerCorrect(cur, arr);
-        showNotice(ok ? "Boşluk cevapları doğru." : "Boşluk cevapları kaydedildi.", ok ? "#2ecc71" : "#4a90e2");
+        showNotice(ok ? `Boşluk cevapları doğru! +${questionXP} XP` : "Boşluk cevapları kaydedildi.", ok ? "#2ecc71" : "#4a90e2");
+        renderLessonPlayer();
+        animateLessonAnswerFeedback(ok);
+        persistLessonProgress(false);
+        return;
+      } else if (qType === "dragdrop") {
+        const mapVal = (st.answered[slideAnswerKey] && typeof st.answered[slideAnswerKey] === "object")
+          ? st.answered[slideAnswerKey]
+          : {};
+        const ok = isLessonAnswerCorrect(cur, mapVal);
+        showNotice(ok ? `Eşleştirme doğru! +${questionXP} XP` : "Eşleştirme kaydedildi.", ok ? "#2ecc71" : "#4a90e2");
+        renderLessonPlayer();
+        animateLessonAnswerFeedback(ok);
+        persistLessonProgress(false);
+        return;
       } else {
         const input = document.getElementById("lesson-short-answer");
         const txt = (input?.value || "").trim();
         st.answered[slideAnswerKey] = txt;
         const ok = isLessonAnswerCorrect(cur, txt);
-        showNotice(ok ? "Doğru cevap kaydedildi." : "Cevap kaydedildi.", ok ? "#2ecc71" : "#4a90e2");
+        showNotice(ok ? `Doğru cevap! +${questionXP} XP` : "Cevap kaydedildi.", ok ? "#2ecc71" : "#4a90e2");
+        renderLessonPlayer();
+        animateLessonAnswerFeedback(ok);
+        persistLessonProgress(false);
+        return;
       }
-      renderLessonPlayer();
-      persistLessonProgress(false);
     };
   }
   const counterEl = document.getElementById("lesson-player-counter");
@@ -16952,6 +18094,18 @@ function renderLessonPlayer() {
   const nextBtn = document.getElementById("btn-lesson-next");
   if (nextBtn) nextBtn.innerText = st.index >= (slides.length - 1) ? "Bitir" : "Sonraki";
   updateLessonProgressBar();
+}
+
+function animateLessonAnswerFeedback(ok) {
+  const stage = document.getElementById("lesson-player-stage");
+  if (!stage) return;
+  stage.classList.remove("lesson-answer-fx-correct", "lesson-answer-fx-wrong");
+  if (lessonAnswerFxTimer) clearTimeout(lessonAnswerFxTimer);
+  stage.classList.add(ok ? "lesson-answer-fx-correct" : "lesson-answer-fx-wrong");
+  lessonAnswerFxTimer = setTimeout(() => {
+    stage.classList.remove("lesson-answer-fx-correct", "lesson-answer-fx-wrong");
+    lessonAnswerFxTimer = null;
+  }, 520);
 }
 
 function clampLessonPlayerZoom(value) {
@@ -16982,41 +18136,233 @@ function applyLessonPlayerZoom(value, options = {}) {
   });
 }
 
-function isLessonAnswerCorrect(slide, answer) {
-  const qType = slide?.questionType || "multiple";
-  if (qType === "multiple") {
-    const normalizedAnswer = String(answer || "").trim().toLowerCase();
-    const normalizedCorrect = String(slide?.correct || "").trim().toLowerCase();
-    if (normalizedAnswer && normalizedAnswer === normalizedCorrect) return true;
-    const options = Array.isArray(slide?.options) ? slide.options : [];
-    const letters = ["a", "b", "c", "d"];
-    const idx = letters.indexOf(normalizedCorrect);
-    if (idx >= 0) {
-      const optText = String(options[idx] || "").trim().toLowerCase();
-      return normalizedAnswer === letters[idx] || (optText && normalizedAnswer === optText);
+function normalizeChoiceToken(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function normalizeLessonQuestionType(raw) {
+  const t = normalizeChoiceToken(raw)
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (
+    t === "quiz"
+    || t === "multiple"
+    || t === "mcq"
+    || t === "test"
+    || t === "coktan secmeli"
+    || t === "coktansecmeli"
+    || t.includes("multiple")
+    || (t.includes("coktan") && t.includes("secmeli"))
+  ) return "multiple";
+  if (
+    t === "truefalse"
+    || t === "tf"
+    || t === "dogru/yanlis"
+    || t === "dogru yanlis"
+    || t === "boolean"
+    || t.includes("true false")
+    || (t.includes("dogru") && t.includes("yanlis"))
+  ) return "boolean";
+  if (t === "short") return "short";
+  if (t === "fill") return "fill";
+  if (t === "dragdrop" || t === "matching") return "dragdrop";
+  return t || "multiple";
+}
+
+function resolveLessonQuestionType(slide, fallbackRaw = "") {
+  const raw = (slide && slide.questionType !== undefined && slide.questionType !== null)
+    ? slide.questionType
+    : fallbackRaw;
+  const normalized = normalizeLessonQuestionType(raw);
+  if (["multiple", "boolean", "short", "fill", "dragdrop"].includes(normalized)) return normalized;
+
+  const options = Array.isArray(slide?.options) ? slide.options.filter((o) => String(o || "").trim().length > 0) : [];
+  const fillAnswers = Array.isArray(slide?.fillAnswers) ? slide.fillAnswers.filter((v) => String(v || "").trim().length > 0) : [];
+  const correctToken = normalizeChoiceToken(slide?.correct);
+
+  if (fillAnswers.length > 0) {
+    const hasPairSyntax = fillAnswers.some((v) => String(v || "").includes(":"));
+    return hasPairSyntax ? "dragdrop" : "fill";
+  }
+  if (options.length >= 2) {
+    const normalizedOpts = options.map((o) => normalizeChoiceToken(o));
+    const hasTrue = normalizedOpts.some((o) => o === "dogru" || o === "true");
+    const hasFalse = normalizedOpts.some((o) => o === "yanlis" || o === "false");
+    if ((hasTrue && hasFalse) || correctToken === "dogru" || correctToken === "yanlis" || correctToken === "true" || correctToken === "false") {
+      return "boolean";
     }
+    return "multiple";
+  }
+  if (correctToken === "dogru" || correctToken === "yanlis" || correctToken === "true" || correctToken === "false") return "boolean";
+  return "short";
+}
+
+function getMultipleChoiceIndex(value, options = []) {
+  const token = normalizeChoiceToken(value);
+  if (!token) return -1;
+  const letters = ["a", "b", "c", "d"];
+  if (/^[0-3]$/.test(token)) return Number(token);
+  if (/^[1-4]$/.test(token)) return Number(token) - 1;
+  const leadMatch = token.match(/^([abcd])(?:[\)\].:\-\s]|$)/);
+  if (leadMatch) return letters.indexOf(leadMatch[1]);
+  if (/^[abcd]$/.test(token)) return letters.indexOf(token);
+  // "a) paris" gibi değerlerde, ilk tokenı harf olarak yakala
+  const firstToken = token.split(/\s+/)[0] || "";
+  const firstTokenLetter = firstToken.replace(/[^abcd0-4]/g, "");
+  if (/^[0-3]$/.test(firstTokenLetter)) return Number(firstTokenLetter);
+  if (/^[1-4]$/.test(firstTokenLetter)) return Number(firstTokenLetter) - 1;
+  if (/^[abcd]$/.test(firstTokenLetter)) return letters.indexOf(firstTokenLetter);
+  const idxByText = options.findIndex((opt) => normalizeChoiceToken(opt) === token);
+  if (idxByText >= 0) return idxByText;
+  return -1;
+}
+
+function getMultipleChoiceCandidateIndices(value, options = []) {
+  const token = normalizeChoiceToken(value);
+  const set = new Set();
+  if (!token) return set;
+  const letters = ["a", "b", "c", "d"];
+
+  const idx = getMultipleChoiceIndex(value, options);
+  if (idx >= 0) set.add(idx);
+
+  // String içinde standalone harf/digit geçiyorsa aday olarak ekle: "sik a", "dogru: 1"
+  const letterMatches = token.match(/(^|[^a-z0-9])([abcd])([^a-z0-9]|$)/g) || [];
+  letterMatches.forEach((m) => {
+    const ch = (m.match(/[abcd]/) || [])[0] || "";
+    const i = letters.indexOf(ch);
+    if (i >= 0) set.add(i);
+  });
+  const digitMatches = token.match(/(^|[^0-9])([1-4])([^0-9]|$)/g) || [];
+  digitMatches.forEach((m) => {
+    const d = (m.match(/[1-4]/) || [])[0] || "";
+    if (d) set.add(Number(d) - 1);
+  });
+  const zeroBasedDigitMatches = token.match(/(^|[^0-9])([0-3])([^0-9]|$)/g) || [];
+  zeroBasedDigitMatches.forEach((m) => {
+    const d = (m.match(/[0-3]/) || [])[0] || "";
+    if (d !== "") set.add(Number(d));
+  });
+
+  // "A) Paris" gibi formatlarda marker sonrası metni option text ile de eşleştir.
+  const withoutLead = token.replace(/^([abcd]|[1-4])\s*[\)\].:\-]?\s*/, "").trim();
+  if (withoutLead) {
+    const byTail = options.findIndex((opt) => normalizeChoiceToken(opt) === withoutLead);
+    if (byTail >= 0) set.add(byTail);
+  }
+
+  return set;
+}
+
+function normalizeBooleanToken(value) {
+  const t = normalizeChoiceToken(value);
+  if (!t) return null;
+  const truthy = new Set(["dogru", "true", "1", "a", "evet", "yes", "t"]);
+  const falsy = new Set(["yanlis", "yanlış", "false", "0", "2", "b", "hayir", "hayır", "no", "f"]);
+  if (truthy.has(t)) return true;
+  if (falsy.has(t)) return false;
+  if (t.includes("dogru")) return true;
+  if (t.includes("yanlis")) return false;
+  if (t.includes("hayir") || t.includes("hayır")) return false;
+  return null;
+}
+
+function normalizeCompareToken(value) {
+  return normalizeChoiceToken(value).replace(/\s+/g, " ").trim();
+}
+
+function getLessonFillAnswers(slide) {
+  const fromArray = Array.isArray(slide?.fillAnswers)
+    ? slide.fillAnswers.map((v) => String(v || "").trim()).filter(Boolean)
+    : [];
+  if (fromArray.length) return fromArray;
+  const fallback = String(slide?.correct || "")
+    .split(",")
+    .map((v) => String(v || "").trim())
+    .filter(Boolean);
+  return fallback;
+}
+
+function getLessonDragdropPairs(slide) {
+  return getLessonFillAnswers(slide)
+    .map((raw) => String(raw || "").split(":"))
+    .filter((arr) => arr.length >= 2)
+    .map((arr) => ({
+      left: normalizeCompareToken(arr[0]),
+      right: normalizeCompareToken(arr.slice(1).join(":"))
+    }))
+    .filter((p) => p.left && p.right);
+}
+
+function isLessonAnswerCorrect(slide, answer) {
+  const qType = resolveLessonQuestionType(slide, slide?.questionType || "multiple");
+  if (qType === "multiple") {
+    const options = Array.isArray(slide?.options) ? slide.options : [];
+    const answerCandidates = getMultipleChoiceCandidateIndices(answer, options);
+    const correctCandidates = getMultipleChoiceCandidateIndices(slide?.correct, options);
+    for (const aIdx of answerCandidates) {
+      if (correctCandidates.has(aIdx)) return true;
+    }
+    // fallback: normalize edilmiş metin birebir aynıysa yine doğru kabul et
+    const normalizedAnswer = normalizeChoiceToken(answer);
+    const normalizedCorrect = normalizeChoiceToken(slide?.correct);
+    if (normalizedAnswer && normalizedAnswer === normalizedCorrect) return true;
     return false;
   }
   if (qType === "boolean") {
-    return String(answer || "").trim().toLowerCase() === String(slide?.correct || "").trim().toLowerCase();
+    const ans = normalizeBooleanToken(answer);
+    const corr = normalizeBooleanToken(slide?.correct);
+    if (ans !== null && corr !== null) return ans === corr;
+    return normalizeChoiceToken(answer) === normalizeChoiceToken(slide?.correct);
   }
   if (qType === "short") {
-    const expectedRaw = String(slide?.correct || "").trim().toLowerCase();
-    const given = String(answer || "").trim().toLowerCase();
-    if (!expectedRaw) return false;
-    if (expectedRaw.includes(",")) {
-      return expectedRaw.split(",").map((x) => x.trim()).filter(Boolean).includes(given);
-    }
-    return given === expectedRaw;
+    const expected = String(slide?.correct || "")
+      .split(",")
+      .map((x) => normalizeCompareToken(x))
+      .filter(Boolean);
+    const given = normalizeCompareToken(answer);
+    if (!expected.length || !given) return false;
+    return expected.includes(given);
   }
   if (qType === "fill") {
-    const expected = Array.isArray(slide?.fillAnswers) ? slide.fillAnswers : [];
+    const expected = getLessonFillAnswers(slide);
     const given = Array.isArray(answer) ? answer : [];
     if (expected.length === 0) return false;
     if (given.length < expected.length) return false;
-    return expected.every((v, i) => String(v || "").trim().toLowerCase() === String(given[i] || "").trim().toLowerCase());
+    return expected.every((v, i) => normalizeCompareToken(v) === normalizeCompareToken(given[i]));
   }
-  return String(answer || "").trim().toLowerCase() === String(slide?.correct || "").trim().toLowerCase();
+  if (qType === "dragdrop") {
+    const expectedPairs = getLessonDragdropPairs(slide);
+    const given = (answer && typeof answer === "object") ? answer : {};
+    if (!expectedPairs.length) return false;
+    return expectedPairs.every((pair, idx) => {
+      const byIndex = normalizeCompareToken(given[idx]);
+      if (byIndex && byIndex === pair.left) return true;
+      const byRightKey = normalizeCompareToken(given[pair.right]);
+      if (byRightKey && byRightKey === pair.left) return true;
+      const mappedKey = Object.keys(given).find((k) => normalizeCompareToken(k) === pair.right);
+      if (mappedKey) return normalizeCompareToken(given[mappedKey]) === pair.left;
+      return false;
+    });
+  }
+  return normalizeCompareToken(answer) === normalizeCompareToken(slide?.correct);
+}
+
+function hasLessonAnswerValue(slide, answer) {
+  const qType = resolveLessonQuestionType(slide, slide?.questionType || "multiple");
+  if (qType === "fill") return Array.isArray(answer) && answer.some((v) => String(v || "").trim().length > 0);
+  if (qType === "dragdrop") return !!answer && typeof answer === "object" && Object.values(answer).some((v) => String(v || "").trim().length > 0);
+  if (typeof answer === "string") return String(answer).trim().length > 0;
+  return !!answer;
+}
+
+function getLessonSlideQuestionXP(slide) {
+  return clampLessonQuestionXP(slide?.questionXP ?? slide?.xp ?? MAX_QUESTION_XP);
 }
 
 function updateLessonProgressBar() {
@@ -17026,42 +18372,57 @@ function updateLessonProgressBar() {
   const total = slides.length || 1;
   const visitedCount = st.visited.size;
   let correctCount = 0;
+  let questionXPBonus = 0;
   const questionSlides = slides.filter((s) => s.type === "question" || s.type === "mixed");
   slides.forEach((s, idx) => {
     if (!(s.type === "question" || s.type === "mixed")) return;
     const key = s.id || `slide_${idx}`;
     const answer = st.answered[key];
-    if (!answer) return;
-    if (isLessonAnswerCorrect(s, answer)) correctCount++;
+    if (!hasLessonAnswerValue(s, answer)) return;
+    if (isLessonAnswerCorrect(s, answer)) {
+      correctCount++;
+      questionXPBonus += getLessonSlideQuestionXP(s);
+    }
   });
   st.correctCount = correctCount;
   const basePercent = Math.round((visitedCount / total) * 70);
   const qPercent = questionSlides.length > 0 ? Math.round((correctCount / questionSlides.length) * 30) : 30;
   const percent = Math.min(100, basePercent + qPercent);
-  const xp = Math.round((visitedCount * 2) + (correctCount * MAX_QUESTION_XP));
+  const xp = Math.round((visitedCount * 2) + questionXPBonus);
   const label = document.getElementById("lesson-player-progress");
   if (label) label.innerText = `%${percent} tamamlandı • ${xp} XP`;
 }
 
 async function persistLessonProgress(closeAfter) {
   const st = lessonPlayerState;
-  if (!st || !currentUserId || userRole !== "student") return;
+  if (!st) return;
+  if (closeAfter) {
+    clearLessonQuestionTimer();
+    const modal = document.getElementById("lesson-player-modal");
+    if (modal) modal.style.display = "none";
+    lessonPlayerState = null;
+  }
+  if (!currentUserId || userRole !== "student") return;
   const slides = Array.isArray(st.lesson.slides) ? st.lesson.slides : [];
   const total = slides.length || 1;
   const visitedCount = st.visited.size;
   let correctCount = 0;
+  let questionXPBonus = 0;
   const questionSlides = slides.filter((s) => s.type === "question" || s.type === "mixed");
   slides.forEach((s, idx) => {
     if (!(s.type === "question" || s.type === "mixed")) return;
     const key = s.id || `slide_${idx}`;
     const answer = st.answered[key];
-    if (!answer) return;
-    if (isLessonAnswerCorrect(s, answer)) correctCount++;
+    if (!hasLessonAnswerValue(s, answer)) return;
+    if (isLessonAnswerCorrect(s, answer)) {
+      correctCount++;
+      questionXPBonus += getLessonSlideQuestionXP(s);
+    }
   });
   const basePercent = Math.round((visitedCount / total) * 70);
   const qPercent = questionSlides.length > 0 ? Math.round((correctCount / questionSlides.length) * 30) : 30;
   const percent = Math.min(100, basePercent + qPercent);
-  const totalXP = Math.round((visitedCount * 2) + (correctCount * MAX_QUESTION_XP));
+  const totalXP = Math.round((visitedCount * 2) + questionXPBonus);
   const completed = visitedCount >= total;
   const ref = doc(db, "lessonProgress", `${st.lesson.id}_${currentUserId}`);
   const prevSnap = await getDoc(ref);
@@ -17090,11 +18451,6 @@ async function persistLessonProgress(closeAfter) {
     }
   }
   updateUserXPDisplay();
-  if (closeAfter) {
-    const modal = document.getElementById("lesson-player-modal");
-    if (modal) modal.style.display = "none";
-    lessonPlayerState = null;
-  }
 }
 
 function openComputeHomeworkModalForEdit(assignment) {
@@ -17130,8 +18486,9 @@ async function updateComputeAssignmentProgressFromLevelEvent({ uid, levelId, lev
     const assignment = assignmentSnap.data() || {};
     const levelStart = Math.max(1, Number(assignment.levelStart || 1));
     const levelEnd = Math.max(levelStart, Number(assignment.levelEnd || levelStart));
+    const expectedTotalLevels = Math.max(0, levelEnd - levelStart + 1);
     const rangeLevels = Array.isArray(levels) ? levels.slice(levelStart - 1, levelEnd) : [];
-    const totalLevels = rangeLevels.length;
+    const totalLevels = expectedTotalLevels;
     const progressRef = doc(db, "computeAssignmentProgress", `${activeComputeAssignmentId}_${uid}`);
     const progressSnap = await getDoc(progressRef);
     const prev = progressSnap.exists() ? progressSnap.data() : {};
@@ -17139,28 +18496,39 @@ async function updateComputeAssignmentProgressFromLevelEvent({ uid, levelId, lev
       ? prev.completedLevelIds.map((v) => Number(v)).filter((v) => Number.isFinite(v))
       : [];
     const merged = new Set(prevIds);
-    rangeLevels.forEach((lv) => {
+    rangeLevels.forEach((lv, idx) => {
       if (lv?.completed) {
-        const lid = Number(lv?.id);
+        const lid = getComputeLevelNo(lv, levelStart - 1 + idx);
         if (Number.isFinite(lid)) merged.add(lid);
       }
     });
-    const eventLevelId = Number(levelId);
+    const eventLevelId = getComputeLevelNo(
+      { id: levelId, levelId, levelNo: levelId },
+      Math.max(0, Number(currentLevelIndex || 0))
+    );
     if (Number.isFinite(eventLevelId)) merged.add(eventLevelId);
-    const mergedIds = Array.from(merged);
-    const completedLevels = totalLevels > 0
-      ? rangeLevels.filter((lv) => merged.has(Number(lv?.id))).length
-      : 0;
+    const mergedIds = normalizeComputeCompletedLevelIds(Array.from(merged), levelStart, levelEnd, 0);
+    const completedLevels = mergedIds.length;
     const percent = totalLevels > 0 ? Math.round((completedLevels / totalLevels) * 100) : 0;
     const completed = totalLevels > 0 && completedLevels >= totalLevels;
     const wasCompleted = !!prev.completed;
     const elapsedSeconds = Math.max(0, Math.floor((Number(prev.lastSessionSeconds || 0)) + ((Number(durationMs || 0)) / 1000)));
-    const totalXP = rangeLevels.reduce((sum, lv) => {
-      const lid = Number(lv?.id);
-      if (!Number.isFinite(lid) || !merged.has(lid)) return sum;
-      return sum + clampAppLevelXP(lv?.xp ?? MAX_APP_LEVEL_XP);
-    }, 0);
-    const prevAwardedXP = Math.max(0, Number(prev.awardedXP || 0));
+    let totalXP = mergedIds.reduce((sum, lid) => sum + getComputeLevelXPByLevelNo(lid), 0);
+    if (completed) totalXP = getComputeRangeXPByLevelNo(levelStart, levelEnd);
+    let prevAwardedXP = Math.max(0, Number(prev.awardedXP || 0));
+    if (prevAwardedXP > totalXP) {
+      const rollback = prevAwardedXP - totalXP;
+      try {
+        const userRef = doc(db, "users", uid);
+        const uSnap = await getDoc(userRef);
+        const currentXp = uSnap.exists() ? Math.max(0, Number((uSnap.data() || {}).xp || 0)) : 0;
+        await setDoc(userRef, { xp: Math.max(0, currentXp - rollback), updatedAt: serverTimestamp() }, { merge: true });
+        if (uid === currentUserId && userData) userData.xp = Math.max(0, Number(userData.xp || 0) - rollback);
+        prevAwardedXP = totalXP;
+      } catch (e) {
+        console.warn("compute awardedXP rollback failed", e);
+      }
+    }
     await setDoc(progressRef, {
       assignmentId: activeComputeAssignmentId,
       assignmentTitle: String(assignment.title || "Compute It Ödevi"),
@@ -17171,7 +18539,7 @@ async function updateComputeAssignmentProgressFromLevelEvent({ uid, levelId, lev
       completed,
       completedLevelIds: mergedIds,
       totalXP,
-      awardedXP: prevAwardedXP,
+      awardedXP: Math.min(prevAwardedXP, totalXP),
       completedLevels,
       totalLevels,
       currentLevelIndex: Math.max(0, Number(currentLevelIndex || 0)),
@@ -17215,7 +18583,10 @@ async function updateComputeAssignmentProgressFromLevelEvent({ uid, levelId, lev
         durationSeconds: Math.max(0, Number(elapsedSeconds || 0)),
         requireAction: true,
         actionText: "Kaydet ve Çık",
-        onAction: async () => await saveAndExitCompletedRunner()
+        onAction: () => {
+          closeBlockRunnerView();
+          return true;
+        }
       });
     }
   } catch (e) {
@@ -17254,7 +18625,9 @@ function assignmentMatchesStudentFor(assignment, student) {
   return targetClass === studentClass;
 }
 
-function renderLimitedRows(listEl, rows, limit = 3) {
+const HOME_PREVIEW_LIMIT = 4;
+
+function renderLimitedRows(listEl, rows, limit = HOME_PREVIEW_LIMIT) {
   if (!listEl) return;
   listEl.innerHTML = "";
   rows.slice(0, limit).forEach((row) => listEl.appendChild(row));
@@ -17297,7 +18670,7 @@ function setStudentCombinedTab(kind = "homework", tab = "pending") {
   if (completedEl) completedEl.classList.toggle("active", tabName === "completed");
 
   const cache = studentCombinedListCache[panelKey] || { pending: [], completed: [] };
-  const show = tabName === "completed" ? (cache.completed || []).length > 3 : (cache.pending || []).length > 3;
+  const show = tabName === "completed" ? (cache.completed || []).length > HOME_PREVIEW_LIMIT : (cache.pending || []).length > HOME_PREVIEW_LIMIT;
   const buttonId = panelKey === "apps" ? "btn-show-all-student-apps" : "btn-show-all-student-homework";
   setShowMoreButton(buttonId, show, () => openAllItemsModal(cache.title || "İçerikler", cache.pending || [], cache.completed || []));
 }
@@ -17334,10 +18707,10 @@ function renderStudentCombinedSections() {
     ...(homeListCache.compute?.completed || [])
   ];
 
-  renderLimitedRows(homePendingList, homeworkPendingRows, 3);
-  renderLimitedRows(homeCompletedList, homeworkCompletedRows, 3);
-  renderLimitedRows(appsPendingList, appsPendingRows, 3);
-  renderLimitedRows(appsCompletedList, appsCompletedRows, 3);
+  renderLimitedRows(homePendingList, homeworkPendingRows, HOME_PREVIEW_LIMIT);
+  renderLimitedRows(homeCompletedList, homeworkCompletedRows, HOME_PREVIEW_LIMIT);
+  renderLimitedRows(appsPendingList, appsPendingRows, HOME_PREVIEW_LIMIT);
+  renderLimitedRows(appsCompletedList, appsCompletedRows, HOME_PREVIEW_LIMIT);
 
   const noHomePending = document.getElementById("no-student-homework-pending");
   const noHomeCompleted = document.getElementById("no-student-homework-completed");
@@ -17370,7 +18743,7 @@ function updateBlockHomeworkShowMoreButton() {
   const completedTab = document.getElementById("block-homework-completed");
   const activeTab = completedTab?.classList.contains("active") ? "completed" : "pending";
   const show = userRole === "teacher"
-    ? (pendingLen + completedLen) > 3
+    ? (pendingLen + completedLen) > HOME_PREVIEW_LIMIT
     : (activeTab === "completed" ? completedLen > 3 : pendingLen > 3);
   setShowMoreButton(
     "btn-show-all-block-homework",
@@ -17517,7 +18890,7 @@ function buildCertificatePageHtml(page) {
       <div class="cert-card">
         <div class="cert-frame">
           <img src="logo.png" alt="Logo" class="cert-logo" />
-          <div class="cert-badge">✦</div>
+          <div class="cert-badge">?</div>
           <h1 class="cert-title">BAŞARI SERTİFİKASI</h1>
           <div class="cert-name">${fullName}</div>
           <p class="cert-text">${awardText}</p>
@@ -18229,7 +19602,7 @@ function updateActivityLists() {
       li.innerHTML = `
         <div style="flex:1;">
           <div style="font-weight:600;">${assignment.title || "Etkinlik"}</div>
-          <small style="color:#666;">📅 ${assignment.createdAtDate.toLocaleDateString("tr-TR")}${deadlineDate ? ` • Son: ${deadlineDate.toLocaleDateString("tr-TR")}` : ""}</small>
+          <small style="color:#666;">?? ${assignment.createdAtDate.toLocaleDateString("tr-TR")}${deadlineDate ? ` • Son: ${deadlineDate.toLocaleDateString("tr-TR")}` : ""}</small>
         </div>
         <div style="display:flex; gap:6px; align-items:center;">${rightBadges}</div>
       `;
@@ -18271,21 +19644,21 @@ function updateActivityLists() {
       const allRows = [...pendingRows, ...completedRows];
       if (noPending) noPending.style.display = allRows.length === 0 ? "block" : "none";
       if (noCompleted) noCompleted.style.display = "none";
-      renderLimitedRows(pendingList, allRows, 3);
+      renderLimitedRows(pendingList, allRows, HOME_PREVIEW_LIMIT);
       if (completedList) completedList.innerHTML = "";
       setShowMoreButton(
         "btn-show-all-activities",
-        allRows.length > 3,
+        allRows.length > HOME_PREVIEW_LIMIT,
         () => openAllItemsModal(homeListCache.activities.title, homeListCache.activities.pending, homeListCache.activities.completed)
       );
     } else {
       if (noPending) noPending.style.display = pendingCount === 0 ? "block" : "none";
       if (noCompleted) noCompleted.style.display = completedCount === 0 ? "block" : "none";
-      renderLimitedRows(pendingList, pendingRows, 3);
-      renderLimitedRows(completedList, completedRows, 3);
+      renderLimitedRows(pendingList, pendingRows, HOME_PREVIEW_LIMIT);
+      renderLimitedRows(completedList, completedRows, HOME_PREVIEW_LIMIT);
       setShowMoreButton(
         "btn-show-all-activities",
-        pendingRows.length > 3 || completedRows.length > 3,
+        pendingRows.length > HOME_PREVIEW_LIMIT || completedRows.length > HOME_PREVIEW_LIMIT,
         () => openAllItemsModal(homeListCache.activities.title, homeListCache.activities.pending, homeListCache.activities.completed)
       );
     }
@@ -18604,39 +19977,71 @@ if (btnBookFinished) {
 
 async function populateClassSectionFilters(classSelect, sectionSelect) {
   if (!classSelect || !sectionSelect) return;
+  const prevClass = String(classSelect.value || "");
+  const prevSection = String(sectionSelect.value || "");
   classSelect.innerHTML = `<option value="">Sınıf</option>`;
   sectionSelect.innerHTML = `<option value="">Şube</option>`;
   const classMap = new Map();
-  let source = allStudents;
-  if (!source || source.length === 0) {
-    const snap = await getDocs(query(collection(db, "users"), where("role", "==", "student")));
-    source = [];
-    snap.forEach((d) => source.push({ id: d.id, ...d.data() }));
+
+  if (userRole === "teacher" && (!Array.isArray(classSectionCatalog) || classSectionCatalog.length === 0)) {
+    await refreshAndApplyClassSectionDropdowns();
   }
-  source = scopeStudentsForCurrentRole(source);
-  source.forEach((s) => {
-    if (!s.className) return;
-    if (!classMap.has(s.className)) classMap.set(s.className, new Set());
-    if (s.section) classMap.get(s.className).add(s.section);
+
+  (Array.isArray(classSectionCatalog) ? classSectionCatalog : []).forEach((row) => {
+    const className = normalizeClassSectionText(row?.className);
+    const section = normalizeClassSectionText(row?.section);
+    if (!className) return;
+    if (!classMap.has(className)) classMap.set(className, new Set());
+    if (section) classMap.get(className).add(section);
   });
-  Array.from(classMap.keys()).sort().forEach((c) => {
+
+  if (classMap.size === 0) {
+    let source = allStudents;
+    if (!source || source.length === 0) {
+      const snap = await getDocs(query(collection(db, "users"), where("role", "==", "student")));
+      source = [];
+      snap.forEach((d) => source.push({ id: d.id, ...d.data() }));
+    }
+    source = scopeStudentsForCurrentRole(source);
+    source.forEach((s) => {
+      if (!s.className) return;
+      if (!classMap.has(s.className)) classMap.set(s.className, new Set());
+      if (s.section) classMap.get(s.className).add(s.section);
+    });
+  }
+
+  const sortedClasses = Array.from(classMap.keys()).sort((a, b) => String(a).localeCompare(String(b), "tr"));
+  sortedClasses.forEach((c) => {
     const opt = document.createElement("option");
     opt.value = c;
     opt.textContent = c;
     classSelect.appendChild(opt);
   });
-  classSelect.onchange = function () {
+
+  const syncSections = () => {
     sectionSelect.innerHTML = `<option value="">Şube</option>`;
     const cls = classSelect.value;
     if (!cls) return;
     const sections = classMap.get(cls) || new Set();
-    Array.from(sections).sort().forEach((s) => {
+    Array.from(sections).sort((a, b) => String(a).localeCompare(String(b), "tr")).forEach((s) => {
       const opt = document.createElement("option");
       opt.value = s;
       opt.textContent = s;
       sectionSelect.appendChild(opt);
     });
   };
+  classSelect.onchange = function () {
+    syncSections();
+  };
+
+  if (prevClass && sortedClasses.includes(prevClass)) {
+    classSelect.value = prevClass;
+  }
+  syncSections();
+  const allowedSections = Array.from(classMap.get(classSelect.value) || []).map(String);
+  if (prevSection && allowedSections.includes(prevSection)) {
+    sectionSelect.value = prevSection;
+  }
 }
 
 async function loadApprovalsModal() {
@@ -19154,9 +20559,9 @@ function updateActivityTimerUI() {
   const mins = Math.floor(elapsed / 60);
   const secs = elapsed % 60;
   const timerEl = document.getElementById("activity-timer");
-  if (timerEl) timerEl.innerText = `⏱ ${mins} dk ${secs} sn`;
+  if (timerEl) timerEl.innerText = `? ${mins} dk ${secs} sn`;
   const fullTimer = document.getElementById("activity-full-timer");
-  if (fullTimer) fullTimer.innerText = `⏱ ${mins} dk ${secs} sn`;
+  if (fullTimer) fullTimer.innerText = `? ${mins} dk ${secs} sn`;
   const fullTitle = document.getElementById("activity-full-title");
   if (fullTitle) fullTitle.innerText = document.getElementById("activity-title")?.innerText || "Uygulama";
 }
@@ -19343,9 +20748,9 @@ async function stopActivitySession(opts = {}) {
     if (activityTimerInterval) clearInterval(activityTimerInterval);
     activityTimerInterval = null;
     const timerEl = document.getElementById("activity-timer");
-    if (timerEl) timerEl.innerText = "⏱ 0 dk 0 sn";
+    if (timerEl) timerEl.innerText = "? 0 dk 0 sn";
     const fullTimer = document.getElementById("activity-full-timer");
-    if (fullTimer) fullTimer.innerText = "⏱ 0 dk 0 sn";
+    if (fullTimer) fullTimer.innerText = "? 0 dk 0 sn";
     setActivityStartButtons(false);
     setActivityPausedUI(false);
     activitySession = null;
@@ -19684,12 +21089,24 @@ function selectContentForView(content, options = {}) {
     } else if (item.type === "video") {
       inner = item.url ? `<div style="color:#2563eb;">${item.url}</div>` : `<div>Video URL yok</div>`;
     } else if (item.type === "quiz") {
+      const opts = Array.isArray(item.options) ? item.options : [];
       inner = `
         <div style="font-weight:600;">${item.question || "Soru"}</div>
-        ${(item.options || []).map(opt => `<label style="display:flex;gap:8px;align-items:center;margin-top:6px;">
-          <input type="radio" name="q_${item.id}" value="${opt}" ${answerData.answer === opt ? "checked" : ""} ${readOnly ? "disabled" : ""}>
-          ${opt}
-        </label>`).join("")}
+        <div class="kahoot-grid">
+          ${opts.map((opt, i) => {
+            const letters = ["A","B","C","D"];
+            const letter = letters[i] || String(i + 1);
+            const colorCls = i === 0 ? "k-a" : i === 1 ? "k-b" : i === 2 ? "k-c" : "k-d";
+            const selectedCls = answerData.answer === opt ? "is-selected" : "";
+            return `
+              <label class="kahoot-option ${colorCls} ${selectedCls}">
+                <input type="radio" name="q_${item.id}" value="${escapeHtmlBasic(String(opt || ""))}" ${answerData.answer === opt ? "checked" : ""} ${readOnly ? "disabled" : ""}>
+                <span class="k-key">${letter}</span>
+                <span class="k-text">${escapeHtmlBasic(String(opt || ""))}</span>
+              </label>
+            `;
+          }).join("")}
+        </div>
         <button class="btn btn-primary btn-answer" data-id="${item.id}" style="margin-top:8px;" ${readOnly ? "disabled" : ""}>Cevapla</button>
         <div class="answer-status" style="margin-top:6px; font-size:12px; color:${answerData.correct ? "#16a34a" : answerData.answer ? "#dc2626" : "#6b7280"};">
           ${answerData.answer ? (answerData.correct ? "Doğru! +" + clampQuestionXP(item.xp || 0) + " XP" : "Yanlış, tekrar deneyebilirsin.") : "Henüz cevaplanmadı"}
@@ -19698,14 +21115,18 @@ function selectContentForView(content, options = {}) {
     } else if (item.type === "truefalse") {
       inner = `
         <div style="font-weight:600;">${item.question || "Soru"}</div>
-        <label style="display:flex;gap:8px;align-items:center;margin-top:6px;">
-          <input type="radio" name="q_${item.id}" value="true" ${answerData.answer === "true" ? "checked" : ""} ${readOnly ? "disabled" : ""}>
-          Doğru
-        </label>
-        <label style="display:flex;gap:8px;align-items:center;margin-top:6px;">
-          <input type="radio" name="q_${item.id}" value="false" ${answerData.answer === "false" ? "checked" : ""} ${readOnly ? "disabled" : ""}>
-          Yanlış
-        </label>
+        <div class="kahoot-grid">
+          <label class="kahoot-option k-t ${answerData.answer === "true" ? "is-selected" : ""}">
+            <input type="radio" name="q_${item.id}" value="true" ${answerData.answer === "true" ? "checked" : ""} ${readOnly ? "disabled" : ""}>
+            <span class="k-key">D</span>
+            <span class="k-text">Doğru</span>
+          </label>
+          <label class="kahoot-option k-f ${answerData.answer === "false" ? "is-selected" : ""}">
+            <input type="radio" name="q_${item.id}" value="false" ${answerData.answer === "false" ? "checked" : ""} ${readOnly ? "disabled" : ""}>
+            <span class="k-key">Y</span>
+            <span class="k-text">Yanlış</span>
+          </label>
+        </div>
         <button class="btn btn-primary btn-answer" data-id="${item.id}" style="margin-top:8px;" ${readOnly ? "disabled" : ""}>Cevapla</button>
         <div class="answer-status" style="margin-top:6px; font-size:12px; color:${answerData.correct ? "#16a34a" : answerData.answer ? "#dc2626" : "#6b7280"};">
           ${answerData.answer ? (answerData.correct ? "Doğru! +" + clampQuestionXP(item.xp || 0) + " XP" : "Yanlış, tekrar deneyebilirsin.") : "Henüz cevaplanmadı"}
@@ -19805,10 +21226,20 @@ function selectContentForView(content, options = {}) {
 
 function isAnswerCorrect(item, answer) {
   if (!item) return false;
-  const a = (answer || "").toString().trim().toLowerCase();
-  const correct = (item.correct || "").toString().trim().toLowerCase();
+  const a = normalizeCompareToken(answer);
+  const correct = normalizeCompareToken(item.correct);
   if (item.type === "truefalse") {
+    const ansBool = normalizeBooleanToken(answer);
+    const corrBool = normalizeBooleanToken(item.correct);
+    if (ansBool !== null && corrBool !== null) return ansBool === corrBool;
     return a === correct;
+  }
+  if (item.type === "short" && String(item.correct || "").includes(",")) {
+    const expected = String(item.correct || "")
+      .split(",")
+      .map((x) => normalizeCompareToken(x))
+      .filter(Boolean);
+    return expected.includes(a);
   }
   return a === correct;
 }
@@ -19870,7 +21301,7 @@ async function startAppSession(content, item, appUsage, completedSet, answers, o
   iframe.src = item.appLink || "about:blank";
   setupIframeFallback(iframe, item.appLink);
   const timerEl = document.getElementById("app-timer");
-  if (timerEl) timerEl.innerText = "⏱ 0 dk 0 sn";
+  if (timerEl) timerEl.innerText = "? 0 dk 0 sn";
   const titleEl = document.getElementById("app-title");
   if (titleEl) titleEl.innerText = item.appTitle || "Uygulama";
   const linkEl = document.getElementById("app-link");
@@ -19891,7 +21322,7 @@ async function startAppSession(content, item, appUsage, completedSet, answers, o
     const elapsed = Math.max(0, Math.round((Date.now() - activeAppSession.start) / 1000));
     const mins = Math.floor(elapsed / 60);
     const secs = elapsed % 60;
-    if (timerEl) timerEl.innerText = `⏱ ${mins} dk ${secs} sn`;
+    if (timerEl) timerEl.innerText = `? ${mins} dk ${secs} sn`;
   }, 1000);
 }
 
@@ -19925,7 +21356,7 @@ async function stopActiveAppSession() {
   if (appTimerInterval) clearInterval(appTimerInterval);
   appTimerInterval = null;
   const timerEl = document.getElementById("app-timer");
-  if (timerEl) timerEl.innerText = "⏱ 0 dk 0 sn";
+  if (timerEl) timerEl.innerText = "? 0 dk 0 sn";
   const titleEl = document.getElementById("app-title");
   if (titleEl) titleEl.innerText = "Uygulama";
   const linkEl = document.getElementById("app-link");
@@ -20166,7 +21597,7 @@ function renderTasksList() {
     div.innerHTML = `
       <div style="flex:1;">
         <div style="font-weight:600;">${task.title || "Başlıksız"}</div>
-        <small style="color:#666;">📅 ${dateStr}</small>
+        <small style="color:#666;">?? ${dateStr}</small>
         ${archiveBadge}
       </div>
       ${actionsHtml}
@@ -20227,7 +21658,7 @@ function loadAllTasksModal() {
     div.innerHTML = `
       <div style="flex:1;">
         <div style="font-weight:600;">${task.title || "Başlıksız"}</div>
-        <small style="color:#666;">📅 ${dateStr}</small>
+        <small style="color:#666;">?? ${dateStr}</small>
       </div>
       <span class="badge badge-info">Düzenle</span>
     `;
@@ -20443,7 +21874,7 @@ async function openClassStudentsModal(className, section, group, totalTasks) {
       <div>
         <strong>${displayName}</strong>
         <small style="display: block; color: #666;">
-          ${completedTotal}/${totalPossible} toplam | Ort: %${avgScore} | ⭐ ${totalXP} XP
+          ${completedTotal}/${totalPossible} toplam | Ort: %${avgScore} | ? ${totalXP} XP
         </small>
       </div>
       <div style="display:flex; gap:6px; align-items:center;">
@@ -20502,8 +21933,70 @@ function populateTaskTargets() {
         targetSelect.appendChild(opt);
       });
     });
+    syncTaskClassSectionFromTarget();
   });
 }
+
+function syncTaskClassSectionFromTarget() {
+  const targetValue = String(document.getElementById("task-target")?.value || "all");
+  const classSel = document.getElementById("task-target-class");
+  const sectionSel = document.getElementById("task-target-section");
+  if (!classSel || !sectionSel) return;
+  if (!targetValue || targetValue === "all" || !targetValue.startsWith("class:")) {
+    classSel.value = "";
+    sectionSel.value = "";
+    return;
+  }
+  const parts = targetValue.split("|");
+  const cls = String(parts[0] || "").replace("class:", "").trim();
+  const sectionPart = parts.find((p) => p.startsWith("section:"));
+  const sec = sectionPart ? String(sectionPart).replace("section:", "").trim() : "";
+  classSel.value = cls;
+  if (typeof classSel.onchange === "function") classSel.onchange();
+  sectionSel.value = sec;
+}
+
+function syncTaskTargetFromClassSection() {
+  const classSel = document.getElementById("task-target-class");
+  const sectionSel = document.getElementById("task-target-section");
+  const targetSel = document.getElementById("task-target");
+  if (!classSel || !sectionSel || !targetSel) return;
+  const cls = String(classSel.value || "").trim();
+  const sec = String(sectionSel.value || "").trim();
+  if (!cls) {
+    targetSel.value = "all";
+    return;
+  }
+  const exact = sec ? `class:${cls}|section:${sec}` : `class:${cls}`;
+  const hasExact = Array.from(targetSel.options || []).some((opt) => String(opt.value) === exact);
+  if (hasExact) {
+    targetSel.value = exact;
+    return;
+  }
+  const classOnly = `class:${cls}`;
+  const hasClassOnly = Array.from(targetSel.options || []).some((opt) => String(opt.value) === classOnly);
+  targetSel.value = hasClassOnly ? classOnly : "all";
+}
+
+async function populateTaskTargetClassSection() {
+  const classSel = document.getElementById("task-target-class");
+  const sectionSel = document.getElementById("task-target-section");
+  if (!classSel || !sectionSel) return;
+  await populateClassSectionFilters(classSel, sectionSel);
+  const originalClassOnChange = classSel.onchange;
+  classSel.onchange = function() {
+    if (typeof originalClassOnChange === "function") originalClassOnChange();
+    syncTaskTargetFromClassSection();
+  };
+  sectionSel.onchange = function() {
+    syncTaskTargetFromClassSection();
+  };
+  syncTaskClassSectionFromTarget();
+}
+
+document.getElementById("task-target")?.addEventListener("change", () => {
+  syncTaskClassSectionFromTarget();
+});
 
 async function downloadClassPdf(className, section, students, completionRate) {
   const { jsPDF } = window.jspdf || {};
@@ -20612,7 +22105,7 @@ async function downloadClassPdf(className, section, students, completionRate) {
       <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border:1px solid #e5e7eb;border-left:5px solid ${color};border-radius:8px;margin-bottom:5px;font-size:12px;">
         <div style="display:flex;gap:8px;align-items:center;">
           <strong>${idx + 1}. ${r.name}</strong>
-          <span style="color:#6b7280;font-size:11px;">%${r.completionRate} | Ort: %${r.avgScore} | ⭐ ${r.xp} XP | ${r.completedCount}/${r.totalPossible}</span>
+          <span style="color:#6b7280;font-size:11px;">%${r.completionRate} | Ort: %${r.avgScore} | ? ${r.xp} XP | ${r.completedCount}/${r.totalPossible}</span>
         </div>
         <span style="background:${color};color:white;border-radius:999px;padding:2px 8px;font-size:11px;">%${r.completionRate}</span>
       </div>
@@ -20967,8 +22460,8 @@ async function loadStatsPage() {
       const p = docSnap.data() || {};
       const userId = String(p.userId || "");
       if (!studentIdLookup.has(userId)) return;
-      xpByUser.set(userId, (xpByUser.get(userId) || 0) + parseXPValue(p.totalXP));
       const assignment = computeAssignmentById.get(String(p.assignmentId || "")) || null;
+      xpByUser.set(userId, (xpByUser.get(userId) || 0) + getNormalizedComputeProgressSnapshot(p, assignment).totalXP);
       const done = isComputeProgressCompleted(p, assignment);
       if (!done) return;
       computeDoneByUser.set(userId, (computeDoneByUser.get(userId) || 0) + 1);
@@ -20983,9 +22476,9 @@ async function loadStatsPage() {
       const hasProgress = completedLevels > 0 || Number(state?.payload?.currentLevelIndex || 0) > 0;
       if (!hasProgress) return;
       computeStateDoneByUser.set(userId, Math.max(1, completedLevels));
-      const stateXP = levels.reduce((sum, l) => {
+      const stateXP = levels.reduce((sum, l, idx) => {
         if (!l?.completed) return sum;
-        return sum + Math.max(0, Number(l?.xp || 0));
+        return sum + getComputeLevelXP(l, idx);
       }, 0);
       if (stateXP > 0) {
         xpByUser.set(userId, Math.max(xpByUser.get(userId) || 0, stateXP));
@@ -21140,7 +22633,7 @@ async function loadStatsPage() {
           const row = document.createElement("div");
           row.className = `top-student-row rank-${idx + 1}`;
           const rankNum = idx + 1;
-          const medal = rankNum === 1 ? "🥇" : rankNum === 2 ? "🥈" : rankNum === 3 ? "🥉" : "";
+          const medal = rankNum === 1 ? "\u{1F947}" : rankNum === 2 ? "\u{1F948}" : rankNum === 3 ? "\u{1F949}" : "";
           const avatar = getAvatarById(s.selectedAvatarId || AVATAR_DEFAULT_ID);
           const avatarImg = buildAvatarImageDataUri(avatar);
           row.innerHTML = `
@@ -21394,7 +22887,8 @@ async function showStudentDetail(student, completions, rank) {
   
   let totalScore = 0;
   let totalTime = 0;
-  let totalXP = 0;
+  // Toplam XP tek kaynaktan okunur: users.xp
+  let totalXP = Math.max(0, Number(getStudentXPValue(student) || 0));
   
   const taskHistory = [];
   
@@ -21440,7 +22934,6 @@ async function showStudentDetail(student, completions, rank) {
       const lesson = lessons.find((l) => l.id === lp.lessonId);
       const percent = Math.max(0, Math.min(100, Number(lp.percent || 0)));
       const xp = Math.max(0, Number(lp.totalXP || 0));
-      totalXP += xp;
       lessonHistory.push({
         title: `Ders: ${lesson?.title || "Ders"}`,
         score: percent,
@@ -21456,9 +22949,7 @@ async function showStudentDetail(student, completions, rank) {
     console.error("Ders geçmişi yüklenemedi:", e);
   }
   const quizStats = await fetchStudentQuizStats(student.id);
-  totalXP += quizStats.totalXP;
   const computeStats = await fetchComputeRunStats(student.id);
-  totalXP += Math.max(0, Number(computeStats?.totalXP || 0));
   const computeHistory = (Array.isArray(computeStats?.runs) ? computeStats.runs : []).map((run) => {
     const durationSec = Math.max(0, Number(run.durationSeconds || 0));
     const percent = Math.max(0, Math.min(100, Number(run.percent || 0)));
@@ -21527,7 +23018,7 @@ async function showStudentDetail(student, completions, rank) {
           </span>
         </div>
         <small style="color: #666; display: block; margin-top: 5px;">
-          📅 ${task.date} | ⏱ ${mins}dk ${secs}sn | ➕ +${task.xp} XP
+          ?? ${task.date} | ? ${mins}dk ${secs}sn | ? +${task.xp} XP
         </small>
       `;
       historyContainer.appendChild(div);
@@ -21582,7 +23073,7 @@ async function showStudentDetail(student, completions, rank) {
             <span class="badge ${cls}">%${act.percent}</span>
           </div>
           <small style="color: #666; display: block; margin-top: 5px;">
-            📅 ${act.updatedAt} | ⏱ ${mins}dk ${secs}sn
+            ?? ${act.updatedAt} | ? ${mins}dk ${secs}sn
           </small>
         `;
         contentHistoryContainer.appendChild(div);
@@ -21603,7 +23094,7 @@ async function showStudentDetail(student, completions, rank) {
             <span class="badge ${qz.successRate >= 80 ? 'badge-success' : qz.successRate >= 60 ? 'badge-info' : 'badge-pending'}">%${qz.successRate}</span>
           </div>
           <small style="color: #666; display: block; margin-top: 5px;">
-            📅 ${qz.date} | ⏱ ${qz.durationText} | ✅ ${qz.correct} • ❌ ${qz.wrong} | ➕ +${qz.xp} XP
+            ?? ${qz.date} | ? ${qz.durationText} | ? ${qz.correct} • ? ${qz.wrong} | ? +${qz.xp} XP
           </small>
         `;
         quizHistoryContainer.appendChild(div);
@@ -21787,6 +23278,27 @@ function getBlockHomeworkAssignmentCounts(blockStats = {}) {
   return { completedCount, totalCount };
 }
 
+function getComputeHomeworkAssignmentCounts(computeStats = {}) {
+  const explicitTotal = Math.max(0, Number(computeStats?.totalAssignments || 0));
+  const explicitCompleted = Math.max(0, Number(computeStats?.completedAssignments || 0));
+  if (explicitTotal > 0 || explicitCompleted > 0) {
+    return {
+      completedCount: Math.min(explicitCompleted, explicitTotal),
+      totalCount: explicitTotal
+    };
+  }
+  const runs = Array.isArray(computeStats?.runs) ? computeStats.runs : [];
+  const assignmentRuns = runs.filter((r) => String(r?.assignmentId || "").trim().length > 0);
+  const totalCount = assignmentRuns.length;
+  const completedCount = assignmentRuns.filter((r) => {
+    const completedLevels = Math.max(0, Number(r?.completedLevels || 0));
+    const totalLevels = Math.max(0, Number(r?.totalLevels || 0));
+    const percent = Math.max(0, Number(r?.percent || 0));
+    return !!r?.completed || percent >= 100 || (totalLevels > 0 && completedLevels >= totalLevels);
+  }).length;
+  return { completedCount, totalCount };
+}
+
 async function fetchStudentQuizStats(studentId) {
   const fallback = {
     totalQuizzes: 0,
@@ -21896,6 +23408,9 @@ async function fetchStudentQuizStats(studentId) {
       totalXP: Math.max(totalXP, finalTotals.totalXP)
     };
     const avgSuccess = mergedTotals.totalAnswered > 0 ? Math.round((mergedTotals.totalCorrect / mergedTotals.totalAnswered) * 100) : 0;
+    if (userRole === "student" && String(currentUserId || "") === uid) {
+      updateStudentQuizPointsDisplay(mergedTotals.totalXP);
+    }
     return {
       totalQuizzes: mergedTotals.totalQuizzes,
       totalAnswered: mergedTotals.totalAnswered,
@@ -21907,7 +23422,20 @@ async function fetchStudentQuizStats(studentId) {
     };
   } catch (e) {
     console.warn("fetchStudentQuizStats", e);
+    if (userRole === "student" && String(currentUserId || "") === String(studentId || "")) {
+      updateStudentQuizPointsDisplay(0);
+    }
     return fallback;
+  }
+}
+
+async function refreshStudentQuizPointsStat() {
+  if (userRole !== "student" || !currentUserId) return;
+  try {
+    const quizStats = await fetchStudentQuizStats(currentUserId);
+    updateStudentQuizPointsDisplay(quizStats.totalXP || 0);
+  } catch {
+    updateStudentQuizPointsDisplay(0);
   }
 }
 
@@ -21993,6 +23521,8 @@ async function fetchComputeRunStats(studentId) {
   const fallback = {
     completedLevels: 0,
     totalLevels: 0,
+    completedAssignments: 0,
+    totalAssignments: 0,
     progressPercent: 0,
     totalXP: 0,
     totalDurationMs: 0,
@@ -22033,17 +23563,13 @@ async function fetchComputeRunStats(studentId) {
       const p = d.data() || {};
       const assignmentId = String(p.assignmentId || "");
       const assignment = assignmentMap.get(assignmentId);
-      const levelStart = Math.max(1, Number(p.levelStart || assignment?.levelStart || 1));
-      const levelEnd = Math.max(levelStart, Number(p.levelEnd || assignment?.levelEnd || levelStart));
+      const normalizedProgress = getNormalizedComputeProgressSnapshot(p, assignment);
+      const levelStart = normalizedProgress.levelStart;
+      const levelEnd = normalizedProgress.levelEnd;
       const durationSeconds = Math.max(0, Number(p.lastSessionSeconds || 0));
-      const totalXPRow = Math.max(0, Number(p.totalXP || 0));
-      const totalLevelsRow = Math.max(0, Number(p.totalLevels || (levelEnd - levelStart + 1)));
-      const completedLevelsRow = Math.max(0, Number(p.completedLevels || 0));
-      const completedIdsRaw = Array.isArray(p.completedLevelIds)
-        ? p.completedLevelIds.map((v) => Number(v)).filter((v) => Number.isFinite(v))
-        : [];
-      const completedIdsInRange = completedIdsRaw.filter((v) => v >= levelStart && v <= levelEnd).length;
-      const completedCountRow = Math.max(completedLevelsRow, completedIdsInRange);
+      const totalLevelsRow = Math.max(0, Number(normalizedProgress.totalLevels || (levelEnd - levelStart + 1)));
+      const completedCountRow = Math.max(0, Number(normalizedProgress.completedLevels || 0));
+      const totalXPRow = Math.max(0, Number(normalizedProgress.totalXP || 0));
       const percentField = Math.max(0, Number(p.percent || 0));
       const rowCompleted = !!p.completed || percentField >= 100 || (totalLevelsRow > 0 && completedCountRow >= totalLevelsRow);
       const effectiveCompletedLevels = rowCompleted
@@ -22057,7 +23583,7 @@ async function fetchComputeRunStats(studentId) {
         title: String(p.assignmentTitle || assignment?.title || "Compute It Ödevi"),
         rangeText: `${levelStart}-${levelEnd}`,
         durationSeconds,
-        xp: totalXPRow,
+        xp: Math.max(0, totalXPRow),
         completedLevels: effectiveCompletedLevels,
         totalLevels: totalLevelsRow,
         percent: Math.max(0, Math.min(100, percentRow)),
@@ -22068,7 +23594,7 @@ async function fetchComputeRunStats(studentId) {
     runs.sort((a, b) => Number(b.updatedAtMs || 0) - Number(a.updatedAtMs || 0));
     if (!runs.length && levels.length) {
       const levelIds = levels
-        .map((l) => Number(l.levelId || 0))
+        .map((l, i) => getComputeLevelNo(l, i))
         .filter((v) => Number.isFinite(v) && v > 0)
         .sort((a, b) => a - b);
       const minLevel = levelIds.length ? levelIds[0] : 1;
@@ -22078,7 +23604,7 @@ async function fetchComputeRunStats(studentId) {
         title: "Genel Compute It",
         rangeText: `${minLevel}-${maxLevel}`,
         durationSeconds: Math.round(levels.reduce((sum, l) => sum + Math.max(0, Number(l.durationMs || 0)), 0) / 1000),
-        xp: levels.reduce((sum, l) => sum + Math.max(0, Number(l.xp || 0)), 0),
+        xp: levels.reduce((sum, l, i) => sum + getComputeLevelXP(l, i), 0),
         completedLevels: levels.length,
         totalLevels: Math.max(levels.length, maxLevel - minLevel + 1),
         percent: 100,
@@ -22088,17 +23614,27 @@ async function fetchComputeRunStats(studentId) {
     }
     const runCompletedLevels = runs.reduce((sum, r) => sum + Math.max(0, Number(r.completedLevels || 0)), 0);
     const runTotalLevels = runs.reduce((sum, r) => sum + Math.max(0, Number(r.totalLevels || 0)), 0);
+    const assignmentRuns = runs.filter((r) => String(r?.assignmentId || "").trim().length > 0);
+    const totalAssignments = assignmentRuns.length;
+    const completedAssignments = assignmentRuns.filter((r) => {
+      const completedLevelsRow = Math.max(0, Number(r?.completedLevels || 0));
+      const totalLevelsRow = Math.max(0, Number(r?.totalLevels || 0));
+      const percentRow = Math.max(0, Number(r?.percent || 0));
+      return !!r?.completed || percentRow >= 100 || (totalLevelsRow > 0 && completedLevelsRow >= totalLevelsRow);
+    }).length;
     const completedLevels = Math.max(0, runCompletedLevels || levels.length);
     const totalLevels = Math.max(
       completedLevels,
       runTotalLevels || (Array.isArray(state?.levels) ? state.levels.length : completedLevels)
     );
     const progressPercent = totalLevels > 0 ? Math.round((completedLevels / totalLevels) * 100) : 0;
-    const totalXP = levels.reduce((sum, l) => sum + (Number(l.xp || 0)), 0);
+    const totalXP = levels.reduce((sum, l, i) => sum + getComputeLevelXP(l, i), 0);
     const totalDurationMs = levels.reduce((sum, l) => sum + (Number(l.durationMs || 0)), 0);
     return {
       completedLevels: Math.max(0, completedLevels),
       totalLevels: Math.max(completedLevels, totalLevels),
+      completedAssignments: Math.max(0, completedAssignments),
+      totalAssignments: Math.max(0, totalAssignments),
       progressPercent: Math.max(0, Math.min(100, progressPercent)),
       totalXP: Math.max(0, totalXP),
       totalDurationMs: Math.max(0, totalDurationMs),
@@ -22284,7 +23820,8 @@ async function loadMyStatsModal() {
       + getLessonXPFromProgressMap()
       + Math.max(0, Number(quizStats.totalXP || 0));
     const headerXP = toSafeNum(String(document.getElementById("user-xp")?.innerText || "0").replace(/[^\d.-]/g, ""));
-    let totalXP = Math.max(toSafeNum(userData?.xp), computedXP, headerXP);
+    let totalXP = Math.max(0, parseXPValue(userData?.xp));
+    if (totalXP <= 0) totalXP = Math.max(computedXP, headerXP);
 
     completions.forEach(c => {
       totalScore += (Number(c.correctAnswers || 0) / Math.max(1, Number(c.totalQuestions || 1))) * 100;
@@ -22494,4 +24031,3 @@ async function loadMyStatsModal() {
     showNotice("İstatistikler yüklenemedi. Lütfen tekrar deneyin.", "#e74c3c");
   }
 }
-

@@ -7,8 +7,11 @@ use App\Models\GameState;
 use App\Models\StudentReport;
 use App\Models\User;
 use App\Models\UserProfile;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
@@ -18,35 +21,54 @@ class ClientDataController extends Controller
 
     public function login(Request $request): JsonResponse
     {
-        $identifier = trim((string) $request->input('identifier', $request->input('email', '')));
-        $password = (string) $request->input('password', '');
+        $validated = $request->validate([
+            'identifier' => ['nullable', 'string', 'max:190'],
+            'email' => ['nullable', 'string', 'max:190'],
+            'password' => ['required', 'string', 'min:1', 'max:128'],
+        ]);
+        $identifier = trim((string) ($validated['identifier'] ?? $validated['email'] ?? ''));
+        $password = (string) ($validated['password'] ?? '');
+        if ($identifier === '') {
+            throw ValidationException::withMessages(['identifier' => 'identifier or email is required']);
+        }
         $user = User::query()->where('email', $identifier)->orWhere('name', $identifier)->first();
         if (! $user || ! Hash::check($password, (string) $user->password)) {
             return response()->json(['message' => 'invalid credentials'], 401);
         }
-        return response()->json(['user' => ['uid' => (string) $user->id, 'id' => (string) $user->id, 'email' => $user->email, 'displayName' => $user->name]]);
+        $token = $this->issueClientToken((string) $user->id);
+        return response()->json(['user' => ['uid' => (string) $user->id, 'id' => (string) $user->id, 'email' => $user->email, 'displayName' => $user->name, 'token' => $token]]);
     }
 
     public function register(Request $request): JsonResponse
     {
-        $email = trim((string) $request->input('email', ''));
-        $password = (string) $request->input('password', '');
+        $validated = $request->validate([
+            'email' => ['required', 'email:rfc', 'max:190'],
+            'password' => ['required', 'string', 'min:6', 'max:128'],
+            'username' => ['nullable', 'string', 'min:3', 'max:60'],
+        ]);
+        $email = trim((string) ($validated['email'] ?? ''));
+        $password = (string) ($validated['password'] ?? '');
         if ($email === '' || $password === '') {
             return response()->json(['message' => 'email and password are required'], 422);
         }
         if (User::query()->where('email', $email)->exists()) {
             return response()->json(['message' => 'email already exists'], 409);
         }
-        $username = trim((string) $request->input('username', Str::before($email, '@') ?: 'user_'.Str::lower(Str::random(6))));
+        $username = trim((string) ($validated['username'] ?? (Str::before($email, '@') ?: 'user_'.Str::lower(Str::random(6)))));
         $user = User::query()->create(['name' => $username, 'email' => $email, 'password' => Hash::make($password)]);
         UserProfile::query()->updateOrCreate(['user_id' => $user->id], ['username' => $username, 'role' => 'student', 'xp' => 0, 'meta' => []]);
-        return response()->json(['user' => ['uid' => (string) $user->id, 'id' => (string) $user->id, 'email' => $user->email, 'displayName' => $user->name]], 201);
+        $token = $this->issueClientToken((string) $user->id);
+        return response()->json(['user' => ['uid' => (string) $user->id, 'id' => (string) $user->id, 'email' => $user->email, 'displayName' => $user->name, 'token' => $token]], 201);
     }
 
     public function updatePassword(Request $request): JsonResponse
     {
-        $user = User::query()->find((string) $request->input('uid', ''));
-        $newPassword = (string) $request->input('newPassword', '');
+        $uid = (string) $request->attributes->get('client_uid', '');
+        $user = User::query()->find($uid);
+        $validated = $request->validate([
+            'newPassword' => ['required', 'string', 'min:6', 'max:128'],
+        ]);
+        $newPassword = (string) ($validated['newPassword'] ?? '');
         if (! $user || $newPassword === '') {
             return response()->json(['message' => 'invalid input'], 422);
         }
@@ -57,12 +79,23 @@ class ClientDataController extends Controller
 
     public function deleteUser(Request $request): JsonResponse
     {
-        $uid = (string) $request->input('uid', '');
+        $uid = (string) $request->attributes->get('client_uid', '');
+        if ($uid === '') return response()->json(['message' => 'unauthenticated'], 401);
         User::query()->whereKey($uid)->delete();
         UserProfile::query()->where('user_id', $uid)->delete();
         GameState::query()->where('user_id', $uid)->delete();
         StudentReport::query()->where('user_id', $uid)->delete();
         DocumentRecord::query()->where('path', "users/{$uid}")->orWhere('path', 'like', "%/{$uid}")->delete();
+        Cache::forget("client_api_token:{$uid}");
+        return response()->json(['ok' => true]);
+    }
+
+    public function logout(Request $request): JsonResponse
+    {
+        $uid = (string) $request->attributes->get('client_uid', '');
+        if ($uid !== '') {
+            Cache::forget("client_api_token:{$uid}");
+        }
         return response()->json(['ok' => true]);
     }
 
@@ -116,17 +149,32 @@ class ClientDataController extends Controller
     {
         $source = (array) $request->input('source', []);
         $constraints = (array) $request->input('constraints', []);
+        if (count($constraints) > 20) {
+            return response()->json(['message' => 'too many constraints'], 422);
+        }
         $type = (string) ($source['type'] ?? 'collection');
         if ($type === 'collectionGroup') {
             $name = (string) ($source['name'] ?? '');
-            $docs = DocumentRecord::query()->where('collection_name', $name)->get()->map(fn ($d) => $this->docPayload($d))->values()->all();
+            if (strlen($name) > 120) {
+                return response()->json(['message' => 'invalid source'], 422);
+            }
+            $q = DocumentRecord::query()->where('collection_name', $name);
+            $this->applyDocumentRecordConstraints($q, $constraints);
+            $docs = $q->get()->map(fn ($d) => $this->docPayload($d))->values()->all();
             return response()->json(['docs' => $this->applyConstraints($docs, $constraints)]);
         }
 
         $collectionPath = trim((string) ($source['path'] ?? ''), '/');
+        if (strlen($collectionPath) > 255) {
+            return response()->json(['message' => 'invalid source'], 422);
+        }
         [$parent, $collection] = $this->splitCollectionPath($collectionPath);
         if ($parent === null && $collection === 'users') {
-            $rows = User::query()->leftJoin('user_profiles', 'users.id', '=', 'user_profiles.user_id')->select(['users.*', 'user_profiles.role', 'user_profiles.xp', 'user_profiles.meta', 'user_profiles.total_time_seconds', 'user_profiles.class_name', 'user_profiles.section', 'user_profiles.selected_avatar_id'])->get();
+            $q = User::query()
+                ->leftJoin('user_profiles', 'users.id', '=', 'user_profiles.user_id')
+                ->select(['users.*', 'user_profiles.role', 'user_profiles.xp', 'user_profiles.meta', 'user_profiles.total_time_seconds', 'user_profiles.class_name', 'user_profiles.section', 'user_profiles.selected_avatar_id']);
+            $this->applyNativeUserConstraints($q, $constraints);
+            $rows = $q->get();
             $docs = $rows->map(function ($r) {
                 $meta = [];
                 if (is_array($r->meta)) $meta = $r->meta;
@@ -144,13 +192,19 @@ class ClientDataController extends Controller
             return response()->json(['docs' => $this->applyConstraints($docs, $constraints)]);
         }
 
-        $docs = DocumentRecord::query()->where('collection_name', $collection)->where('parent_path', $parent)->get()->map(fn ($d) => $this->docPayload($d))->values()->all();
+        $q = DocumentRecord::query()->where('collection_name', $collection)->where('parent_path', $parent);
+        $this->applyDocumentRecordConstraints($q, $constraints);
+        $docs = $q->get()->map(fn ($d) => $this->docPayload($d))->values()->all();
         return response()->json(['docs' => $this->applyConstraints($docs, $constraints)]);
     }
 
     public function batch(Request $request): JsonResponse
     {
-        foreach ((array) $request->input('ops', []) as $op) {
+        $ops = (array) $request->input('ops', []);
+        if (count($ops) > 500) {
+            return response()->json(['message' => 'too many operations'], 422);
+        }
+        foreach ($ops as $op) {
             $kind = (string) ($op['kind'] ?? '');
             if ($kind === 'set') $this->upsertDoc((string) ($op['path'] ?? ''), (array) ($op['data'] ?? []), (bool) ($op['merge'] ?? false));
             if ($kind === 'update') $this->upsertDoc((string) ($op['path'] ?? ''), (array) ($op['data'] ?? []), true);
@@ -163,7 +217,25 @@ class ClientDataController extends Controller
     {
         $data = (array) $request->input('data', []);
         if ($name === 'deleteUserByAdmin') {
-            User::query()->whereKey((string) ($data['uid'] ?? $data['userId'] ?? ''))->delete();
+            $requesterUid = (string) $request->attributes->get('client_uid', '');
+            $targetUid = (string) ($data['uid'] ?? $data['userId'] ?? '');
+            if ($requesterUid === '' || $targetUid === '') {
+                return response()->json(['data' => ['ok' => false, 'message' => 'invalid user']], 422);
+            }
+
+            $targetProfile = UserProfile::query()->where('user_id', $targetUid)->first();
+            $targetRole = Str::lower(trim((string) ($targetProfile?->role ?? 'student')));
+            $isTeacherLike = in_array($targetRole, ['teacher', 'admin', 'administrator', 'ogretmen', 'öğretmen'], true);
+
+            // Başka bir öğretmen/admin hesabını bu endpoint ile silmeye izin verme.
+            if ($targetUid !== $requesterUid && $isTeacherLike) {
+                return response()->json(['data' => ['ok' => false, 'message' => 'teacher/admin account is protected']], 403);
+            }
+
+            User::query()->whereKey($targetUid)->delete();
+            UserProfile::query()->where('user_id', $targetUid)->delete();
+            GameState::query()->where('user_id', $targetUid)->delete();
+            StudentReport::query()->where('user_id', $targetUid)->delete();
             return response()->json(['data' => ['ok' => true]]);
         }
         if ($name === 'setUserPasswordByAdmin') {
@@ -339,6 +411,113 @@ class ClientDataController extends Controller
         return [$parent, $collection, $id];
     }
 
+    private function applyDocumentRecordConstraints(Builder $query, array $constraints): void
+    {
+        foreach ($constraints as $c) {
+            if (($c['type'] ?? '') !== 'where') continue;
+            $field = (string) ($c['field'] ?? '');
+            $op = (string) ($c['op'] ?? '==');
+            $value = $c['value'] ?? null;
+            if ($field === '') continue;
+            $column = $this->mapDocumentRecordField($field);
+            if (! $column) continue;
+            $this->applyWhereConstraint($query, $column, $op, $value);
+        }
+        foreach ($constraints as $c) {
+            if (($c['type'] ?? '') !== 'orderBy') continue;
+            $field = (string) ($c['field'] ?? '');
+            if ($field === '') continue;
+            $column = $this->mapDocumentRecordField($field);
+            if (! $column) continue;
+            $dir = strtolower((string) ($c['direction'] ?? 'asc')) === 'desc' ? 'desc' : 'asc';
+            $query->orderBy($column, $dir);
+        }
+        foreach ($constraints as $c) {
+            if (($c['type'] ?? '') !== 'limit') continue;
+            $count = (int) ($c['count'] ?? 0);
+            if ($count > 0) $query->limit($count);
+        }
+    }
+
+    private function applyNativeUserConstraints(Builder $query, array $constraints): void
+    {
+        foreach ($constraints as $c) {
+            if (($c['type'] ?? '') !== 'where') continue;
+            $field = (string) ($c['field'] ?? '');
+            $op = (string) ($c['op'] ?? '==');
+            $value = $c['value'] ?? null;
+            if ($field === '') continue;
+            $column = $this->mapNativeUserField($field);
+            if (! $column) continue;
+            $this->applyWhereConstraint($query, $column, $op, $value);
+        }
+        foreach ($constraints as $c) {
+            if (($c['type'] ?? '') !== 'orderBy') continue;
+            $field = (string) ($c['field'] ?? '');
+            if ($field === '') continue;
+            $column = $this->mapNativeUserField($field);
+            if (! $column) continue;
+            $dir = strtolower((string) ($c['direction'] ?? 'asc')) === 'desc' ? 'desc' : 'asc';
+            $query->orderBy($column, $dir);
+        }
+        foreach ($constraints as $c) {
+            if (($c['type'] ?? '') !== 'limit') continue;
+            $count = (int) ($c['count'] ?? 0);
+            if ($count > 0) $query->limit($count);
+        }
+    }
+
+    private function mapDocumentRecordField(string $field): ?string
+    {
+        $plain = trim($field);
+        if ($plain === 'id' || $plain === 'document_id') return 'document_id';
+        if ($plain === 'path') return 'path';
+        if ($plain === 'parentPath' || $plain === 'parent_path') return 'parent_path';
+        if ($plain === 'collection' || $plain === 'collection_name') return 'collection_name';
+        if ($plain === 'createdAt' || $plain === 'created_at') return 'created_at';
+        if ($plain === 'updatedAt' || $plain === 'updated_at') return 'updated_at';
+        $payloadField = str_replace('.', '->', $plain);
+        return "payload->{$payloadField}";
+    }
+
+    private function mapNativeUserField(string $field): ?string
+    {
+        $plain = trim($field);
+        return match ($plain) {
+            'id', 'uid' => 'users.id',
+            'username', 'name' => 'users.name',
+            'email' => 'users.email',
+            'role' => 'user_profiles.role',
+            'xp' => 'user_profiles.xp',
+            'totalTimeSeconds' => 'user_profiles.total_time_seconds',
+            'class', 'className' => 'user_profiles.class_name',
+            'section' => 'user_profiles.section',
+            'selectedAvatarId' => 'user_profiles.selected_avatar_id',
+            'createdAt', 'created_at' => 'users.created_at',
+            'updatedAt', 'updated_at' => 'users.updated_at',
+            default => null,
+        };
+    }
+
+    private function applyWhereConstraint(Builder $query, string $column, string $op, mixed $value): void
+    {
+        if ($op === 'in' && is_array($value)) {
+            $query->whereIn($column, $value);
+            return;
+        }
+        if ($op === '==') {
+            $query->where($column, '=', $value);
+            return;
+        }
+        if ($op === '!=') {
+            $query->where($column, '!=', $value);
+            return;
+        }
+        if (in_array($op, ['>', '>=', '<', '<='], true)) {
+            $query->where($column, $op, $value);
+        }
+    }
+
     private function applyConstraints(array $docs, array $constraints): array
     {
         $limit = null;
@@ -373,5 +552,13 @@ class ClientDataController extends Controller
         $out = [];
         foreach ($payload as $k => $v) if (! in_array((string) $k, $reserved, true)) $out[$k] = $v;
         return $out;
+    }
+
+    private function issueClientToken(string $uid): string
+    {
+        $plain = Str::random(80);
+        $ttlMinutes = max(30, (int) env('CLIENT_API_TOKEN_TTL_MINUTES', 720));
+        Cache::put("client_api_token:{$uid}", hash('sha256', $plain), now()->addMinutes($ttlMinutes));
+        return $plain;
     }
 }

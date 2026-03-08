@@ -1,0 +1,30 @@
+{
+  "vus": 30,
+  "duration_sec": 120,
+  "register": {
+    "ok": 30,
+    "fail": 0,
+    "status": {
+      "201": 30
+    }
+  },
+  "login": {
+    "ok": 30,
+    "fail": 0,
+    "status": {
+      "200": 30
+    }
+  },
+  "requests_total": 1550,
+  "requests_ok": 1550,
+  "requests_fail": 0,
+  "status": {
+    "200": 1550
+  },
+  "latency_ms": {
+    "p50": 2046,
+    "p95": 2223,
+    "p99": 2319,
+    "max": 2348
+  }
+}

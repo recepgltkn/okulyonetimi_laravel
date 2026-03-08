@@ -1,6 +1,8 @@
 const API_BASE = "/api/client";
 const AUTH_KEY = "mysql_auth_user";
-const WATCH_INTERVAL_MS = 2500;
+const WATCH_INTERVAL_MS = 5000;
+const WATCH_INTERVAL_HIDDEN_MS = 15000;
+const WATCH_BACKOFF_MAX_MS = 60000;
 
 let currentUser = null;
 const authListeners = new Set();
@@ -35,12 +37,23 @@ function persistAuthUser(user) {
 }
 
 async function api(path, method = "GET", body = null) {
+  const headers = { "Content-Type": "application/json" };
+  const uid = String(currentUser?.uid || currentUser?.id || "").trim();
+  const token = String(currentUser?.token || "").trim();
+  if (uid) headers["X-Client-Uid"] = uid;
+  if (token) {
+    headers["X-Client-Token"] = token;
+    headers["Authorization"] = `Bearer ${token}`;
+  }
   const res = await fetch(`${API_BASE}${path}`, {
     method,
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: body ? JSON.stringify(body) : null,
   });
   const json = await res.json().catch(() => ({}));
+  if (res.status === 401 && !/\/auth\/(login|register)/.test(path)) {
+    persistAuthUser(null);
+  }
   if (!res.ok) throw new Error(json?.message || `HTTP ${res.status}`);
   return json;
 }
@@ -87,26 +100,53 @@ function subscribeWatch(target, cb) {
   const key = serializeTarget(target);
   let watcher = watchRegistry.get(key);
   if (!watcher) {
-    watcher = { target, cbs: new Set(), timer: null, lastSig: "" };
+    watcher = { target, cbs: new Set(), timer: null, lastSig: "", errorStreak: 0 };
     watchRegistry.set(key, watcher);
   }
   watcher.cbs.add(cb);
+
+  const isHidden = () => (typeof document !== "undefined" ? !!document.hidden : false);
+  const withJitter = (ms) => {
+    const factor = 0.85 + Math.random() * 0.3;
+    return Math.max(1000, Math.round(ms * factor));
+  };
+  const getDelay = () => {
+    const base = isHidden() ? WATCH_INTERVAL_HIDDEN_MS : WATCH_INTERVAL_MS;
+    const backoff = watcher.errorStreak > 0
+      ? Math.min(WATCH_BACKOFF_MAX_MS, base * Math.pow(2, Math.min(watcher.errorStreak, 4)))
+      : base;
+    return withJitter(backoff);
+  };
+  const buildSig = (result) => {
+    if (result.kind === "doc") {
+      const data = result.snapshot.data() || null;
+      return JSON.stringify(data);
+    }
+    const rows = (result.snapshot.docs || []).map((d) => {
+      const data = d.data() || {};
+      const ver = data.updatedAt ?? data.updated_at ?? data.createdAt ?? data.created_at ?? "";
+      // Prefer IDs + timestamps; fallback still includes shallow shape.
+      return `${d.id}|${typeof ver === "object" ? JSON.stringify(ver) : String(ver)}|${Object.keys(data).length}`;
+    });
+    return rows.join("||");
+  };
 
   const tick = async () => {
     if (!watchRegistry.has(key)) return;
     try {
       const result = await fetchTarget(target);
-      const sig = result.kind === "doc"
-        ? JSON.stringify(result.snapshot.data() || null)
-        : JSON.stringify((result.snapshot.docs || []).map((d) => d.data()));
+      watcher.errorStreak = 0;
+      const sig = buildSig(result);
       if (sig !== watcher.lastSig) {
         watcher.lastSig = sig;
         for (const fn of watcher.cbs) {
           try { fn(result.snapshot); } catch {}
         }
       }
-    } catch {}
-    watcher.timer = setTimeout(tick, WATCH_INTERVAL_MS);
+    } catch {
+      watcher.errorStreak += 1;
+    }
+    watcher.timer = setTimeout(tick, getDelay());
   };
 
   if (!watcher.timer) tick();
@@ -216,6 +256,9 @@ export async function createUserWithEmailAndPassword(_auth, email, password) {
   const res = await api("/auth/register", "POST", { email, password });
   const user = res?.user || null;
   if (!user) throw new Error("Register failed");
+  if (isPrimaryAuth(_auth)) {
+    persistAuthUser(user);
+  }
   return { user };
 }
 export async function updatePassword(user, newPassword) { await api("/auth/update-password", "POST", { uid: user?.uid || user?.id, newPassword }); }
@@ -233,6 +276,9 @@ export function onAuthStateChanged(_auth, cb) {
 }
 export async function signOut(_auth) {
   if (isPrimaryAuth(_auth)) {
+    if (currentUser?.token && (currentUser?.uid || currentUser?.id)) {
+      try { await api("/auth/logout", "POST", { uid: currentUser?.uid || currentUser?.id }); } catch {}
+    }
     persistAuthUser(null);
     return;
   }

@@ -16,6 +16,7 @@
   const countAEl = document.getElementById("count-a");
   const countBEl = document.getElementById("count-b");
   const countCEl = document.getElementById("count-c");
+  const countXpEl = document.getElementById("count-xp");
 
   const designerModal = document.getElementById("designer-modal");
   const designerTitle = document.getElementById("designer-title");
@@ -706,6 +707,42 @@
   function cloneCounters(obj) { return { a: toInt(obj?.a), b: toInt(obj?.b), c: toInt(obj?.c) }; }
   function wallSet(level) { return new Set((level.walls || []).map(([x, y]) => `${x},${y}`)); }
   function keyXY(x, y) { return `${x},${y}`; }
+  function getComputeLevelXPByLevelNo(levelNo) {
+    const n = Math.max(1, toInt(levelNo, 1));
+    if (n <= 10) return 5;
+    if (n <= 21) return 10;
+    if (n <= 35) return 17;
+    if (n <= 42) return 22;
+    return 30;
+  }
+  function getLevelNo(level, fallbackIndex) {
+    const n = Number(level?.id);
+    if (Number.isFinite(n) && n > 0) return Math.floor(n);
+    return Math.max(1, Math.floor(Number(fallbackIndex || 0) + 1));
+  }
+  function getRangeIndexes() {
+    if (role !== "teacher" && levelRange) {
+      const startIdx = Math.max(0, Number(levelRange.startIdx || 0));
+      const endIdx = Math.min(levels.length - 1, Math.max(startIdx, Number(levelRange.endIdx || (levels.length - 1))));
+      return { startIdx, endIdx };
+    }
+    return { startIdx: 0, endIdx: Math.max(0, levels.length - 1) };
+  }
+  function getRangeCompletedLevelIds() {
+    const { startIdx, endIdx } = getRangeIndexes();
+    const inRangeIds = new Set(
+      levels
+        .slice(startIdx, endIdx + 1)
+        .map((l, idx) => getLevelNo(l, startIdx + idx))
+    );
+    return Array.from(completed)
+      .map((v) => Number(v))
+      .filter((v) => Number.isFinite(v) && inRangeIds.has(v))
+      .sort((a, b) => a - b);
+  }
+  function getRangeTotalXP() {
+    return getRangeCompletedLevelIds().reduce((sum, levelNo) => sum + getComputeLevelXPByLevelNo(levelNo), 0);
+  }
 
   function emitGameUpdate() {
     try {
@@ -716,12 +753,13 @@
   function emitLevelCompleted(level) {
     if (role !== "student") return;
     try {
+      const levelNo = getLevelNo(level, levelIndex);
       window.parent.postMessage({
         type: "LEVEL_COMPLETED",
         source: "compute-it",
         userId: uid || null,
-        levelId: Number(level.id),
-        xp: Number(level.xp || 0),
+        levelId: levelNo,
+        xp: getComputeLevelXPByLevelNo(levelNo),
         duration: Math.max(0, Date.now() - startMs),
         levels,
         currentLevelIndex: levelIndex
@@ -733,6 +771,7 @@
     if (countAEl) countAEl.textContent = String(counters.a);
     if (countBEl) countBEl.textContent = String(counters.b);
     if (countCEl) countCEl.textContent = String(counters.c);
+    if (countXpEl) countXpEl.textContent = String(getRangeTotalXP());
   }
 
   function evalCondition(level) {
@@ -1050,7 +1089,9 @@
               type: "ASSIGNMENT_RANGE_COMPLETED",
               source: "compute-it",
               currentLevelIndex: levelIndex,
-              levels
+              levels,
+              xp: getRangeTotalXP(),
+              completedLevelIds: getRangeCompletedLevelIds()
             }, "*");
           } catch (e) {}
         }
@@ -1171,6 +1212,7 @@
         ? data.completedLevelIds.map((v) => Number(v)).filter((v) => Number.isFinite(v))
         : [];
       completed = new Set(ids);
+      renderCounters();
       return;
     }
     if (role !== "teacher") return;

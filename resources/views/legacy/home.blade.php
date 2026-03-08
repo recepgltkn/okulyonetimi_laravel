@@ -246,8 +246,8 @@
         #teacher-stats .teacher-app-stats-grid,
         #activities-teacher-stats .teacher-app-stats-grid,
         #lessons-teacher-stats .teacher-app-stats-grid {
-            grid-template-columns: repeat(3, minmax(180px, 220px));
-            justify-content: center;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            justify-content: stretch;
         }
         .teacher-app-stats-tile {
             background: #ffffff;
@@ -363,10 +363,29 @@
             flex: 1;
             overflow: auto;
         }
+        /* Sol panelde okla gösterilen iç kart çerçevesini kaldır */
+        #app-screen.teacher-view #student-homework-shell #tasks-section {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            padding: 0 !important;
+        }
         #app-screen.teacher-view #tasks-section #btn-show-all-tasks,
         #app-screen.teacher-view #activities-section #btn-show-all-activities,
         #app-screen.teacher-view #lessons-section #btn-show-all-lessons {
             margin-top: auto !important;
+        }
+        /* Ödevler sekmesinde üstteki istatistik kutusu sekmelerden daha ayrık dursun */
+        #app-screen.teacher-view #tasks-section #teacher-stats {
+            margin-top: 16px !important;
+        }
+        /* Sol paneldeki iç kart kenarlıklarını kaldır (Ödevler/Etkinlikler/Dersler) */
+        #app-screen.teacher-view #student-homework-shell #activities-section,
+        #app-screen.teacher-view #student-homework-shell #lessons-section {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            padding: 0 !important;
         }
         #app-screen.teacher-view #tasks-title,
         #app-screen.teacher-view #activities-title,
@@ -1414,7 +1433,8 @@
         #block-homework-tabs .tab-btn,
         #compute-homework-tabs .tab-btn,
         #lessons-tabs .tab-btn,
-        #quiz-tabs .tab-btn {
+        #quiz-tabs .tab-btn,
+        #block-homework-assign-tabs .tab-btn {
             display: flex;
             align-items: center;
             justify-content: center;
@@ -1422,6 +1442,8 @@
             padding: 0 12px;
             line-height: 1;
             box-sizing: border-box;
+            margin: 0;
+            vertical-align: middle;
         }
         #app-screen.teacher-view #student-tabs,
         #app-screen.teacher-view #activities-tabs,
@@ -1493,8 +1515,36 @@
             transform: translate(-50%, -50%);
             align-items: center;
             justify-content: center;
+            width: 134px;
+            height: 134px;
             pointer-events: none;
             z-index: 2;
+        }
+        #header-center-logo::before {
+            content: "";
+            position: absolute;
+            inset: 6px;
+            border-radius: 999px;
+            border: 2px solid rgba(255, 255, 255, 0.95);
+            box-shadow:
+                0 0 0 1px rgba(255, 255, 255, 0.45),
+                0 0 16px rgba(255, 255, 255, 0.48),
+                0 0 28px rgba(255, 255, 255, 0.34);
+            filter: blur(1.2px);
+            z-index: -1;
+            pointer-events: none;
+            opacity: 0;
+        }
+        #header-center-logo::after {
+            content: "";
+            position: absolute;
+            inset: -18px;
+            border-radius: 999px;
+            background: radial-gradient(circle, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.28) 45%, rgba(255,255,255,0.05) 72%, rgba(255,255,255,0) 100%);
+            filter: blur(13px);
+            z-index: -2;
+            pointer-events: none;
+            opacity: 0;
         }
         #header-center-logo img {
             width: 52px;
@@ -1504,6 +1554,25 @@
         }
         #app-screen.teacher-view #header-center-logo,
         #app-screen.student-view #header-center-logo { display: inline-flex; }
+        body.dark-mode #header-center-logo::before {
+            border-color: rgba(255, 255, 255, 0.98);
+            box-shadow:
+                0 0 0 1px rgba(255, 255, 255, 0.5),
+                0 0 16px rgba(255, 255, 255, 0.72),
+                0 0 30px rgba(255, 255, 255, 0.45);
+            filter: blur(1.8px);
+            opacity: 1;
+        }
+        body.dark-mode #header-center-logo::after {
+            background: radial-gradient(circle, rgba(255,255,255,0.75) 0%, rgba(255,255,255,0.38) 48%, rgba(255,255,255,0.09) 74%, rgba(255,255,255,0) 100%);
+            filter: blur(15px);
+            opacity: 1;
+        }
+        body.dark-mode #header-center-logo img {
+            filter:
+                drop-shadow(0 0 8px rgba(255, 255, 255, 0.9))
+                drop-shadow(0 0 18px rgba(255, 255, 255, 0.55));
+        }
         #user-header-avatar {
             width: 36px;
             height: 36px;
@@ -2554,14 +2623,344 @@
             color: #64748b;
             font-weight: 800;
         }
-        .lesson-question-grid {
+        .lesson-frame-item.drag-over {
+            border-color: #2563eb;
+            background: #dbeafe;
+            transform: translateY(-1px);
+        }
+        .lesson-frame-item.dragging { opacity: .7; }
+        .lesson-question-card {
+            position: relative;
+            border-radius: 16px;
+            padding: 16px;
+            border: 1px solid rgba(148, 163, 184, .45);
+            backdrop-filter: blur(6px);
+            box-shadow: 0 12px 30px rgba(15, 23, 42, .18);
+            overflow: hidden;
+        }
+        .lesson-question-card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 0% 0%, rgba(96, 165, 250, .26), transparent 45%);
+            pointer-events: none;
+        }
+        .lesson-question-head {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .lesson-question-tag {
+            font-size: 11px;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            font-weight: 800;
+            padding: 5px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(59, 130, 246, .35);
+            background: rgba(219, 234, 254, .85);
+            color: #1e3a8a;
+        }
+        .lesson-question-xp {
+            font-size: 12px;
+            font-weight: 900;
+            padding: 5px 10px;
+            border-radius: 999px;
+            color: #166534;
+            border: 1px solid rgba(34, 197, 94, .35);
+            background: rgba(220, 252, 231, .88);
+        }
+        .lesson-question-timer {
+            margin-top: 12px;
+            position: relative;
+            z-index: 1;
+        }
+        .lesson-question-timer-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: .02em;
+            color: #334155;
+        }
+        .lesson-question-timer-track {
+            width: 100%;
+            height: 10px;
+            border-radius: 999px;
+            overflow: hidden;
+            background: rgba(148, 163, 184, .25);
+            border: 1px solid rgba(148, 163, 184, .35);
+        }
+        .lesson-question-timer-fill {
+            height: 100%;
+            width: 0%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #22c55e 0%, #f59e0b 55%, #ef4444 100%);
+            transition: width .1s linear;
+        }
+        .lesson-question-builder {
+            display: grid;
+            gap: 8px;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px dashed #cbd5e1;
+        }
+        .lesson-question-grid-2 {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 8px;
         }
-        .lesson-question-grid .form-control:first-child,
-        .lesson-question-grid .full {
-            grid-column: 1 / -1;
+        .lesson-question-options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .lesson-side-help {
+            font-size: 11px;
+            color: #64748b;
+            line-height: 1.4;
+        }
+        .lesson-question-title { margin: 0 0 6px; position: relative; z-index: 1; }
+        .lesson-question-layout {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-rows: 1fr 1fr;
+            gap: 12px;
+            min-height: 56vh;
+        }
+        .lesson-question-prompt {
+            border: 1px solid rgba(148,163,184,.35);
+            border-radius: 14px;
+            padding: 16px;
+            background: rgba(255,255,255,.08);
+            display: flex;
+            align-items: center;
+        }
+        .lesson-question-text {
+            margin: 0;
+            opacity: .98;
+            font-size: clamp(28px, 4vw, 48px);
+            line-height: 1.15;
+            font-weight: 900;
+            letter-spacing: .01em;
+            position: relative;
+            z-index: 1;
+        }
+        .lesson-q-options {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            align-content: stretch;
+        }
+        .lesson-q-option {
+            width: 100%;
+            text-align: left;
+            margin: 0;
+            border-radius: 12px;
+            border: 1px solid #dbe3f0;
+            background: linear-gradient(160deg, #ffffff 0%, #f8fbff 100%);
+            padding: 14px;
+            display: grid;
+            grid-template-columns: 38px 1fr;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            min-height: 108px;
+            transition: transform .16s ease, box-shadow .18s ease, background .18s ease, border-color .18s ease;
+        }
+        .lesson-q-option:hover { transform: translateX(2px); box-shadow: 0 8px 18px rgba(15, 23, 42, .12); }
+        .lesson-q-option .opt-key {
+            width: 40px;
+            height: 40px;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            font-weight: 900;
+            color: #1e3a8a;
+            background: #dbeafe;
+            border: 1px solid #93c5fd;
+        }
+        .lesson-q-option .opt-text {
+            line-height: 1.35;
+            color: #ffffff;
+            font-size: 28px;
+            font-weight: 900;
+            text-shadow: 0 1px 2px rgba(0,0,0,.18);
+        }
+        .lesson-q-option.q-a { background: linear-gradient(145deg, #ef4444 0%, #dc2626 100%); border-color: #b91c1c; }
+        .lesson-q-option.q-b { background: linear-gradient(145deg, #2563eb 0%, #1d4ed8 100%); border-color: #1e40af; }
+        .lesson-q-option.q-c { background: linear-gradient(145deg, #f59e0b 0%, #d97706 100%); border-color: #b45309; }
+        .lesson-q-option.q-d { background: linear-gradient(145deg, #22c55e 0%, #16a34a 100%); border-color: #15803d; }
+        .lesson-q-option.q-t { background: linear-gradient(145deg, #22c55e 0%, #16a34a 100%); border-color: #15803d; }
+        .lesson-q-option.q-f { background: linear-gradient(145deg, #ef4444 0%, #dc2626 100%); border-color: #b91c1c; }
+        .lesson-q-option.is-correct {
+            background: #dcfce7 !important;
+            border-color: #22c55e !important;
+            color: #166534 !important;
+            animation: lessonPulseCorrect .48s ease;
+        }
+        .lesson-q-option.is-correct .opt-key { background: #16a34a; border-color: #15803d; color: #fff; }
+        .lesson-q-option.is-wrong {
+            background: #fee2e2 !important;
+            border-color: #ef4444 !important;
+            color: #991b1b !important;
+            animation: lessonShakeWrong .42s ease;
+        }
+        .lesson-q-option.is-wrong .opt-key { background: #dc2626; border-color: #b91c1c; color: #fff; }
+        .lesson-q-option.is-reveal-correct {
+            background: #ecfccb !important;
+            border-color: #84cc16 !important;
+            color: #365314 !important;
+        }
+        .lesson-q-option.is-correct .opt-text,
+        .lesson-q-option.is-wrong .opt-text,
+        .lesson-q-option.is-reveal-correct .opt-text { color: inherit; text-shadow: none; }
+        .lesson-q-option.is-reveal-correct .opt-key { background: #65a30d; border-color: #4d7c0f; color: #fff; }
+        .lesson-dd-board {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 8px;
+        }
+        .lesson-dd-bank,
+        .lesson-dd-targets {
+            border: 1px dashed #93c5fd;
+            border-radius: 10px;
+            padding: 8px;
+            min-height: 120px;
+            background: rgba(255,255,255,.6);
+        }
+        .lesson-dd-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin: 4px;
+            padding: 10px 14px;
+            border-radius: 999px;
+            border: 1px solid #93c5fd;
+            background: #eff6ff;
+            color: #1e3a8a;
+            cursor: grab;
+            font-weight: 800;
+            font-size: 18px;
+        }
+        .lesson-dd-drop {
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            padding: 10px;
+            margin-bottom: 8px;
+            background: #fff;
+        }
+        .lesson-dd-drop.drag-over {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59,130,246,.2);
+            background: #eff6ff;
+        }
+        .lesson-dd-drop .drop-answer {
+            margin-top: 6px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            background: #f8fafc;
+            border: 1px dashed #cbd5e1;
+            color: #334155;
+            min-height: 64px;
+            display: flex;
+            align-items: center;
+            font-size: 18px;
+            font-weight: 700;
+        }
+        .kahoot-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 10px;
+        }
+        .kahoot-option {
+            position: relative;
+            display: grid;
+            grid-template-columns: 54px 1fr;
+            align-items: center;
+            gap: 12px;
+            min-height: 108px;
+            border-radius: 14px;
+            padding: 16px 18px;
+            border: 2px solid #dbe3f0;
+            background: linear-gradient(165deg, #ffffff 0%, #f8fbff 100%);
+            color: #0f172a;
+            cursor: pointer;
+            font-weight: 800;
+            transition: transform .14s ease, box-shadow .18s ease, border-color .18s ease, filter .18s ease;
+        }
+        .kahoot-option:hover { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(15,23,42,.14); }
+        .kahoot-option.is-selected {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37,99,235,.22), 0 10px 24px rgba(37,99,235,.18);
+            filter: saturate(1.08);
+        }
+        .kahoot-option .k-key {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            font-weight: 900;
+            color: #fff;
+        }
+        .kahoot-option .k-text {
+            font-size: 26px;
+            line-height: 1.2;
+            color: #0f172a;
+        }
+        .kahoot-option.k-a .k-key { background: #ef4444; }
+        .kahoot-option.k-b .k-key { background: #2563eb; }
+        .kahoot-option.k-c .k-key { background: #eab308; color: #111827; }
+        .kahoot-option.k-d .k-key { background: #22c55e; }
+        .kahoot-option.k-t .k-key { background: #22c55e; }
+        .kahoot-option.k-f .k-key { background: #ef4444; }
+        .kahoot-option input[type="radio"] { position: absolute; opacity: 0; pointer-events: none; }
+        .lesson-answer-status {
+            margin-top: 10px;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: .02em;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 8px;
+            border-radius: 999px;
+            border: 1px solid transparent;
+            animation: lessonStatusIn .28s ease;
+        }
+        .lesson-answer-status.is-correct { color: #166534; background: #dcfce7; border-color: #86efac; }
+        .lesson-answer-status.is-wrong { color: #991b1b; background: #fee2e2; border-color: #fca5a5; }
+        #lesson-player-stage.lesson-answer-fx-correct .lesson-question-card { animation: lessonPulseCorrect .42s ease; }
+        #lesson-player-stage.lesson-answer-fx-wrong .lesson-question-card { animation: lessonShakeWrong .38s ease; }
+        @keyframes lessonPulseCorrect {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(34, 197, 94, .0); }
+            45% { transform: scale(1.012); box-shadow: 0 0 0 8px rgba(34, 197, 94, .16); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(34, 197, 94, .0); }
+        }
+        @keyframes lessonShakeWrong {
+            0%, 100% { transform: translateX(0); }
+            20% { transform: translateX(-4px); }
+            40% { transform: translateX(4px); }
+            60% { transform: translateX(-3px); }
+            80% { transform: translateX(3px); }
+        }
+        @keyframes lessonStatusIn {
+            from { opacity: 0; transform: translateY(-3px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         .lesson-editor-scroll {
             flex: 1;
@@ -2653,6 +3052,7 @@
         }
         #lesson-text-modal { z-index: 26002 !important; }
         #lesson-player-modal {
+            z-index: 24080 !important;
             padding: 0 !important;
             align-items: stretch !important;
             justify-content: stretch !important;
@@ -3679,6 +4079,14 @@
         
         .empty-state { text-align: center; padding: 40px 20px; color: #888; }
         .empty-state-icon { font-size: 3rem; margin-bottom: 10px; }
+        /* Dersler: liste boşsa empty-state otomatik görünsün (JS aksasa bile) */
+        #lessons-pending #list-lessons-pending:empty + #no-lessons-pending,
+        #lessons-completed #list-lessons-completed:empty + #no-lessons-completed {
+            display: flex !important;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
         
         .loading { text-align: center; padding: 20px; color: var(--primary); }
         
@@ -4220,6 +4628,25 @@
         body.dark-mode .lesson-theme-item { background: #0f172a !important; border-color: #334155 !important; }
         body.dark-mode .lesson-theme-item.active { background: #1e293b !important; border-color: #60a5fa !important; }
         body.dark-mode .lesson-theme-name { color: #e2e8f0 !important; }
+        body.dark-mode .lesson-q-option { border-color: #334155 !important; color: #e2e8f0 !important; background: #0f172a !important; }
+        body.dark-mode .lesson-question-tag { background: rgba(30, 58, 138, .35); border-color: rgba(96, 165, 250, .45); color: #bfdbfe; }
+        body.dark-mode .lesson-question-xp { background: rgba(22, 163, 74, .24); border-color: rgba(134, 239, 172, .45); color: #bbf7d0; }
+        body.dark-mode .lesson-question-timer-head { color: #cbd5e1; }
+        body.dark-mode .lesson-question-timer-track { background: rgba(15, 23, 42, .55); border-color: rgba(100, 116, 139, .55); }
+        body.dark-mode .lesson-question-builder { border-top-color: #334155; }
+        body.dark-mode .lesson-side-help { color: #94a3b8; }
+        body.dark-mode .lesson-question-prompt { background: rgba(15,23,42,.35); border-color: rgba(148,163,184,.28); }
+        body.dark-mode .lesson-q-option .opt-key { background: #1e3a8a; border-color: #3b82f6; color: #e0ecff; }
+        body.dark-mode .lesson-q-option .opt-text { color: #e2e8f0; }
+        body.dark-mode .kahoot-option { background: #0f172a !important; border-color: #334155 !important; color: #e2e8f0 !important; }
+        body.dark-mode .kahoot-option .k-text { color: #e2e8f0 !important; }
+        body.dark-mode .kahoot-option.is-selected { border-color: #60a5fa !important; box-shadow: 0 0 0 3px rgba(96,165,250,.22), 0 10px 24px rgba(96,165,250,.14) !important; }
+        body.dark-mode .lesson-dd-bank,
+        body.dark-mode .lesson-dd-targets,
+        body.dark-mode .lesson-dd-drop { background: #0f172a !important; border-color: #334155 !important; color: #e2e8f0 !important; }
+        body.dark-mode .lesson-dd-chip { background: #1e293b; border-color: #60a5fa; color: #dbeafe; }
+        body.dark-mode .lesson-answer-status.is-correct { color: #bbf7d0; background: rgba(22, 163, 74, .22); border-color: rgba(134, 239, 172, .5); }
+        body.dark-mode .lesson-answer-status.is-wrong { color: #fecaca; background: rgba(220, 38, 38, .22); border-color: rgba(252, 165, 165, .5); }
         body.dark-mode #lesson-player-nav,
         body.dark-mode #lesson-player-stage {
             background: #111827 !important;
@@ -4398,6 +4825,22 @@
         body.dark-mode #teacher-analytics .pie-summary-label {
             color: #cbd5e1 !important;
         }
+        body.dark-mode #student-stats-bar .completed-card .stat-label,
+        body.dark-mode #student-stats-bar .completed-summary .item .k,
+        body.dark-mode #student-stats-bar .completed-summary .item .v,
+        body.dark-mode #student-stats-bar .completed-summary .item.xp-item .k,
+        body.dark-mode #student-stats-bar .completed-summary .item.xp-item .v {
+            color: #ffffff !important;
+        }
+        body.dark-mode #student-stats-bar .completed-card .stat-label,
+        body.dark-mode #student-stats-bar .completed-summary .item .k,
+        body.dark-mode #student-stats-bar .completed-summary .item.xp-item .k {
+            font-size: 115% !important;
+        }
+        body.dark-mode #student-stats-bar .completed-summary .item .v,
+        body.dark-mode #student-stats-bar .completed-summary .item.xp-item .v {
+            font-size: 115% !important;
+        }
 
         /* Mobil uyumluluk */
         img, canvas { max-width: 100%; height: auto; }
@@ -4453,7 +4896,6 @@
             .lesson-builder-topbar { grid-template-columns: 1fr; }
             .lesson-builder-main { grid-template-columns: 1fr; }
             .lesson-quick-tools { grid-template-columns: 1fr; }
-            .lesson-question-grid { grid-template-columns: 1fr; }
             #lesson-slide-preview { min-height: 220px !important; }
             .lesson-player-shell {
                 width: 100vw !important;
@@ -4527,6 +4969,12 @@
             #lessons-teacher-stats .teacher-app-stats-tile > div:last-child {
                 font-size: 14px !important;
                 line-height: 1.1;
+            }
+            /* Mobilde Ödev/Etkinlik/Ders kutuları sekme çizgisine yaklaşmasın */
+            #app-screen.teacher-view #tasks-section #teacher-stats,
+            #app-screen.teacher-view #activities-section #activities-teacher-stats,
+            #app-screen.teacher-view #lessons-section #lessons-teacher-stats {
+                margin-top: 10px !important;
             }
 
             /* Mobil/ogretmen: kart yuksekligi dengeli, liste satirlari tek satir */
@@ -4716,7 +5164,8 @@
             }
             #app-screen.teacher-view #top-students-card {
                 grid-column: 1 / -1;
-                height: 430px;
+                height: auto;
+                min-height: 0;
                 margin-bottom: 0;
                 order: 99;
             }
@@ -4726,21 +5175,23 @@
             #app-screen.teacher-view #block-homework-section,
             #app-screen.teacher-view #lessons-section {
                 grid-column: span 1;
-                height: 430px;
+                height: auto;
+                min-height: 0;
             }
-            #app-screen.teacher-view #student-homework-shell,
-            #app-screen.teacher-view #block-homework-section {
-                grid-column: span 5;
-                height: 650px;
-                min-height: 650px;
-                max-height: 650px;
+            #app-screen.teacher-view #student-homework-shell {
+                grid-column: 1 / 6;
+                height: auto;
+                min-height: 0;
+                max-height: none;
+                width: 100%;
                 align-self: stretch;
             }
             #app-screen.teacher-view #block-homework-section {
                 grid-column: 6 / 11;
-                height: 650px;
-                min-height: 650px;
-                max-height: 650px;
+                height: auto;
+                min-height: 0;
+                max-height: none;
+                width: 100%;
                 align-self: stretch;
             }
             /* Öğretmen ana sayfası kart sırası: Quiz ve Dersler yer değiştirildi */
@@ -4851,6 +5302,99 @@
                 display: flex !important;
                 flex-direction: column;
             }
+            /* Uygulamalarım sekme kapsayıcı kenarlıklarını kaldır */
+            #app-screen.teacher-view #block-homework-assign-tabs,
+            #app-screen.teacher-view #block-homework-tabs,
+            #app-screen.teacher-view #compute-homework-tabs {
+                border: none !important;
+                box-shadow: none !important;
+                background: transparent !important;
+                padding: 0 !important;
+            }
+            /* Uygulamalarım sekmesine soldaki gibi alt ayırıcı çizgi */
+            #app-screen.teacher-view #block-homework-assign-tabs {
+                border-bottom: 2px solid #dbe3ef !important;
+            }
+            /* Compute It panelindeki iç çerçeveyi kaldır */
+            #app-screen.teacher-view #block-homework-section #compute-homework-split,
+            #app-screen.teacher-view #block-homework-section #compute-homework-pending,
+            #app-screen.teacher-view #block-homework-section #compute-homework-completed {
+                border: none !important;
+                outline: none !important;
+                box-shadow: none !important;
+                background: transparent !important;
+            }
+            /* Sol ve sağ ana kart alt çizgileri masaüstünde birebir aynı hizaya gelsin */
+            #app-screen.teacher-view #student-homework-shell,
+            #app-screen.teacher-view #block-homework-section {
+                height: clamp(560px, 66vh, 780px) !important;
+                min-height: clamp(560px, 66vh, 780px) !important;
+            }
+            /* Sağ/sol panel hizası tamamen aynı kalsın */
+            #app-screen.teacher-view #student-homework-shell,
+            #app-screen.teacher-view #block-homework-section {
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 12px !important;
+                padding: 14px !important;
+            }
+            #app-screen.teacher-view #teacher-home-tabs,
+            #app-screen.teacher-view #block-homework-assign-tabs {
+                display: flex !important;
+                margin: 0 0 12px 0 !important;
+                padding: 0 !important;
+                height: 44px !important;
+                min-height: 44px !important;
+                align-items: stretch !important;
+                gap: 10px !important;
+            }
+            #app-screen.teacher-view #teacher-home-tabs .tab-btn,
+            #app-screen.teacher-view #block-homework-assign-tabs .tab-btn {
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                height: 44px !important;
+                min-height: 44px !important;
+                padding: 0 12px !important;
+                line-height: 1 !important;
+                margin: 0 !important;
+                box-sizing: border-box !important;
+            }
+            /* Sol sekme satırını sağ panelle aynı düşeye getir */
+            #app-screen.teacher-view #teacher-home-tabs {
+                margin-top: 12px !important;
+            }
+            #app-screen.teacher-view #tasks-section #teacher-stats,
+            #app-screen.teacher-view #activities-section #activities-teacher-stats,
+            #app-screen.teacher-view #lessons-section #lessons-teacher-stats {
+                margin-top: 0 !important;
+            }
+            #app-screen.teacher-view #block-homework-teacher-stats,
+            #app-screen.teacher-view #compute-homework-teacher-stats {
+                margin-top: 12px !important;
+            }
+            /* Sağ panel sekme/istatistik başlangıcı soldakiyle aynı hizaya gelsin */
+            #app-screen.teacher-view #block-homework-teacher-stats,
+            #app-screen.teacher-view #compute-homework-teacher-stats {
+                margin-top: 0 !important;
+            }
+            #app-screen.teacher-view #teacher-home-sections-host,
+            #app-screen.teacher-view #compute-homework-section {
+                flex: 1 1 auto !important;
+                min-height: 0 !important;
+            }
+            /* Compute It iç alandaki kalan çerçeveyi tamamen kaldır */
+            #app-screen.teacher-view #compute-homework-section,
+            #app-screen.teacher-view #compute-homework-split,
+            #app-screen.teacher-view #compute-homework-pending,
+            #app-screen.teacher-view #compute-homework-completed,
+            #app-screen.teacher-view #compute-homework-pending.tab-content.active,
+            #app-screen.teacher-view #compute-homework-completed.tab-content.active {
+                border: none !important;
+                outline: none !important;
+                box-shadow: none !important;
+                background: transparent !important;
+            }
             #teacher-analytics .stats-summary-grid {
                 grid-template-columns: repeat(5, minmax(82px, 1fr)) !important;
                 gap: 8px !important;
@@ -4923,9 +5467,9 @@
         @media (min-width: 900px) and (max-width: 1023px) {
             #app-screen.teacher-view #student-homework-shell,
             #app-screen.teacher-view #block-homework-section {
-                min-height: 620px;
-                max-height: 620px;
-                height: 620px;
+                min-height: 0;
+                max-height: none;
+                height: auto;
                 align-self: stretch;
             }
         }
@@ -4933,9 +5477,9 @@
         @media (min-width: 769px) and (max-width: 899px) {
             #app-screen.teacher-view #student-homework-shell,
             #app-screen.teacher-view #block-homework-section {
-                min-height: 620px;
-                max-height: 620px;
-                height: 620px;
+                min-height: 0;
+                max-height: none;
+                height: auto;
                 align-self: stretch;
             }
         }
@@ -5455,8 +5999,16 @@
                                 <div class="v" id="stat-flowchart-completed">0</div>
                             </div>
                             <div class="item">
+                                <div class="k">Python</div>
+                                <div class="v" id="stat-python-completed">0</div>
+                            </div>
+                            <div class="item">
                                 <div class="k">Derslerim</div>
                                 <div class="v" id="stat-lessons-completed">0</div>
+                            </div>
+                            <div class="item">
+                                <div class="k">Quiz Puanı</div>
+                                <div class="v" id="stat-quiz-points">0 Puan</div>
                             </div>
                             <div class="item xp-item">
                                 <div class="k">Toplam XP</div>
@@ -6059,6 +6611,20 @@
                 <select id="task-target" class="form-control">
                     <option value="all">Tüm Sınıflar</option>
                 </select>
+                <div style="display:flex; gap:10px; margin-bottom:10px;">
+                    <div style="flex:1;">
+                        <label><small>Sınıf:</small></label>
+                        <select id="task-target-class" class="form-control">
+                            <option value="">Sınıf</option>
+                        </select>
+                    </div>
+                    <div style="flex:1;">
+                        <label><small>Şube:</small></label>
+                        <select id="task-target-section" class="form-control">
+                            <option value="">Şube</option>
+                        </select>
+                    </div>
+                </div>
                 
                 <div style="display: flex; gap: 10px; margin-bottom: 15px;">
                     <div style="flex: 1;">
@@ -6085,41 +6651,6 @@
                         </select>
                     </div>
                 </div>
-                
-                <div style="background: #f0f4f8; padding: 15px; border-radius: 10px; border: 1px solid #d1d9e6; margin-bottom: 15px;">
-                    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                        <div style="flex: 2;">
-                            <label><small>Soru Tipi (Opsiyonel):</small></label>
-                            <select id="task-type" class="form-control">
-                                <option value="quiz">📝 Çoktan Seçmeli</option>
-                                <option value="truefalse">✅ Doğru/Yanlış</option>
-                                <option value="fill">✍️ Boşluk Doldurma</option>
-                            </select>
-                        </div>
-                        <div style="flex: 1;">
-                            <label><small>Adet:</small></label>
-                            <input type="number" id="q-count" value="1" min="1" max="10" class="form-control">
-                        </div>
-                    </div>
-
-                    <input type="text" id="main-question" placeholder="Soru metni..." class="form-control">
-                    <input type="file" id="question-image" class="form-control" accept="image/*">
-                    
-                    <div id="options-area" style="display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px;">
-                        <input type="text" id="opt-1" placeholder="A Şıkkı" style="width: 48%; padding: 8px; border-radius: 5px; border: 1px solid #ddd;">
-                        <input type="text" id="opt-2" placeholder="B Şıkkı" style="width: 48%; padding: 8px; border-radius: 5px; border: 1px solid #ddd;">
-                        <input type="text" id="opt-3" placeholder="C Şıkkı" style="width: 48%; padding: 8px; border-radius: 5px; border: 1px solid #ddd;">
-                        <input type="text" id="opt-4" placeholder="D Şıkkı" style="width: 48%; padding: 8px; border-radius: 5px; border: 1px solid #ddd;">
-                    </div>
-                    
-                    <input type="text" id="correct-answer" placeholder="Doğru Cevap" class="form-control">
-                    <button id="btn-add-q" class="btn btn-primary" style="width: 100%;">➕ Soruları Listeye Ekle</button>
-                </div>
-
-                <div style="margin-bottom: 10px; font-weight: bold; color: var(--primary);">
-                    Toplam Soru: <span id="q-counter-display">0</span>
-                </div>
-                <div id="added-questions-preview" style="max-height: 200px; overflow-y: auto; border: 1px solid #eee; padding: 10px; border-radius: 8px; margin-bottom: 10px; background: #fff;"></div>
                 
                 <button id="btn-save-task" class="btn btn-success" style="width: 100%;">ÖDEVİ YAYINLA</button>
             </div>
@@ -6566,8 +7097,12 @@
             <input type="text" id="add-student-username" class="form-control" placeholder="Kullanıcı Adı (e-posta olabilir)">
             <input type="password" id="add-student-password" class="form-control" placeholder="Şifre (en az 6 karakter)">
             <div style="display:flex; gap:10px;">
-                <input type="text" id="add-student-class" class="form-control" placeholder="Sınıf (örn: 9)">
-                <input type="text" id="add-student-section" class="form-control" placeholder="Şube (örn: A)">
+                <select id="add-student-class" class="form-control">
+                    <option value="">Sınıf seçin</option>
+                </select>
+                <select id="add-student-section" class="form-control">
+                    <option value="">Şube seçin</option>
+                </select>
             </div>
             <button id="btn-add-student-save" class="btn btn-success" style="width: 100%; margin-top: 8px;">Kaydet</button>
 
@@ -6885,6 +7420,7 @@ Ayşe, Yılmaz, ogretmen.ayse, 123456"></textarea>
                     <input id="lesson-title" class="form-control lesson-main-input" placeholder="Ders başlığı">
                 </div>
                 <div class="lesson-builder-actions">
+                    <button id="btn-preview-lesson" class="btn" style="background:#dbeafe;color:#1d4ed8;">Önizleme</button>
                     <button id="btn-save-slide" class="btn btn-primary">Slide Kaydet</button>
                     <button id="btn-save-lesson" class="btn btn-success">Dersi Kaydet</button>
                     <button id="btn-delete-slide" class="btn btn-danger">Slide Sil</button>
@@ -6906,7 +7442,6 @@ Ayşe, Yılmaz, ogretmen.ayse, 123456"></textarea>
                         <button id="btn-lesson-quick-text" type="button" class="btn btn-primary">📝 Yazı Ekle</button>
                         <button id="btn-lesson-quick-image" type="button" class="btn">🖼️ Görsel Ekle</button>
                         <button id="btn-lesson-quick-code" type="button" class="btn" style="background:#dbeafe;color:#1d4ed8;">&lt;/&gt; Kod Ekle</button>
-                        <button id="btn-lesson-quick-question" type="button" class="btn btn-warning">❓ Soru Ekle</button>
                     </div>
                     <div class="lesson-toolbar">
                         <button type="button" class="btn" data-lesson-cmd="bold" title="Kalın">T</button>
@@ -6924,7 +7459,7 @@ Ayşe, Yılmaz, ogretmen.ayse, 123456"></textarea>
                     <div class="lesson-editor-scroll">
                         <div class="lesson-editor-head">
                             <span>İçerik Alanı</span>
-                            <small>Yazı, görsel ve soruyu buradan düzenleyin</small>
+                            <small>Yazı ve görsel içeriğini buradan düzenleyin</small>
                         </div>
                         <textarea id="lesson-desc" class="form-control" rows="2" placeholder="Ders açıklaması"></textarea>
                         <div id="slide-content-area" class="lesson-content-block">
@@ -6944,20 +7479,6 @@ Ayşe, Yılmaz, ogretmen.ayse, 123456"></textarea>
                                 <div id="lesson-canvas-stage" style="position:relative;height:300px;border:1px dashed #94a3b8;border-radius:10px;background:#fff;overflow:hidden;"></div>
                             </div>
                         </div>
-                        <div id="slide-question-area" class="lesson-content-block" style="display:none;">
-                            <div class="lesson-editor-head" style="margin-bottom:8px;">
-                                <span>Soru Alanı</span>
-                            </div>
-                            <div class="lesson-question-grid">
-                                <input id="slide-question" class="form-control" placeholder="Soru metni">
-                                <input id="slide-opt-1" class="form-control" placeholder="Seçenek 1">
-                                <input id="slide-opt-2" class="form-control" placeholder="Seçenek 2">
-                                <input id="slide-opt-3" class="form-control" placeholder="Seçenek 3">
-                                <input id="slide-opt-4" class="form-control" placeholder="Seçenek 4">
-                                <input id="slide-correct" class="form-control full" placeholder="Doğru seçenek (ör: A)">
-                                <input id="slide-fill-answers" class="form-control full" placeholder="Boşluk cevapları (virgülle)">
-                            </div>
-                        </div>
                         <div class="lesson-editor-head" style="margin-top:10px;">
                             <span>Canlı Önizleme</span>
                         </div>
@@ -6971,7 +7492,7 @@ Ayşe, Yılmaz, ogretmen.ayse, 123456"></textarea>
                         <input id="slide-title" class="form-control" placeholder="Slide başlığı">
                         <select id="slide-type" class="form-control">
                             <option value="content">Konu Anlatım</option>
-                            <option value="question">Soru</option>
+                            <option value="question">Soru Sayfası</option>
                             <option value="mixed">Konu + Soru</option>
                         </select>
                         <select id="slide-layout" class="form-control">
@@ -6981,18 +7502,48 @@ Ayşe, Yılmaz, ogretmen.ayse, 123456"></textarea>
                             <option value="canvas">Serbest Yerleşim</option>
                             <option value="code">HTML/CSS/JS Kod Önizleme</option>
                         </select>
-                        <select id="slide-question-type" class="form-control">
-                            <option value="multiple">Çoktan Seçmeli</option>
-                            <option value="boolean">Doğru / Yanlış</option>
-                            <option value="short">Kısa Cevap</option>
-                            <option value="fill">Boşluk Doldurma</option>
-                        </select>
+                        <div id="lesson-question-builder" class="lesson-question-builder" style="display:none;">
+                            <select id="slide-question-type" class="form-control">
+                                <option value="multiple">Çoktan Seçmeli</option>
+                                <option value="boolean">Doğru / Yanlış</option>
+                                <option value="dragdrop">Sürükle Bırak</option>
+                            </select>
+                            <textarea id="slide-question-text" class="form-control" rows="3" placeholder="Soru metni"></textarea>
+                            <div class="lesson-question-grid-2">
+                                <input id="slide-question-xp" type="number" min="0" max="100" class="form-control" placeholder="Soru XP">
+                                <input id="slide-question-duration" type="number" min="5" max="300" class="form-control" placeholder="Süre (sn)">
+                            </div>
+                            <div id="lesson-question-multiple-fields" style="display:none;">
+                                <div class="lesson-question-options-grid">
+                                    <input id="slide-option-0" class="form-control" placeholder="A şıkkı">
+                                    <input id="slide-option-1" class="form-control" placeholder="B şıkkı">
+                                    <input id="slide-option-2" class="form-control" placeholder="C şıkkı">
+                                    <input id="slide-option-3" class="form-control" placeholder="D şıkkı">
+                                </div>
+                                <select id="slide-correct-choice" class="form-control" style="margin-top:8px;">
+                                    <option value="0">Doğru Cevap: A</option>
+                                    <option value="1">Doğru Cevap: B</option>
+                                    <option value="2">Doğru Cevap: C</option>
+                                    <option value="3">Doğru Cevap: D</option>
+                                </select>
+                            </div>
+                            <div id="lesson-question-boolean-fields" style="display:none;">
+                                <select id="slide-correct-boolean" class="form-control">
+                                    <option value="dogru">Doğru</option>
+                                    <option value="yanlis">Yanlış</option>
+                                </select>
+                            </div>
+                            <div id="lesson-question-dragdrop-fields" style="display:none;">
+                                <textarea id="slide-dragdrop-pairs" class="form-control" rows="4" placeholder="Her satıra bir eşleştirme yazın. Örn: Elma:Meyve"></textarea>
+                            </div>
+                            <div class="lesson-side-help">Süre bitince soru kilitlenir. Öğrenci sorunun altındaki zaman çubuğunu görür.</div>
+                        </div>
                     </div>
                     <div class="lesson-side-title">Kullanım</div>
                     <div class="lesson-side-block" style="font-size:12px;color:#64748b;line-height:1.5;">
                         1) Soldan sayfa ekleyin.
-                        2) Ortada yazı, görsel, kod ve soru içeriğini hazırlayın.
-                        3) Sağdan sayfa tipini seçin ve kaydedin.
+                        2) Ortada yazı, görsel ve kod içeriğini hazırlayın.
+                        3) Sayfayı kaydedin.
                     </div>
                 </aside>
             </div>
@@ -7174,7 +7725,6 @@ Ayşe, Yılmaz, ogretmen.ayse, 123456"></textarea>
             <p id="live-quiz-invite-text" style="margin:8px 0 14px;">Öğretmen canlı quiz başlattı.</p>
             <div style="display:flex;gap:8px;">
                 <button id="btn-join-live-quiz" class="btn btn-warning" style="flex:1;">Katıl</button>
-                <button id="btn-close-live-invite" class="btn" style="flex:1;background:#eee;">Kapat</button>
             </div>
         </div>
     </div>
@@ -7497,6 +8047,6 @@ Ayşe, Yılmaz, ogretmen.ayse, 123456"></textarea>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script type="module" src="script.js"></script>
+    <script type="module" src="{{ asset('script.js') }}?v={{ filemtime(public_path('script.js')) }}"></script>
 </body>
 </html>

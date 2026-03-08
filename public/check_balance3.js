@@ -1,5 +1,10 @@
-const fs = require('fs');
-const s = fs.readFileSync('script.js','utf8');
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const s = fs.readFileSync(path.join(__dirname, "script.js"), "utf8");
 const stack = [];
 for (let i=0;i<s.length;i++){
   const c = s[i];
