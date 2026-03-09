@@ -81,6 +81,9 @@ class ClientDataController extends Controller
     {
         $uid = (string) $request->attributes->get('client_uid', '');
         if ($uid === '') return response()->json(['message' => 'unauthenticated'], 401);
+        if ($this->isProtectedUser($uid)) {
+            return response()->json(['message' => 'teacher/admin account is protected'], 403);
+        }
         User::query()->whereKey($uid)->delete();
         UserProfile::query()->where('user_id', $uid)->delete();
         GameState::query()->where('user_id', $uid)->delete();
@@ -123,6 +126,9 @@ class ClientDataController extends Controller
         [$parent, $collection, $id] = $this->splitDocPath($path);
         if ($parent === null && in_array($collection, self::NATIVE, true)) {
             if ($collection === 'users') {
+                if ($this->isProtectedUser($id)) {
+                    return response()->json(['message' => 'teacher/admin account is protected'], 403);
+                }
                 User::query()->whereKey($id)->delete();
                 UserProfile::query()->where('user_id', $id)->delete();
             } elseif ($collection === 'gameStates') {
@@ -224,11 +230,11 @@ class ClientDataController extends Controller
             }
 
             $targetProfile = UserProfile::query()->where('user_id', $targetUid)->first();
-            $targetRole = Str::lower(trim((string) ($targetProfile?->role ?? 'student')));
-            $isTeacherLike = in_array($targetRole, ['teacher', 'admin', 'administrator', 'ogretmen', 'öğretmen'], true);
+            $targetRole = Str::lower(Str::ascii(trim((string) ($targetProfile?->role ?? 'student'))));
+            $isTeacherLike = in_array($targetRole, ['teacher', 'admin', 'administrator', 'ogretmen'], true);
 
             // Başka bir öğretmen/admin hesabını bu endpoint ile silmeye izin verme.
-            if ($targetUid !== $requesterUid && $isTeacherLike) {
+            if ($isTeacherLike) {
                 return response()->json(['data' => ['ok' => false, 'message' => 'teacher/admin account is protected']], 403);
             }
 
@@ -251,6 +257,16 @@ class ClientDataController extends Controller
             return response()->json(['data' => ['reply' => 'AI assistant is not configured on Laravel API yet.']]);
         }
         return response()->json(['data' => ['ok' => false, 'message' => "Unknown callable: {$name}"]], 404);
+    }
+
+    private function isProtectedUser(string $uid): bool
+    {
+        if ($uid === '') {
+            return false;
+        }
+        $role = (string) (UserProfile::query()->where('user_id', $uid)->value('role') ?? '');
+        $normalized = Str::lower(Str::ascii(trim($role)));
+        return in_array($normalized, ['teacher', 'admin', 'administrator', 'ogretmen'], true);
     }
 
     private function upsertDoc(string $rawPath, array $data, bool $merge): array

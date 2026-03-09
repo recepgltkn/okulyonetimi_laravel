@@ -465,6 +465,8 @@ let activeHomePanelId = null;
 let classManagerSelectedId = null;
 let classManagerRows = [];
 let classSectionCatalog = [];
+let teacherAssignedClassRows = [];
+let teacherAssignedClassKeys = new Set();
 let authReadyWaiters = [];
 let liveQuizItems = [];
 let liveQuizSelectedQuestionIndex = -1;
@@ -8551,6 +8553,11 @@ function setProfileModalRoleMode() {
   if (approvalsWrap) approvalsWrap.style.display = isTeacher ? "block" : "none";
   const usernameInput = document.getElementById("profile-username");
   if (usernameInput) usernameInput.disabled = !isTeacher;
+  const branchInput = document.getElementById("profile-branch");
+  if (branchInput) {
+    branchInput.style.display = isTeacher ? "block" : "none";
+    branchInput.disabled = !isTeacher;
+  }
 }
 
 function fillProfileModalFromUserData() {
@@ -8560,6 +8567,8 @@ function fillProfileModalFromUserData() {
   if (firstInput) firstInput.value = userData?.firstName || "";
   const lastInput = document.getElementById("profile-lastname");
   if (lastInput) lastInput.value = userData?.lastName || "";
+  const branchInput = document.getElementById("profile-branch");
+  if (branchInput) branchInput.value = userData?.branch || "";
   const passInput = document.getElementById("profile-password");
   if (passInput) passInput.value = "";
 }
@@ -10760,6 +10769,7 @@ document.getElementById("btn-profile-save").onclick = async function() {
   const newFirstName = (document.getElementById("profile-firstname")?.value || "").trim();
   const newLastName = (document.getElementById("profile-lastname")?.value || "").trim();
   const newUsername = (document.getElementById("profile-username")?.value || "").trim();
+  const newBranch = (document.getElementById("profile-branch")?.value || "").trim();
   const newPassword = (document.getElementById("profile-password")?.value || "").trim();
   if (!currentUserId) return;
   try {
@@ -10812,11 +10822,13 @@ document.getElementById("btn-profile-save").onclick = async function() {
     if (newUsername) profileUpdate.username = newUsername;
     profileUpdate.firstName = newFirstName;
     profileUpdate.lastName = newLastName;
+    if (userRole === "teacher") profileUpdate.branch = newBranch;
     await updateDoc(doc(db, "users", currentUserId), profileUpdate);
     if (userData) {
       userData.firstName = newFirstName;
       userData.lastName = newLastName;
       if (newUsername) userData.username = newUsername;
+      if (userRole === "teacher") userData.branch = newBranch;
     }
     if (newPassword) {
       await applyStudentPasswordUpdate(
@@ -10964,10 +10976,11 @@ async function createStudentAccount({ firstName, lastName, username, password, c
   });
 }
 
-async function createTeacherAccount({ firstName, lastName, username, password }) {
+async function createTeacherAccount({ firstName, lastName, username, password, branch = "", assignedClassSections = [] }) {
   const email = fixEmail(username);
   const res = await createUserWithEmailAndPassword(secondaryAuth, email, password);
   const passwordHash = await hashPassword(password);
+  const normalizedAssignedRows = normalizeClassSectionRows(assignedClassSections);
   await setDoc(doc(db, "users", res.user.uid), {
     username: username,
     email: email,
@@ -10975,10 +10988,23 @@ async function createTeacherAccount({ firstName, lastName, username, password })
     lastName: lastName,
     passwordHash: passwordHash,
     role: "teacher",
+    branch: String(branch || "").trim(),
+    assignedClassSections: normalizedAssignedRows,
+    assignedClassSectionsText: normalizedAssignedRows.map((row) => `${row.className}/${row.section}`).join("|"),
     xp: 0,
     createdAt: serverTimestamp(),
     createdBy: currentUserId || ""
   });
+  if (normalizedAssignedRows.length) {
+    await Promise.all(normalizedAssignedRows.map((row) => addDoc(collection(db, "classSections"), {
+      userId: res.user.uid,
+      className: row.className,
+      section: row.section,
+      createdBy: currentUserId || "",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    })));
+  }
 }
 
 document.getElementById("btn-add-student-save").onclick = async function () {
@@ -11050,10 +11076,21 @@ document.getElementById("btn-add-teacher-save").onclick = async function () {
   const firstName = document.getElementById("add-teacher-firstname").value.trim();
   const lastName = document.getElementById("add-teacher-lastname").value.trim();
   const username = document.getElementById("add-teacher-username").value.trim();
+  const branch = document.getElementById("add-teacher-branch").value.trim();
+  const assignedRaw = document.getElementById("add-teacher-class-sections").value.trim();
   const password = document.getElementById("add-teacher-password").value;
+  const assignedClassSections = parseTeacherClassSectionInput(assignedRaw);
 
   if (!firstName || !lastName || !username || !password) {
     showNotice("Öğretmen ekleme alanları zorunludur!", "#e74c3c");
+    return;
+  }
+  if (!branch) {
+    showNotice("Branş alanı zorunludur.", "#e74c3c");
+    return;
+  }
+  if (!assignedClassSections.length) {
+    showNotice("En az bir sınıf/şube ataması girin. Örn: 5/A, 6/B", "#e74c3c");
     return;
   }
   if (password.length < 6) {
@@ -11061,11 +11098,13 @@ document.getElementById("btn-add-teacher-save").onclick = async function () {
     return;
   }
   try {
-    await createTeacherAccount({ firstName, lastName, username, password });
+    await createTeacherAccount({ firstName, lastName, username, password, branch, assignedClassSections });
     showNotice("Öğretmen eklendi!", "#2ecc71");
     document.getElementById("add-teacher-firstname").value = "";
     document.getElementById("add-teacher-lastname").value = "";
     document.getElementById("add-teacher-username").value = "";
+    document.getElementById("add-teacher-branch").value = "";
+    document.getElementById("add-teacher-class-sections").value = "";
     document.getElementById("add-teacher-password").value = "";
   } catch (e) {
     showNotice("Öğretmen kayıt hatası: " + e.message, "#e74c3c");
@@ -11085,18 +11124,20 @@ document.getElementById("btn-bulk-teacher-save").onclick = async function () {
   let failCount = 0;
   for (const line of lines) {
     const parts = line.split(",").map(p => p.trim()).filter(Boolean);
-    if (parts.length < 4) {
+    if (parts.length < 5) {
       failCount++;
       continue;
     }
-    const [firstName, lastName, username, pass] = parts;
+    const [firstName, lastName, username, pass, branch, ...assignmentParts] = parts;
+    const assignedRaw = assignmentParts.join(",");
+    const assignedClassSections = parseTeacherClassSectionInput(assignedRaw);
     const password = pass || defaultPass;
-    if (!password || password.length < 6) {
+    if (!password || password.length < 6 || !branch || !assignedClassSections.length) {
       failCount++;
       continue;
     }
     try {
-      await createTeacherAccount({ firstName, lastName, username, password });
+      await createTeacherAccount({ firstName, lastName, username, password, branch, assignedClassSections });
       okCount++;
     } catch (e) {
       failCount++;
@@ -11107,9 +11148,9 @@ document.getElementById("btn-bulk-teacher-save").onclick = async function () {
 
 document.getElementById("btn-download-teacher-template").onclick = function () {
   const csv = [
-    "Ad,Soyad,Kullanıcı Adı,Şifre",
-    "Ali,Veli,ogretmen.ali,123456",
-    "Ayşe,Yılmaz,ogretmen.ayse,123456"
+    "Ad,Soyad,Kullanıcı Adı,Şifre,Branş,Sınıf/Şube",
+    "Ali,Veli,ogretmen.ali,123456,Matematik,5/A|6/B",
+    "Ayşe,Yılmaz,ogretmen.ayse,123456,Fen,7/C"
   ].join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
@@ -11412,50 +11453,60 @@ document.getElementById("bulk-students-file").onchange = async function (e) {
   if (userRole !== "teacher") return;
   const file = e.target.files && e.target.files[0];
   if (!file) return;
+  const hideOverlay = showBulkStudentsDeleteOverlay("Toplu öğrenci kaydı yapılıyor, lütfen bekleyin...");
   const isExcel = /\.xlsx?$|\.xls$/i.test(file.name);
   const reader = new FileReader();
   reader.onload = async function () {
-    let rows = [];
-    if (isExcel && window.XLSX) {
-      const data = new Uint8Array(reader.result);
-      const wb = XLSX.read(data, { type: "array" });
-      const sheetName = wb.SheetNames[0];
-      const sheet = wb.Sheets[sheetName];
-      rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }).filter(r => r && r.length);
-    } else {
-      const text = String(reader.result || "");
-      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-      rows = lines.map(l => parseCsvLine(l));
-    }
-    if (!rows.length) {
-      showNotice("Dosya boş.", "#e74c3c");
-      return;
-    }
-    const header = rows[0].join(" ").toLowerCase();
-    if (header.includes("ad") && header.includes("soyad") && header.includes("kullanıcı")) {
-      rows.shift();
-    }
-    let okCount = 0;
-    let failCount = 0;
-    for (const r of rows) {
-      const parts = r.map(p => (p ?? "").toString().trim()).filter(Boolean);
-      if (parts.length < 6) {
+    try {
+      let rows = [];
+      if (isExcel && window.XLSX) {
+        const data = new Uint8Array(reader.result);
+        const wb = XLSX.read(data, { type: "array" });
+        const sheetName = wb.SheetNames[0];
+        const sheet = wb.Sheets[sheetName];
+        rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }).filter(r => r && r.length);
+      } else {
+        const text = String(reader.result || "");
+        const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+        rows = lines.map(l => parseCsvLine(l));
+      }
+      if (!rows.length) {
+        showNotice("Dosya boş.", "#e74c3c");
+        return;
+      }
+      const header = rows[0].join(" ").toLowerCase();
+      if (header.includes("ad") && header.includes("soyad") && header.includes("kullanıcı")) {
+        rows.shift();
+      }
+      let okCount = 0;
+      let failCount = 0;
+      for (const r of rows) {
+        const parts = r.map(p => (p ?? "").toString().trim()).filter(Boolean);
+        if (parts.length < 6) {
+          failCount++;
+          continue;
+        }
+      const [firstName, lastName, username, pass, className, section] = parts;
+      if (!pass || pass.length < 6) {
         failCount++;
         continue;
       }
-    const [firstName, lastName, username, pass, className, section] = parts;
-    if (!pass || pass.length < 6) {
-      failCount++;
-      continue;
-    }
-    try {
-      await createStudentAccount({ firstName, lastName, username, password: pass, className, section });
-      okCount++;
-    } catch (err) {
-      failCount++;
+      try {
+        await createStudentAccount({ firstName, lastName, username, password: pass, className, section });
+        okCount++;
+      } catch (err) {
+        failCount++;
+        }
       }
+      showNotice(`Dosyadan kayıt tamamlandı. Başarılı: ${okCount}, Hatalı: ${failCount}`, "#4a90e2");
+      e.target.value = "";
+    } finally {
+      hideOverlay();
     }
-    showNotice(`Dosyadan kayıt tamamlandı. Başarılı: ${okCount}, Hatalı: ${failCount}`, "#4a90e2");
+  };
+  reader.onerror = function () {
+    hideOverlay();
+    showNotice("Dosya okunamadı.", "#e74c3c");
     e.target.value = "";
   };
   if (isExcel) {
@@ -11496,19 +11547,21 @@ document.getElementById("bulk-teachers-file").onchange = async function (e) {
     let failCount = 0;
     const defaultPass = document.getElementById("bulk-teachers-default-password").value;
     for (const r of rows) {
-      const parts = r.map(p => (p ?? "").toString().trim()).filter(Boolean);
-      if (parts.length < 3) {
+      const parts = r.map(p => (p ?? "").toString().trim());
+      if (parts.length < 5) {
         failCount++;
         continue;
       }
-      const [firstName, lastName, username, pass] = parts;
+      const [firstName, lastName, username, pass, branch, ...assignmentParts] = parts;
+      const assignedRaw = assignmentParts.join(",");
+      const assignedClassSections = parseTeacherClassSectionInput(assignedRaw);
       const password = pass || defaultPass;
-      if (!firstName || !lastName || !username || !password || password.length < 6) {
+      if (!firstName || !lastName || !username || !password || password.length < 6 || !branch || !assignedClassSections.length) {
         failCount++;
         continue;
       }
       try {
-        await createTeacherAccount({ firstName, lastName, username, password });
+        await createTeacherAccount({ firstName, lastName, username, password, branch, assignedClassSections });
         okCount++;
       } catch (err) {
         failCount++;
@@ -11896,6 +11949,7 @@ onAuthStateChanged(auth, (user) => {
     userData = null;
     lastTaskXP = 0;
     teacherOwnerAliasTokens = new Set();
+    setTeacherAssignedClasses([]);
     if (progressUnsub) progressUnsub();
     progressUnsub = null;
     if (contentUnsub) contentUnsub();
@@ -12089,6 +12143,7 @@ onAuthStateChanged(auth, (user) => {
         lastName: fallbackData.lastName || "",
         className: fallbackData.className || "",
         section: fallbackData.section || "",
+        branch: fallbackData.branch || "",
         role: inferredRole,
         xp: Math.max(0, Number(fallbackData.xp || 0)),
         ownedAvatarIds: normalizeOwnedAvatarIds(fallbackData.ownedAvatarIds),
@@ -12135,9 +12190,11 @@ onAuthStateChanged(auth, (user) => {
       }
     }
     if (userRole === "teacher") {
+      syncTeacherAssignedClassesFromUserData();
       await refreshTeacherOwnerAliasTokens();
     } else {
       teacherOwnerAliasTokens = new Set();
+      setTeacherAssignedClasses([]);
     }
     
     loginScreen.classList.add("hidden");
@@ -12424,10 +12481,11 @@ onAuthStateChanged(auth, (user) => {
       // canlı sayaç gerekirse buradan UI güncellenebilir
     }, 1000);
 
-    if (isTeacher) await ensureStudentsCache();
     if (isTeacher) await refreshAndApplyClassSectionDropdowns();
+    if (isTeacher) await ensureStudentsCache();
     else {
       classSectionCatalog = [];
+      setTeacherAssignedClasses([]);
       applyClassSectionDropdownBindings();
       repairComputeXPData(user.uid).catch((e) => console.warn("student compute xp repair skipped", e));
     }
@@ -13992,8 +14050,13 @@ function loadLeaderboard() {
 function getTeacherManagedStudents(students = []) {
   if (userRole !== "teacher") return [];
   if (!currentUserId && !userData?.username && !userData?.email) return [];
+  const hasClassAssignment = teacherAssignedClassKeys.size > 0;
   return (Array.isArray(students) ? students : []).filter((s) => {
-    // Öğretmen verileri kesin ayrılmalı: sahiplik bilgisi olmayan öğrenci başka hesaplara düşmemeli.
+    if (hasClassAssignment) {
+      const key = buildClassSectionKey(s?.className || s?.class || "", s?.section || "");
+      return !!key && teacherAssignedClassKeys.has(key);
+    }
+    // Geriye uyum: atama tanımlı değilse legacy sahiplik alanını kullan.
     return recordBelongsToCurrentTeacher(s);
   });
 }
@@ -14006,6 +14069,63 @@ function scopeStudentsForCurrentRole(students = []) {
 
 function normalizeClassSectionText(value) {
   return String(value || "").trim();
+}
+
+function buildClassSectionKey(className, section) {
+  const cls = normalizeClassSectionText(className);
+  const sec = normalizeClassSectionText(section);
+  if (!cls) return "";
+  return `${cls}|${sec || "*"}`;
+}
+
+function normalizeClassSectionRows(rows = []) {
+  const uniq = new Map();
+  (Array.isArray(rows) ? rows : []).forEach((row) => {
+    const className = normalizeClassSectionText(row?.className || row?.class || "");
+    const section = normalizeClassSectionText(row?.section || "");
+    if (!className || !section) return;
+    const key = buildClassSectionKey(className, section);
+    if (!uniq.has(key)) uniq.set(key, { className, section });
+  });
+  return Array.from(uniq.values());
+}
+
+function parseTeacherClassSectionInput(rawValue) {
+  const raw = String(rawValue || "").trim();
+  if (!raw) return [];
+  const chunks = raw
+    .split(/\r?\n|;/)
+    .flatMap((part) => String(part || "").split("|"))
+    .flatMap((part) => String(part || "").split(","))
+    .map((part) => String(part || "").trim())
+    .filter(Boolean);
+  const parsed = [];
+  chunks.forEach((chunk) => {
+    const m = chunk.match(/^(.+?)[\/-](.+)$/);
+    if (!m) return;
+    parsed.push({ className: m[1], section: m[2] });
+  });
+  return normalizeClassSectionRows(parsed);
+}
+
+function setTeacherAssignedClasses(rows = []) {
+  teacherAssignedClassRows = normalizeClassSectionRows(rows);
+  teacherAssignedClassKeys = new Set(teacherAssignedClassRows.map((row) => buildClassSectionKey(row.className, row.section)).filter(Boolean));
+}
+
+function getTeacherAssignedClassesFromUserData() {
+  const directRows = normalizeClassSectionRows(userData?.assignedClassSections || userData?.assignedClasses || []);
+  if (directRows.length) return directRows;
+  const fromText = parseTeacherClassSectionInput(userData?.assignedClassSectionsText || "");
+  return fromText;
+}
+
+function syncTeacherAssignedClassesFromUserData() {
+  if (userRole !== "teacher") {
+    setTeacherAssignedClasses([]);
+    return;
+  }
+  setTeacherAssignedClasses(getTeacherAssignedClassesFromUserData());
 }
 
 function buildClassSectionCatalogFromStudents(students = []) {
@@ -14137,6 +14257,7 @@ function applyClassSectionDropdownBindings() {
 async function refreshAndApplyClassSectionDropdowns() {
   if (userRole !== "teacher" || !currentUserId) {
     classSectionCatalog = [];
+    setTeacherAssignedClasses([]);
     applyClassSectionDropdownBindings();
     return;
   }
@@ -14154,6 +14275,7 @@ async function refreshAndApplyClassSectionDropdowns() {
   } catch (e) {
     console.warn("classSections load failed", e);
   }
+  setTeacherAssignedClasses(fromClassSections);
 
   let fromStudents = [];
   try {
@@ -14385,11 +14507,11 @@ function renderLoginCardsModal() {
           </div>
         <div class="login-card-fields">
           <div class="login-card-field">
-            <span class="icon">??</span>
+            <span class="icon">Kullanıcı Adı</span>
             <span class="val">${escapeHtmlBasic(username)}</span>
           </div>
-          <div class="login-card-field">
-            <span class="icon">??</span>
+          <div class="login-card-field password-field">
+            <span class="icon">Şifre</span>
             <span class="val">${escapeHtmlBasic(pass)}</span>
           </div>
         </div>
@@ -14448,11 +14570,11 @@ function openLoginCardsPrintPreview() {
             </div>
           </div>
           <div class="print-row">
-            <div class="print-icon">??</div>
+            <div class="print-icon">Kullanıcı Adı</div>
             <div class="print-val">${username}</div>
           </div>
-          <div class="print-row">
-            <div class="print-icon">??</div>
+          <div class="print-row password-row">
+            <div class="print-icon">Şifre</div>
             <div class="print-val">${pass}</div>
           </div>
           <div class="print-foot">Öğrenci Giriş Kartı</div>
@@ -14518,11 +14640,14 @@ function openLoginCardsPrintPreview() {
   .print-logo { width: 20mm; height: 20mm; border-radius: 2.4mm; border: 0.3mm solid #ddd6fe; background:#fff; object-fit: contain; padding: 0.9mm; box-shadow: 0 0.8mm 1.8mm rgba(76,29,149,0.22); flex:0 0 auto; }
   .print-title { display:flex; align-items:baseline; gap: 1.2mm; font-weight:700; font-size: 4.5mm; line-height:1.08; letter-spacing:0.01em; color:#ffffff; text-shadow: 0 0.45mm 0.8mm rgba(49,46,129,0.4); width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .print-name { min-width: 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .print-class { font-weight:700; font-size: 3.3mm; color:#f5f3ff; text-shadow: 0 0.35mm 0.7mm rgba(49,46,129,0.36); max-width:45%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .print-row { position: relative; z-index: 1; display:grid; grid-template-columns: 6.6mm 1fr; border: 0.3mm solid #ddd6fe; border-radius: 1.8mm; overflow:hidden; min-height: 8.2mm; height: 8.2mm; background: rgba(255,255,255,0.92); }
-  .print-icon { background:#ede9fe; color:#4c1d95; border-right: 0.3mm solid #ddd6fe; display:flex; align-items:center; justify-content:center; font-size:4mm; }
+  .print-class { font-weight:700; font-size: 3.8mm; color:#f5f3ff; text-shadow: 0 0.35mm 0.7mm rgba(49,46,129,0.36); max-width:45%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .print-row { position: relative; z-index: 1; display:grid; grid-template-columns: 19mm 1fr; border: 0.3mm solid #ddd6fe; border-radius: 1.8mm; overflow:hidden; min-height: 8.2mm; height: 8.2mm; background: rgba(255,255,255,0.92); }
+  .print-icon { background:#ede9fe; color:#4c1d95; border-right: 0.3mm solid #ddd6fe; display:flex; align-items:center; justify-content:center; font-size:2.1mm; font-weight:700; white-space:nowrap; }
   .print-val { padding: 1mm 1.6mm; font-weight:700; font-size: 3.2mm; display:flex; align-items:center; color:#312e81; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .print-foot { position: relative; z-index: 1; margin-top:auto; text-align:right; font-size:2.5mm; font-weight:700; color:#6d28d9; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .print-row.password-row { border-color:#d8b4fe; background:rgba(250,232,255,0.6); }
+  .print-row.password-row .print-icon { background:#f3e8ff; color:#6b21a8; border-right-color:#d8b4fe; font-weight:800; }
+  .print-row.password-row .print-val { color:#581c87; font-weight:800; font-size:3.35mm; }
+  .print-foot { position: relative; z-index: 1; margin-top:auto; text-align:right; font-size:2.9mm; font-weight:700; color:#6d28d9; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .print-login-card .print-accent {
     position:absolute;
     right:-8mm;
@@ -14720,6 +14845,7 @@ async function loadClassesModal() {
       });
     });
     classManagerRows = rows.filter((r) => r.className && r.section);
+    setTeacherAssignedClasses(classManagerRows);
     renderClassesList();
     classSectionCatalog = buildClassSectionCatalogFromStudents([...(classSectionCatalog || []), ...classManagerRows]);
     applyClassSectionDropdownBindings();
