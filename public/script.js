@@ -5470,6 +5470,7 @@ function updateUserXPDisplay(taskXP) {
   }
   const el = document.getElementById("user-xp");
   if (el) el.innerText = `${total} XP`;
+  renderStudentAdventureBoard();
   if (currentUserId && Array.isArray(leaderboardRowsCache) && leaderboardRowsCache.length) {
     let changed = false;
     leaderboardRowsCache = leaderboardRowsCache.map((row) => {
@@ -5499,6 +5500,7 @@ function updateStudentQuizPointsDisplay(points = 0) {
   if (!el) return;
   const safePoints = Math.max(0, Number(points || 0));
   el.innerText = `${safePoints} Puan`;
+  renderStudentAdventureBoard();
 }
 
 function addStudentQuizPoints(delta = 0) {
@@ -12205,18 +12207,10 @@ onAuthStateChanged(auth, (user) => {
     const displayLast = userData.lastName || "";
     const fallbackName = userData.username ? userData.username.split("@")[0] : "Kullanıcı";
     const fullName = (displayFirst || displayLast) ? `${displayFirst} ${displayLast}`.trim() : fallbackName;
-    const welcomeLabel = document.getElementById("user-welcome");
-    const fullNameEl = document.getElementById("user-fullname");
-    const userMenuTrigger = document.getElementById("user-menu-trigger");
-    if (fullNameEl) {
-      fullNameEl.innerText = userRole === "student" ? `Hoş geldin, ${fullName}` : "";
-    }
-    if (welcomeLabel) {
-      welcomeLabel.innerText = userRole === "teacher" ? "Hoş geldin, " + fullName + " Öğrt." : "";
-    }
-    if (userMenuTrigger) {
-      userMenuTrigger.innerText = userRole === "teacher" ? `Hoş geldin, ${fullName}` : `Hoş geldin, ${fullName}`;
-    }
+    syncResponsiveHeaderGreeting(fullName);
+    renderTeacherWorkspaceHero();
+    renderStudentAdventureBoard();
+    syncMobileOpenMenuPlacement();
 
     const isTeacher = userRole === "teacher";
     const sideMenu = document.getElementById("side-menu");
@@ -12241,7 +12235,8 @@ onAuthStateChanged(auth, (user) => {
     document.getElementById("teacher-stats").style.display = isTeacher ? "block" : "none";
     document.getElementById("teacher-filters").style.display = "none";
     document.getElementById("tasks-title").innerText = isTeacher ? "Verilen Ödevler" : "Ödevlerim";
-    document.getElementById("leaderboard-section").style.display = isTeacher ? "none" : "block";
+    const leaderboardSection = document.getElementById("leaderboard-section");
+    if (leaderboardSection) leaderboardSection.style.display = isTeacher ? "none" : "block";
     document.getElementById("activities-title").innerText = isTeacher ? "Verilen Etkinlikler" : "Etkinliklerim";
     document.getElementById("activities-tabs").style.display = "flex";
     document.getElementById("activities-teacher-stats").style.display = isTeacher ? "block" : "none";
@@ -12501,14 +12496,14 @@ onAuthStateChanged(auth, (user) => {
       flushAuthReadyWaiters(false);
       ensureLoggedOutView();
       restoreLoginButtonState();
-      showNotice("Profil yüklenemedi. Lütfen tekrar giriş yapın.", "#e74c3c");
+      console.warn("Profil yüklenemedi (gizlendi notification). Hata detayları konsolda.", e);
     }
   }, (error) => {
     console.error("Kullanıcı profil dinleyici hatası:", error);
     flushAuthReadyWaiters(false);
     ensureLoggedOutView();
     restoreLoginButtonState();
-    showNotice("Profil verisi alınamadı. Lütfen tekrar deneyin.", "#e74c3c");
+    console.warn("Profil verisi alınamadı (gizlendi notification). Hata detayları konsolda.", error);
   });
 });
 
@@ -13882,9 +13877,10 @@ function renderLeaderboardPreview(rows = []) {
   list.innerHTML = "";
   if (!rows.length) {
     list.innerHTML = `<li class="list-item" style="cursor:default;">Sıralama verisi bulunamadı.</li>`;
+    renderStudentAdventureBoard();
     return;
   }
-  const topRows = rows.slice(0, 8);
+  const topRows = rows.slice(0, 6);
   topRows.forEach((u) => {
     const li = document.createElement("li");
     li.className = `top-student-row rank-${Math.min(3, Number(u.rank || 99))}`;
@@ -13911,6 +13907,39 @@ function renderLeaderboardPreview(rows = []) {
       li.style.background = "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)";
     }
     list.appendChild(li);
+  });
+  renderStudentAdventureBoard();
+}
+
+function renderStudentTopStudentsList(rows = []) {
+  const list = document.getElementById("student-top-students-list");
+  const card = document.getElementById("student-top-students-card");
+  if (!list) return;
+  if (card) card.style.display = "block";
+  list.innerHTML = "";
+  if (!rows.length) {
+    list.innerHTML = `<div class="empty-state">Sıralama verisi bulunamadı.</div>`;
+    return;
+  }
+  const topRows = rows.slice(0, 6);
+  topRows.forEach((u, idx) => {
+    const row = document.createElement("div");
+    row.className = `top-student-row rank-${Math.min(3, Number(u.rank || idx + 1))}`;
+    const rankNum = Number(u.rank || idx + 1);
+    const medal = rankNum === 1 ? "\u{1F947}" : rankNum === 2 ? "\u{1F948}" : rankNum === 3 ? "\u{1F949}" : "";
+    const avatar = getAvatarById(u.selectedAvatarId || AVATAR_DEFAULT_ID);
+    const avatarImg = buildAvatarImageDataUri(avatar);
+    const isMe = String(u.id || "") === String(currentUserId || "");
+    const classText = `${u.className || "-"}${u.section ? "/" + u.section : ""}`;
+    row.innerHTML = `
+      <div class="top-rank-badge">${rankNum}</div>
+      <div class="top-student-avatar"><img src="${avatarImg}" alt="${u.name} avatar"></div>
+      <div>
+        <div class="top-student-name">${u.name}${isMe ? " (Sen)" : ""} ${classText}${medal ? `<span class="top-student-medal">${medal}</span>` : ""}</div>
+      </div>
+      <div class="top-student-xp">${u.xp} XP</div>
+    `;
+    list.appendChild(row);
   });
 }
 
@@ -13998,7 +14027,8 @@ function loadLeaderboard() {
   
   onSnapshot(q, async (snap) => {
     const list = document.getElementById("leaderboard-list");
-    if (!list) return;
+    const studentTopList = document.getElementById("student-top-students-list");
+    if (!list && !studentTopList) return;
     const reportsXPMap = new Map();
     try {
       const rptSnap = await getDocs(collection(db, "studentReports"));
@@ -14038,7 +14068,8 @@ function loadLeaderboard() {
     });
   });
     leaderboardRowsCache = buildLeaderboardRankedRows(users);
-    renderLeaderboardPreview(leaderboardRowsCache);
+    if (list) renderLeaderboardPreview(leaderboardRowsCache);
+    if (studentTopList) renderStudentTopStudentsList(leaderboardRowsCache);
     populateLeaderboardFilters(leaderboardRowsCache);
     if (document.getElementById("leaderboard-modal")?.style.display === "flex") {
       renderLeaderboardModalList();
@@ -19447,7 +19478,244 @@ function renderHomeOverviewStrip() {
   setMeta("home-overview-block-meta", block.pending, block.completed, block.total);
   setMeta("home-overview-compute-meta", compute.pending, compute.completed, compute.total);
   setMeta("home-overview-lessons-meta", lesson.pending, lesson.completed, lesson.total);
+
+  if (userRole === "student") {
+    setText("student-mini-tasks", task.total);
+    setText("student-mini-activities", act.total);
+    setText("student-mini-block", block.total);
+    setText("student-mini-compute", compute.total);
+    setText("student-mini-lessons", lesson.total);
+
+    setText("student-mini-tasks-meta", `${task.pending} bekleyen • ${task.completed} tamamlanan`);
+    setText("student-mini-activities-meta", `${act.pending} bekleyen • ${act.completed} tamamlanan`);
+    setText("student-mini-block-meta", `${block.pending} bekleyen • ${block.completed} tamamlanan`);
+    setText("student-mini-compute-meta", `${compute.pending} bekleyen • ${compute.completed} tamamlanan`);
+    setText("student-mini-lessons-meta", `${lesson.pending} bekleyen • ${lesson.completed} tamamlanan`);
+  }
+
+  renderStudentAdventureBoard();
 }
+
+function renderStudentAdventureBoard() {
+  if (userRole !== "student") return;
+  const setText = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.innerText = String(val);
+  };
+  const summary = getStudentCertificateSummary();
+  const xp = Math.max(0, parseXPValue(userData?.xp));
+  const completed = Math.max(0, Number(summary.completed || 0));
+  const total = Math.max(0, Number(summary.total || 0));
+  const pending = Math.max(0, total - completed);
+  const rate = Math.max(0, Math.min(100, Number(summary.completionRate || 0)));
+  const quizPoints = Math.max(
+    0,
+    Number(String(document.getElementById("stat-quiz-points")?.innerText || "0").replace(/[^\d.-]/g, "")) || 0
+  );
+  const fullName = getUserDisplayName(userData || {});
+  const firstName = String(fullName || "Kahraman").trim().split(/\s+/)[0] || "Kahraman";
+  const rankIndex = Array.isArray(leaderboardRowsCache)
+    ? leaderboardRowsCache.findIndex((row) => String(row?.id || "") === String(currentUserId || ""))
+    : -1;
+  const rank = rankIndex >= 0 ? rankIndex + 1 : null;
+  const rankText = rank ? `${rank}. sıradasın` : "Sıralaman hazırlanıyor";
+  const heroMessage = pending > 0
+    ? `${pending} görevin seni bekliyor. Bir sonraki adımı seçip ilerleme çubuğunu hızla doldurabilirsin.`
+    : "Tüm görevlerini bitirdin. Şimdi tekrar yapabilir, istatistiklerini inceleyebilir veya liderlikte yerini koruyabilirsin.";
+  const progressNote = pending > 0
+    ? `Şu ana kadar ${completed} görev tamamladın. Bir sonraki hedefin: en az 1 bekleyen görevi bitirmek.`
+    : "Harika ilerledin. Yeni içerikler geldikçe bu alan otomatik güncellenecek.";
+
+  setText("student-hero-greeting", `${firstName}, bugün yeni bir adım atmaya hazır mısın?`);
+  setText("student-hero-message", heroMessage);
+  setText("student-hero-xp", `${xp} XP`);
+  setText("student-hero-completed", completed);
+  setText("student-hero-pending", pending);
+  setText("student-hero-quiz", `${quizPoints} puan`);
+  setText("student-hero-progress-text", `%${rate}`);
+  setText("student-hero-progress-note", progressNote);
+  // show compact class rank value in hero stats and avoid long explanatory text
+  setText("student-hero-class-rank", rank ? `${rank}.` : "—");
+  setText("student-hero-rank-note", "");
+  const progressFill = document.getElementById("student-hero-progress-fill");
+  if (progressFill) progressFill.style.width = `${rate}%`;
+}
+
+function renderTeacherWorkspaceHero() {
+  if (userRole !== "teacher") return;
+  const setText = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.innerText = String(val);
+  };
+  const totalStudents = document.getElementById("stats-total-students")?.innerText || "0";
+  const activeStudents = document.getElementById("stats-active-students")?.innerText || "0";
+  const avgCompletion = document.getElementById("stats-avg-completion")?.innerText || "%0";
+  const totalXP = document.getElementById("stats-total-xp")?.innerText || "0";
+  const totalStudentsNum = Number(String(totalStudents).replace(/[^\d.-]/g, "")) || 0;
+  const activeStudentsNum = Number(String(activeStudents).replace(/[^\d.-]/g, "")) || 0;
+  const avgCompletionNum = Number(String(avgCompletion).replace(/[^\d.-]/g, "")) || 0;
+  const totalXPNum = Number(String(totalXP).replace(/[^\d.-]/g, "")) || 0;
+  const totalCompletions = document.getElementById("stats-total-completions")?.innerText || "0";
+  const totalCompletionsNum = Number(String(totalCompletions).replace(/[^\d.-]/g, "")) || 0;
+  const taskDone = Number(String(document.getElementById("stats-task-completions")?.innerText || "0").replace(/[^\d.-]/g, "")) || 0;
+  const activityDone = Number(String(document.getElementById("stats-activity-completions")?.innerText || "0").replace(/[^\d.-]/g, "")) || 0;
+  const blockDone = Number(String(document.getElementById("stats-block-completions")?.innerText || "0").replace(/[^\d.-]/g, "")) || 0;
+  const computeDone = Number(String(document.getElementById("stats-compute-completions")?.innerText || "0").replace(/[^\d.-]/g, "")) || 0;
+  const topRows = document.querySelectorAll("#top-students-list .top-student-row").length;
+  const fullName = getUserDisplayName(userData || {});
+  const teacherName = String(fullName || "Öğretmen").trim().split(/\s+/)[0] || "Öğretmen";
+  const categories = [
+    { key: "Ödev", value: taskDone },
+    { key: "Etkinlik", value: activityDone },
+    { key: "Blok Kodlama", value: blockDone },
+    { key: "Compute It", value: computeDone }
+  ].sort((a, b) => b.value - a.value);
+  const strongest = categories[0];
+  const weakest = categories[categories.length - 1];
+  const attendancePercent = totalStudentsNum > 0 ? Math.round((activeStudentsNum / totalStudentsNum) * 100) : 0;
+  const supportPercent = totalStudentsNum > 0 ? Math.max(0, 100 - attendancePercent) : 0;
+  const motivationPercent = totalStudentsNum > 0 ? Math.min(100, Math.round((topRows / totalStudentsNum) * 100)) : 0;
+  let statusNote = "Sınıfın verileri toplanıyor. Kartlar güncellendikçe bu alan da yenilenir.";
+  if (totalStudentsNum > 0) {
+    statusNote = `${activeStudentsNum}/${totalStudentsNum} öğrenci aktif görünüyor. Ortalama tamamlama ${avgCompletionNum}% seviyesinde ve başarı listesinde ${topRows} öğrenci öne çıkıyor.`;
+  }
+  setText("teacher-hero-title", `${teacherName}, akış hazır.`);
+  setText("teacher-hero-text", "Kısa sinyallerle sınıfın ritmini anında okuyun.");
+  setText("teacher-hero-total-students", totalStudents);
+  setText("teacher-hero-active-students", activeStudents);
+  setText("teacher-hero-avg-completion", avgCompletion);
+  setText("teacher-hero-total-xp", totalXP);
+  setText("teacher-hero-status-note", statusNote);
+  setText("teacher-rail-attendance-text", `%${attendancePercent}`);
+  setText("teacher-rail-progress-text", `%${Math.max(0, avgCompletionNum)}`);
+  const setWidth = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.style.width = `${Math.max(0, Math.min(100, Number(value || 0)))}%`;
+  };
+  setWidth("teacher-rail-attendance", attendancePercent);
+  setWidth("teacher-rail-progress", avgCompletionNum);
+  setText(
+    "teacher-hero-focus-title",
+    activeStudentsNum < totalStudentsNum ? "Katılımı artırın" : "Tamamlama hızını yükseltin"
+  );
+  setText(
+    "teacher-hero-focus-text",
+    activeStudentsNum < totalStudentsNum
+      ? `${Math.max(0, totalStudentsNum - activeStudentsNum)} öğrenci beklemede.`
+      : `Ortalama %${Math.max(avgCompletionNum, 0)} seviyesinde.`
+  );
+  setText(
+    "teacher-hero-strong-title",
+    strongest && strongest.value > 0 ? `${strongest.key} önde` : "Kategori verisi bekleniyor"
+  );
+  setText(
+    "teacher-hero-strong-text",
+    strongest && strongest.value > 0
+      ? `${strongest.value} tamamlanma ile güçlü sinyal veriyor.`
+      : "İlk tamamlamalarda netleşecek."
+  );
+  setText(
+    "teacher-hero-rhythm-title",
+    totalCompletionsNum > 0 ? `${totalCompletionsNum} toplam üretim` : "Ritim bekleniyor"
+  );
+  setText(
+    "teacher-hero-rhythm-text",
+    totalCompletionsNum > 0
+      ? `${weakest && weakest.value >= 0 ? `${weakest.key} yavaş kalıyor.` : "Dağılım dengeleniyor."}`
+      : "İlk veriyle hareketlenecek."
+  );
+  setText("teacher-info-attendance-title", `${activeStudentsNum}/${totalStudentsNum} öğrenci aktif`);
+  setWidth("teacher-info-attendance-bar", attendancePercent);
+  setText(
+    "teacher-info-attendance-text",
+    totalStudentsNum > 0
+      ? `${Math.max(0, totalStudentsNum - activeStudentsNum)} öğrenci bekliyor.`
+      : "Aktiflik özeti gelecek."
+  );
+  setText("teacher-info-progress-title", `Ortalama tamamlama ${avgCompletion}`);
+  setWidth("teacher-info-progress-bar", avgCompletionNum);
+  setText(
+    "teacher-info-progress-text",
+    totalCompletionsNum > 0
+      ? `${totalCompletionsNum} kayıt oluştu.`
+      : "İlk ilerleme bekleniyor."
+  );
+  setText(
+    "teacher-info-support-title",
+    activeStudentsNum < totalStudentsNum ? "Destek grubu var" : "Destek dengeli"
+  );
+  setWidth("teacher-info-support-bar", supportPercent);
+  setText(
+    "teacher-info-support-text",
+    activeStudentsNum < totalStudentsNum
+      ? "Pasif öğrencilere kısa görev verin."
+      : "Akış şu an dengeli görünüyor."
+  );
+  setText("teacher-info-motivation-title", `${totalXPNum} toplam XP üretildi`);
+  setWidth("teacher-info-motivation-bar", motivationPercent);
+  setText(
+    "teacher-info-motivation-text",
+    topRows > 0
+      ? `${topRows} öğrenci öne çıkıyor.`
+      : "Başarı listesi bekleniyor."
+  );
+}
+
+function syncResponsiveHeaderGreeting(explicitFullName = "") {
+  const displayFirst = explicitFullName || getUserDisplayName(userData || {});
+  const fullName = String(displayFirst || "Kullanıcı").trim();
+  const welcomeLabel = document.getElementById("user-welcome");
+  const fullNameEl = document.getElementById("user-fullname");
+  const userMenuTrigger = document.getElementById("user-menu-trigger");
+  const isCompactTeacherHeader = userRole === "teacher" && window.matchMedia("(max-width: 720px)").matches;
+  if (fullNameEl) {
+    fullNameEl.innerText = userRole === "student" ? `Hoş geldin, ${fullName}` : "";
+  }
+  if (welcomeLabel) {
+    welcomeLabel.innerText = userRole === "teacher"
+      ? (isCompactTeacherHeader ? "" : `Hoş geldin, ${fullName} Öğrt.`)
+      : "";
+  }
+  if (userMenuTrigger) {
+    userMenuTrigger.innerText = `Hoş geldin, ${fullName}`;
+  }
+}
+
+function syncMobileOpenMenuPlacement() {
+  const openMenuBtn = document.getElementById("open-menu");
+  const appHeader = document.querySelector("#app-screen[style*='display: grid'] .app-header") || document.querySelector("#app-screen .app-header");
+  if (!openMenuBtn || !appHeader) return;
+  const isMobile = window.matchMedia("(max-width: 768px)").matches;
+  const forceInHeader = userRole === "teacher";
+  if (isMobile || forceInHeader) {
+    if (openMenuBtn.parentElement !== appHeader) {
+      appHeader.insertBefore(openMenuBtn, appHeader.firstChild);
+    }
+  } else {
+    const container = document.querySelector(".container");
+    if (container && openMenuBtn.parentElement !== container) {
+      container.insertBefore(openMenuBtn, container.firstChild);
+    }
+  }
+}
+
+window.scrollStudentPanel = function(panelId) {
+  const target = document.getElementById(panelId);
+  if (!target) return;
+  target.scrollIntoView({ behavior: "smooth", block: "start" });
+};
+
+window.scrollTeacherPanel = function(panelId) {
+  const target = document.getElementById(panelId);
+  if (!target) return;
+  target.scrollIntoView({ behavior: "smooth", block: "start" });
+};
+
+window.addEventListener("resize", () => {
+  if (!currentUserId) return;
+  syncResponsiveHeaderGreeting();
+  syncMobileOpenMenuPlacement();
+});
 
 function openAllItemsModal(title, pendingRows = [], completedRows = []) {
   const modal = document.getElementById("all-tasks-modal");
@@ -22791,6 +23059,7 @@ async function loadStatsPage() {
     setText("stats-activity-completions", activityCompletionsTotal);
     setText("stats-block-completions", blockCompletionsTotal);
     setText("stats-compute-completions", computeCompletionsTotal);
+    renderTeacherWorkspaceHero();
 
     const ensureBlockAnomalyPanel = () => {
       const parent = document.getElementById("teacher-stats-content");

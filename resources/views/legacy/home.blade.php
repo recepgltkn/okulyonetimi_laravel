@@ -78,7 +78,7 @@
         #app-screen.teacher-view #teacher-home-tabs {
             margin-top: 4px !important;
             margin-bottom: 0 !important;
-            min-height: 54px;
+            min-height: 58px;
             align-items: stretch;
         }
         #app-screen.teacher-view #block-homework-assign-tabs {
@@ -136,6 +136,1305 @@
             color: #64748b;
             text-align: center;
         }
+        #app-screen.student-view {
+            position: relative;
+            background:
+                radial-gradient(circle at top left, rgba(255, 209, 102, 0.38), transparent 28%),
+                radial-gradient(circle at top right, rgba(34, 211, 238, 0.22), transparent 24%),
+                linear-gradient(180deg, #fffaf0 0%, #f6fbff 40%, #eef7ff 100%);
+            gap: 18px;
+            padding: 18px;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            justify-content: center;
+        }
+        #app-screen.student-view::before,
+        #app-screen.student-view::after {
+            content: "";
+            position: absolute;
+            border-radius: 999px;
+            filter: blur(10px);
+            pointer-events: none;
+            opacity: 0.65;
+        }
+        #app-screen.student-view::before {
+            width: 140px;
+            height: 140px;
+            top: 72px;
+            right: 28px;
+            background: rgba(59, 130, 246, 0.14);
+            animation: studentFloat 9s ease-in-out infinite;
+        }
+        #app-screen.student-view::after {
+            width: 120px;
+            height: 120px;
+            left: 24px;
+            bottom: 48px;
+            background: rgba(251, 146, 60, 0.14);
+            animation: studentFloat 11s ease-in-out infinite reverse;
+        }
+        #app-screen.student-view > * {
+            position: relative;
+            z-index: 1;
+        }
+        #app-screen.student-view .app-header,
+        #app-screen.teacher-view .app-header {
+            z-index: 50;
+        }
+        #user-menu {
+            z-index: 120;
+        }
+        #user-dropdown {
+            z-index: 130 !important;
+        }
+        #app-screen.student-view #home-overview-strip {
+            display: none;
+        }
+        #app-screen.student-view #student-stats-bar {
+            background: transparent;
+            padding: 0;
+            border: none;
+            box-shadow: none;
+        }
+        #app-screen.student-view #student-stats-bar .stats-grid {
+            display: none;
+        }
+        #student-hero-panel {
+            display: none;
+        }
+        #app-screen.student-view #student-hero-panel {
+            display: grid;
+            grid-column: 1 / -1;
+            grid-template-columns: minmax(0, 1.9fr) minmax(240px, 0.8fr);
+            gap: 16px;
+            align-items: start;
+            /* ensure hero panel aligns vertically with main student sections */
+            min-height: 520px;
+            height: 520px;
+            overflow: hidden;
+        }
+        .student-hero-main,
+        .student-hero-side,
+        .student-spark-card,
+        .student-quick-card {
+            border-radius: 26px;
+            overflow: hidden;
+        }
+        .student-hero-main,
+        .student-hero-side {
+            height: 100%;
+            min-height: 0;
+            box-sizing: border-box;
+        }
+        .student-hero-main {
+            position: relative;
+            padding: 24px;
+            color: #132238;
+            background:
+                radial-gradient(circle at top right, rgba(255,255,255,0.92), transparent 24%),
+                linear-gradient(135deg, #ffd166 0%, #ff9f68 30%, #6ecbf5 72%, #3b82f6 100%);
+            box-shadow: 0 20px 45px rgba(59, 130, 246, 0.18);
+            isolation: isolate;
+        }
+        .student-hero-main::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(circle at 15% 18%, rgba(255,255,255,0.36), transparent 18%),
+                radial-gradient(circle at 88% 18%, rgba(255,255,255,0.18), transparent 16%);
+            z-index: -1;
+        }
+        .student-hero-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(10px);
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: #0f3d91;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+        .student-hero-title {
+            margin: 14px 0 10px;
+            font-family: "Unbounded", sans-serif;
+            font-size: clamp(1.5rem, 3vw, 2.4rem);
+            line-height: 1.12;
+            color: #0f172a;
+        }
+        .student-hero-message {
+            max-width: 64ch;
+            font-size: 0.98rem;
+            line-height: 1.6;
+            color: rgba(15, 23, 42, 0.82);
+            margin: 0;
+        }
+        .student-hero-stats {
+            margin-top: 18px;
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 10px;
+        }
+        .student-hero-stat {
+            padding: 14px;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.86);
+            backdrop-filter: blur(10px);
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.35);
+        }
+        .student-hero-stat-label {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: #475569;
+            margin-bottom: 6px;
+        }
+        .student-hero-stat-value {
+            font-family: "Unbounded", sans-serif;
+            font-size: 1.05rem;
+            color: #0f172a;
+        }
+        .student-hero-progress {
+            margin-top: 16px;
+            padding: 16px 18px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.82);
+        }
+        .student-hero-progress-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 10px;
+            font-weight: 700;
+            color: #1e293b;
+        }
+        .student-hero-progress-track {
+            height: 14px;
+            border-radius: 999px;
+            overflow: hidden;
+            background: rgba(148, 163, 184, 0.2);
+        }
+        .student-hero-progress-fill {
+            width: 0%;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #22c55e 0%, #14b8a6 50%, #3b82f6 100%);
+            transition: width 0.45s ease;
+        }
+        .student-hero-progress-note {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: #334155;
+        }
+        .student-hero-side {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            align-self: start;
+        }
+        .student-hero-main {
+            align-self: start;
+        }
+        .student-spark-card,
+        .student-quick-card,
+        #app-screen.student-view #student-homework-shell,
+        #app-screen.student-view #student-apps-shell,
+        #app-screen.student-view #leaderboard-section {
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid rgba(255, 255, 255, 0.7);
+            box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
+            backdrop-filter: blur(14px);
+        }
+        .student-spark-card {
+            padding: 18px;
+        }
+        .student-spark-title {
+            font-family: "Unbounded", sans-serif;
+            font-size: 1rem;
+            margin: 0 0 6px;
+            color: #132238;
+        }
+        .student-spark-sub {
+            margin: 0;
+            color: #475569;
+            font-size: 0.88rem;
+            line-height: 1.5;
+        }
+        .student-rank-pill {
+            margin-top: 14px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #eff6ff, #dbeafe);
+            color: #1d4ed8;
+            font-weight: 700;
+        }
+        .student-quick-card {
+            padding: 18px;
+        }
+        .student-quick-title {
+            margin: 0 0 12px;
+            font-family: "Unbounded", sans-serif;
+            font-size: 0.96rem;
+            color: #0f172a;
+        }
+        .student-quick-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+        .student-quick-btn {
+            border: none;
+            border-radius: 18px;
+            padding: 14px 12px;
+            text-align: left;
+            cursor: pointer;
+            color: #0f172a;
+            font-weight: 700;
+            background: linear-gradient(135deg, #fff7ed, #ffedd5);
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }
+        .student-quick-btn:nth-child(2) { background: linear-gradient(135deg, #ecfeff, #cffafe); }
+        .student-quick-btn:nth-child(3) { background: linear-gradient(135deg, #eff6ff, #dbeafe); }
+        .student-quick-btn:nth-child(4) { background: linear-gradient(135deg, #f5f3ff, #ede9fe); }
+        .student-quick-btn:hover {
+            transform: translateY(-2px) scale(1.01);
+            box-shadow: 0 10px 24px rgba(59, 130, 246, 0.12);
+        }
+        .student-quick-btn span {
+            display: block;
+            font-size: 0.78rem;
+            font-weight: 500;
+            color: #475569;
+            margin-top: 4px;
+        }
+
+        /* Make leaderboard medal/texts take less horizontal space by placing them on a separate line */
+        #top-students-list .top-student-medal,
+        #leaderboard-list .top-student-medal {
+            margin-left: 0;
+            display: block;
+            margin-top: 6px;
+            font-size: 0.82rem;
+        }
+        .student-mini-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 12px;
+            grid-column: 1 / -1;
+        }
+        .student-mini-card {
+            padding: 16px;
+            border-radius: 22px;
+            color: #0f172a;
+            background: rgba(255,255,255,0.78);
+            border: 1px solid rgba(148, 163, 184, 0.14);
+            box-shadow: 0 12px 26px rgba(15, 23, 42, 0.06);
+        }
+        .student-mini-card:nth-child(1) { background: linear-gradient(135deg, #fff7ed, #ffedd5); }
+        .student-mini-card:nth-child(2) { background: linear-gradient(135deg, #fef3c7, #fde68a); }
+        .student-mini-card:nth-child(3) { background: linear-gradient(135deg, #ecfeff, #bae6fd); }
+        .student-mini-card:nth-child(4) { background: linear-gradient(135deg, #eef2ff, #c7d2fe); }
+        .student-mini-card:nth-child(5) { background: linear-gradient(135deg, #ecfccb, #bbf7d0); }
+        .student-mini-label {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: #334155;
+            margin-bottom: 6px;
+        }
+        .student-mini-value {
+            font-family: "Unbounded", sans-serif;
+            font-size: 1.18rem;
+        }
+        .student-mini-meta {
+            margin-top: 6px;
+            font-size: 0.8rem;
+            color: #475569;
+        }
+        #app-screen.student-view #student-homework-shell,
+        #app-screen.student-view #student-apps-shell,
+        #app-screen.student-view #leaderboard-section {
+            border-radius: 28px;
+            padding: 18px;
+        }
+        #app-screen.student-view .student-shell-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+        #app-screen.student-view .student-shell-head h3 {
+            margin: 0;
+            font-family: "Unbounded", sans-serif;
+            font-size: 1.18rem;
+            color: #0f172a;
+        }
+        #app-screen.student-view .student-shell-head p {
+            margin: 6px 0 0;
+            max-width: 58ch;
+            color: #475569;
+            line-height: 1.5;
+        }
+        #app-screen.student-view .student-combined-wrap .tabs {
+            display: inline-flex !important;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 8px;
+            border-radius: 999px;
+            background: #edf4ff;
+            margin-top: 0;
+            width: fit-content;
+        }
+        #app-screen.student-view .student-combined-wrap .tab-btn {
+            border-radius: 999px;
+            padding: 10px 16px;
+            border: none;
+            background: transparent;
+            font-weight: 700;
+            color: #33507a;
+        }
+        #app-screen.student-view .student-combined-wrap .tab-btn.active {
+            background: linear-gradient(135deg, #3b82f6, #06b6d4);
+            color: #fff;
+            box-shadow: 0 10px 20px rgba(59, 130, 246, 0.2);
+        }
+        #app-screen.teacher-view #teacher-home-tabs,
+        #app-screen.teacher-view #block-homework-assign-tabs {
+            display: inline-flex !important;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 8px;
+            border-radius: 999px;
+            background: #edf4ff;
+            width: fit-content;
+            margin-top: 0 !important;
+            margin-bottom: 8px !important;
+            align-self: center;
+        }
+        #app-screen.teacher-view #teacher-home-tabs .tab-btn,
+        #app-screen.teacher-view #block-homework-assign-tabs .tab-btn {
+            border-radius: 999px;
+            padding: 10px 16px;
+            border: none;
+            background: transparent;
+            font-weight: 700;
+            color: #33507a;
+            height: auto;
+        }
+        #app-screen.teacher-view #teacher-home-tabs .tab-btn.active,
+        #app-screen.teacher-view #block-homework-assign-tabs .tab-btn.active {
+            background: linear-gradient(135deg, #3b82f6, #06b6d4);
+            color: #fff;
+            box-shadow: 0 10px 20px rgba(59, 130, 246, 0.2);
+        }
+        #app-screen.student-view .status-split {
+            gap: 14px;
+            margin-top: 0;
+        }
+        #app-screen.student-view .status-split .tab-content {
+            padding: 14px;
+            border-radius: 22px;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+            border: 1px solid #e5eefc;
+        }
+        #app-screen.student-view #student-homework-shell .list-item,
+        #app-screen.student-view #student-apps-shell .list-item {
+            border-left: 0;
+            padding: 14px 16px;
+            margin-bottom: 10px;
+            border-radius: 18px;
+            background: linear-gradient(135deg, #ffffff, #f8fbff);
+            box-shadow: 0 8px 20px rgba(148, 163, 184, 0.1);
+        }
+        #app-screen.student-view #student-homework-shell .list-item:hover,
+        #app-screen.student-view #student-apps-shell .list-item:hover {
+            transform: translateY(-2px);
+            background: linear-gradient(135deg, #ffffff, #eef6ff);
+        }
+        #app-screen.student-view #leaderboard-section h3 {
+            margin: 0;
+            font-family: "Unbounded", sans-serif;
+            color: #0f172a;
+        }
+        /* Keep leaderboard height from stretching the level map */
+        #app-screen.student-view #student-hero-panel #leaderboard-section {
+            height: 100%;
+            max-height: 520px;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        #app-screen.student-view #student-hero-panel #leaderboard-list {
+            flex: 1;
+            min-height: 0;
+            overflow: auto;
+        }
+        #app-screen.student-view #leaderboard-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        #app-screen.student-view #leaderboard-list .top-student-row {
+            min-height: 54px;
+            padding: 6px 8px;
+            gap: 6px;
+            border-radius: 12px;
+            border: 1px solid #dbeafe;
+            background: rgba(255,255,255,0.96);
+            font-weight: 700;
+            color: #0f172a;
+            line-height: 1.1;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        /* Force student leaderboard typography to match teacher list */
+        #app-screen.student-view #leaderboard-list .top-student-name {
+            font-weight: 700;
+            color: #0f172a;
+            line-height: 1.1;
+            font-size: 0.98rem;
+            font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+            letter-spacing: -0.01em;
+            text-align: left;
+        }
+        #app-screen.student-view #leaderboard-list .top-student-meta {
+            color: #64748b;
+            font-size: 0.8rem;
+            margin-top: 0;
+        }
+        #app-screen.student-view #leaderboard-list .top-student-xp {
+            font-weight: 800;
+            color: #047857;
+            background: #ecfdf5;
+            border: 1px solid #a7f3d0;
+            border-radius: 999px;
+            padding: 4px 6px;
+            font-size: 0.82rem;
+            white-space: nowrap;
+        }
+        @keyframes studentFloat {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+        @media (max-width: 980px) {
+            #app-screen.student-view #student-hero-panel {
+                grid-template-columns: 1fr;
+                height: auto;
+                min-height: 0;
+            }
+            #app-screen.student-view {
+                grid-template-columns: 1fr;
+            }
+            .student-hero-stats,
+            .student-mini-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+            .student-hero-main,
+            .student-hero-side {
+                height: auto;
+                min-height: 0;
+            }
+            #app-screen.student-view #student-hero-panel #leaderboard-section {
+                max-height: none;
+                height: auto;
+            }
+            #app-screen.student-view #student-hero-panel #leaderboard-list {
+                overflow: visible;
+            }
+        }
+        @media (max-width: 640px) {
+            #app-screen.student-view {
+                padding: 12px;
+                gap: 14px;
+            }
+            .student-hero-main,
+            .student-spark-card,
+            .student-quick-card,
+            #app-screen.student-view #student-homework-shell,
+            #app-screen.student-view #student-apps-shell,
+            #app-screen.student-view #leaderboard-section {
+                border-radius: 22px;
+                padding: 14px;
+            }
+            .student-hero-stats,
+            .student-mini-grid,
+            .student-quick-grid,
+            #app-screen.student-view .status-split {
+                grid-template-columns: 1fr;
+            }
+            #app-screen.student-view .student-combined-wrap .tabs {
+                width: 100%;
+            }
+            #app-screen.student-view .student-combined-wrap .tab-btn {
+                flex: 1 1 auto;
+                text-align: center;
+            }
+        }
+        /* Align leaderboard height with level map and keep list inside */
+        #app-screen.student-view #student-hero-panel #leaderboard-section {
+            height: 100% !important;
+            max-height: 520px !important;
+            min-height: 0 !important;
+            display: flex;
+            flex-direction: column;
+        }
+        #app-screen.student-view #student-hero-panel #leaderboard-list {
+            flex: 1;
+            min-height: 0;
+            overflow: auto;
+            padding-right: 4px;
+        }
+        #teacher-hero-panel {
+            display: none;
+        }
+        #app-screen.teacher-view {
+            position: relative;
+            background:
+                radial-gradient(circle at top left, rgba(148, 163, 184, 0.18), transparent 25%),
+                linear-gradient(180deg, #f6f8fb 0%, #eef3f8 100%);
+            gap: 16px;
+            padding: 16px;
+        }
+        #app-screen.teacher-view > * {
+            position: relative;
+            z-index: 1;
+        }
+        #app-screen.teacher-view > .app-header {
+            display: grid;
+            grid-template-columns: auto 1fr auto auto;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 18px;
+            margin-bottom: 0;
+            border-radius: 22px;
+            background: rgba(255,255,255,0.82);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+            backdrop-filter: blur(10px);
+        }
+        #app-screen.teacher-view #user-fullname,
+        #app-screen.teacher-view #header-center-logo {
+            display: none;
+        }
+        #app-screen.teacher-view #user-welcome {
+            display: none !important;
+        }
+        #app-screen.teacher-view #header-center-logo {
+            display: inline-flex !important;
+            grid-column: 2;
+            justify-self: center;
+        }
+        #app-screen.teacher-view #theme-toggle-app {
+            grid-column: 3;
+            justify-self: end;
+        }
+        #app-screen.teacher-view #user-menu {
+            grid-column: 4;
+            justify-self: end;
+        }
+        #app-screen.teacher-view #theme-toggle-app,
+        #app-screen.teacher-view #user-menu-trigger {
+            min-height: 42px;
+            border-radius: 14px;
+            border: 1px solid #d9e2ec;
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+        }
+        #app-screen.teacher-view #user-menu-trigger {
+            background: linear-gradient(180deg, #ffffff, #f8fafc);
+            color: #0f172a;
+            font-weight: 700;
+            padding: 10px 16px;
+        }
+        #app-screen.teacher-view #open-menu {
+            position: static !important;
+            width: 46px;
+            height: 46px;
+            padding: 0 !important;
+            border-radius: 14px !important;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 8px 0 0;
+            flex: 0 0 46px;
+        }
+        #app-screen.teacher-view #teacher-hero-panel {
+            display: grid;
+            grid-column: 1 / -1;
+            grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.95fr);
+            gap: 16px;
+        }
+        .teacher-hero-main,
+        .teacher-hero-side,
+        .teacher-hero-quick,
+        .teacher-hero-metric {
+            border-radius: 24px;
+        }
+        .teacher-hero-main,
+        .teacher-hero-quick,
+        .teacher-hero-side,
+        #app-screen.teacher-view #teacher-analytics,
+        #app-screen.teacher-view #top-students-card,
+        #app-screen.teacher-view #student-homework-shell,
+        #app-screen.teacher-view #block-homework-section {
+            background: rgba(255,255,255,0.88);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            box-shadow: 0 16px 34px rgba(15, 23, 42, 0.08);
+            backdrop-filter: blur(12px);
+        }
+        .teacher-hero-main {
+            padding: 22px 24px;
+            background:
+                radial-gradient(circle at top right, rgba(255,255,255,0.7), transparent 22%),
+                linear-gradient(145deg, #f8fafc 0%, #e8eef6 100%);
+            overflow: hidden;
+            position: relative;
+        }
+        .teacher-hero-main::after {
+            content: "";
+            position: absolute;
+            width: 180px;
+            height: 180px;
+            top: -46px;
+            right: -20px;
+            border-radius: 999px;
+            background: radial-gradient(circle, rgba(96, 165, 250, 0.22), rgba(96, 165, 250, 0) 68%);
+            pointer-events: none;
+            animation: teacherOrbFloat 7s ease-in-out infinite;
+        }
+        .teacher-hero-kicker {
+            display: inline-flex;
+            align-items: center;
+            padding: 10px 12px;
+            border-radius: 999px;
+            background: #e2e8f0;
+            color: #334155;
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .teacher-hero-title {
+            margin: 14px 0 10px;
+            font-family: "Unbounded", sans-serif;
+            font-size: clamp(1.35rem, 2.7vw, 2.2rem);
+            line-height: 1.14;
+            color: #0f172a;
+        }
+        .teacher-hero-text {
+            margin: 0;
+            color: #475569;
+            line-height: 1.5;
+            max-width: 38ch;
+            font-size: 0.92rem;
+        }
+        .teacher-hero-topline {
+            display: grid;
+            grid-template-columns: minmax(0, 1.2fr) 220px;
+            gap: 18px;
+            align-items: center;
+        }
+        .teacher-hero-metrics {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 18px;
+        }
+        .teacher-hero-metric {
+            padding: 14px 15px;
+            background: rgba(255,255,255,0.86);
+            border: 1px solid rgba(148, 163, 184, 0.14);
+        }
+        .teacher-hero-metric-label {
+            font-size: 0.76rem;
+            font-weight: 700;
+            color: #64748b;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .teacher-hero-metric-value {
+            font-family: "Unbounded", sans-serif;
+            font-size: 1rem;
+            color: #0f172a;
+        }
+        .teacher-hero-visual {
+            position: relative;
+            min-height: 190px;
+            border-radius: 24px;
+            background:
+                radial-gradient(circle at center, rgba(255,255,255,0.56), rgba(255,255,255,0) 58%),
+                linear-gradient(145deg, rgba(255,255,255,0.72), rgba(226,232,240,0.62));
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            overflow: hidden;
+        }
+        .teacher-hero-core {
+            position: absolute;
+            inset: 50% auto auto 50%;
+            width: 82px;
+            height: 82px;
+            margin-left: -41px;
+            margin-top: -41px;
+            border-radius: 999px;
+            background: linear-gradient(145deg, #1d4ed8, #0ea5e9);
+            box-shadow: 0 14px 30px rgba(37, 99, 235, 0.28);
+        }
+        .teacher-hero-core::before,
+        .teacher-hero-core::after {
+            content: "";
+            position: absolute;
+            inset: -18px;
+            border-radius: inherit;
+            border: 1px solid rgba(59, 130, 246, 0.22);
+            animation: teacherPulseRing 3.2s ease-out infinite;
+        }
+        .teacher-hero-core::after {
+            inset: -36px;
+            animation-delay: 1.1s;
+        }
+        .teacher-hero-dot {
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            border-radius: 999px;
+            background: #ffffff;
+            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.14);
+        }
+        .teacher-hero-dot.dot-a { top: 26px; left: 42px; background: #38bdf8; animation: teacherDotFloat 4.8s ease-in-out infinite; }
+        .teacher-hero-dot.dot-b { right: 34px; top: 54px; background: #f59e0b; animation: teacherDotFloat 5.6s ease-in-out infinite reverse; }
+        .teacher-hero-dot.dot-c { left: 62px; bottom: 28px; background: #22c55e; animation: teacherDotFloat 5.2s ease-in-out infinite; }
+        .teacher-hero-rail {
+            position: absolute;
+            left: 28px;
+            right: 28px;
+            bottom: 24px;
+            display: grid;
+            gap: 10px;
+        }
+        .teacher-hero-rail-item {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            gap: 10px;
+            align-items: center;
+            font-size: 0.78rem;
+            color: #475569;
+            font-weight: 700;
+        }
+        .teacher-hero-rail-track {
+            height: 8px;
+            border-radius: 999px;
+            background: rgba(148, 163, 184, 0.22);
+            overflow: hidden;
+        }
+        .teacher-hero-rail-fill {
+            width: 0%;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #38bdf8, #2563eb);
+            transition: width 0.45s ease;
+        }
+        .teacher-hero-signal-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 16px;
+        }
+        .teacher-hero-signal {
+            border-radius: 18px;
+            padding: 14px 16px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(248,250,252,0.88));
+            border: 1px solid rgba(148, 163, 184, 0.16);
+            box-shadow: 0 10px 20px rgba(15, 23, 42, 0.05);
+        }
+        .teacher-hero-signal-kicker {
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: #64748b;
+            margin-bottom: 8px;
+        }
+        .teacher-hero-signal-title {
+            font-size: 0.98rem;
+            font-weight: 800;
+            color: #0f172a;
+            line-height: 1.3;
+            margin-bottom: 6px;
+        }
+        .teacher-hero-signal-text {
+            color: #475569;
+            font-size: 0.78rem;
+            line-height: 1.45;
+        }
+        .teacher-hero-side {
+            display: grid;
+            gap: 16px;
+        }
+        .teacher-hero-quick {
+            padding: 20px;
+        }
+        .teacher-hero-quick h3,
+        .teacher-hero-side h3 {
+            margin: 0 0 10px;
+            font-family: "Unbounded", sans-serif;
+            font-size: 1rem;
+            color: #0f172a;
+        }
+        .teacher-hero-side p {
+            margin: 0;
+            color: #475569;
+            line-height: 1.55;
+        }
+        .teacher-quick-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+        .teacher-info-card {
+            border: 1px solid #dbe3ed;
+            border-radius: 18px;
+            padding: 14px;
+            background: linear-gradient(180deg, #ffffff, #f8fafc);
+            color: #0f172a;
+            min-height: 92px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 8px;
+        }
+        .teacher-info-kicker {
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: #64748b;
+        }
+        .teacher-info-title {
+            font-size: 0.95rem;
+            font-weight: 800;
+            color: #0f172a;
+            line-height: 1.25;
+        }
+        .teacher-info-text {
+            color: #475569;
+            font-size: 0.72rem;
+            line-height: 1.35;
+        }
+        .teacher-info-bar {
+            height: 7px;
+            border-radius: 999px;
+            background: rgba(148, 163, 184, 0.22);
+            overflow: hidden;
+        }
+        .teacher-info-bar > span {
+            display: block;
+            width: 0%;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #60a5fa, #2563eb);
+            transition: width 0.45s ease;
+        }
+        #app-screen.teacher-view #teacher-analytics,
+        #app-screen.teacher-view #top-students-card,
+        #app-screen.teacher-view #student-homework-shell,
+        #app-screen.teacher-view #block-homework-section {
+            border-radius: 26px;
+            padding: 18px;
+        }
+        #app-screen.teacher-view #teacher-home-tabs,
+        #app-screen.teacher-view #block-homework-assign-tabs,
+        #app-screen.teacher-view #student-tabs,
+        #app-screen.teacher-view #activities-tabs,
+        #app-screen.teacher-view #lessons-tabs,
+        #app-screen.teacher-view #quiz-tabs,
+        #app-screen.teacher-view #block-homework-tabs,
+        #app-screen.teacher-view #compute-homework-tabs {
+            gap: 8px;
+            padding: 8px;
+            border-radius: 18px;
+            background: #eef3f8;
+            border: 1px solid #dce4ee;
+        }
+        #app-screen.teacher-view .tab-btn {
+            border: 0;
+            border-bottom: 0;
+            border-radius: 14px;
+            min-height: 42px;
+            padding: 10px 14px;
+            font-size: 0.92rem;
+            font-weight: 700;
+            color: #475569;
+        }
+        #app-screen.teacher-view .tab-btn.active {
+            color: #0f172a;
+            background: linear-gradient(180deg, #ffffff, #f8fafc);
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+        }
+        #app-screen.teacher-view #tasks-section .list-item,
+        #app-screen.teacher-view #activities-section .list-item,
+        #app-screen.teacher-view #lessons-section .list-item,
+        #app-screen.teacher-view #block-homework-section .list-item,
+        #app-screen.teacher-view #quiz-section .list-item {
+            padding: 14px 16px;
+            border-radius: 18px;
+            border-left: 0;
+            border: 1px solid #e2e8f0;
+            background: linear-gradient(180deg, #ffffff, #f8fafc);
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+        }
+        #app-screen.teacher-view #tasks-section .list-item:hover,
+        #app-screen.teacher-view #activities-section .list-item:hover,
+        #app-screen.teacher-view #lessons-section .list-item:hover,
+        #app-screen.teacher-view #block-homework-section .list-item:hover,
+        #app-screen.teacher-view #quiz-section .list-item:hover {
+            transform: translateY(-1px);
+            background: linear-gradient(180deg, #ffffff, #f2f7fc);
+        }
+        #app-screen.teacher-view .teacher-app-stats {
+            padding: 10px;
+            border-radius: 18px;
+            background: linear-gradient(180deg, #f8fbff, #eef4fb);
+            border: 1px solid #dce6f2;
+        }
+        #app-screen.teacher-view .teacher-app-stats-tile,
+        #app-screen.teacher-view .teacher-app-stats-btn-tile {
+            border-radius: 14px;
+            border: 1px solid #dbe6f3;
+            background: linear-gradient(180deg, #ffffff, #f8fafc);
+            box-shadow: none;
+        }
+        #app-screen.teacher-view #teacher-analytics #stats-content > .card {
+            padding: 0;
+            background: transparent;
+            box-shadow: none;
+            border: 0;
+        }
+        #app-screen.teacher-view #teacher-analytics h4,
+        #app-screen.teacher-view #top-students-card h4 {
+            margin: 0 0 14px;
+            font-family: "Unbounded", sans-serif;
+            font-size: 1.04rem;
+            color: #0f172a;
+        }
+        #app-screen.teacher-view .stats-summary-grid .stat-card,
+        #app-screen.teacher-view .teacher-mini-stats-grid .stat-card {
+            border-radius: 18px;
+            border: 1px solid #dbe4ef;
+            background: linear-gradient(180deg, #ffffff, #f8fafc);
+            box-shadow: 0 10px 20px rgba(15, 23, 42, 0.05);
+        }
+        #app-screen.teacher-view .stat-number {
+            font-family: "Unbounded", sans-serif;
+            font-size: 1.08rem;
+            color: #0f172a;
+        }
+        #app-screen.teacher-view .stat-label {
+            color: #64748b;
+            font-weight: 700;
+        }
+        #app-screen.teacher-view #teacher-analytics .teacher-type-panel,
+        #app-screen.teacher-view #teacher-analytics .teacher-pie-panel {
+            border-radius: 22px;
+            background: linear-gradient(180deg, #f8fbff, #eef4fb);
+            border: 1px solid #dbe5f0;
+            box-shadow: none;
+        }
+        #app-screen.teacher-view .btn,
+        #app-screen.student-view .btn {
+            min-height: 42px;
+            border-radius: 14px;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+        }
+        #app-screen.teacher-view .btn.btn-primary {
+            background: linear-gradient(180deg, #2563eb, #1d4ed8);
+            border: 0;
+            box-shadow: 0 10px 18px rgba(37, 99, 235, 0.2);
+        }
+        #app-screen.student-view .btn.btn-primary {
+            box-shadow: 0 10px 18px rgba(59, 130, 246, 0.18);
+        }
+        body.dark-mode #app-screen.student-view {
+            background:
+                radial-gradient(circle at top left, rgba(245, 158, 11, 0.14), transparent 24%),
+                radial-gradient(circle at top right, rgba(59, 130, 246, 0.16), transparent 22%),
+                linear-gradient(180deg, #0b1220 0%, #111827 100%) !important;
+        }
+        body.dark-mode #app-screen.student-view #student-hero-panel,
+        body.dark-mode #app-screen.teacher-view #teacher-hero-panel {
+            color: #e5e7eb;
+        }
+        body.dark-mode .student-hero-main {
+            background:
+                radial-gradient(circle at top right, rgba(255,255,255,0.08), transparent 22%),
+                linear-gradient(145deg, #1e293b 0%, #0f3b66 48%, #1d4ed8 100%) !important;
+            box-shadow: 0 20px 40px rgba(2, 6, 23, 0.38);
+        }
+        body.dark-mode .student-hero-kicker,
+        body.dark-mode .teacher-hero-kicker {
+            background: rgba(15, 23, 42, 0.65);
+            color: #dbeafe;
+        }
+        body.dark-mode .student-hero-title,
+        body.dark-mode .teacher-hero-title,
+        body.dark-mode .student-spark-title,
+        body.dark-mode .student-quick-title,
+        body.dark-mode .teacher-hero-quick h3,
+        body.dark-mode .teacher-hero-side h3 {
+            color: #f8fafc !important;
+        }
+        body.dark-mode .student-hero-message,
+        body.dark-mode .student-hero-progress-note,
+        body.dark-mode .student-spark-sub,
+        body.dark-mode .teacher-hero-text,
+        body.dark-mode .teacher-hero-side p,
+        body.dark-mode .teacher-quick-btn span,
+        body.dark-mode .student-quick-btn span,
+        body.dark-mode .student-mini-meta {
+            color: #cbd5e1 !important;
+        }
+        body.dark-mode .student-hero-stat,
+        body.dark-mode .student-mini-card,
+        body.dark-mode .student-spark-card,
+        body.dark-mode .student-quick-card,
+        body.dark-mode .teacher-hero-main,
+        body.dark-mode .teacher-hero-quick,
+        body.dark-mode .teacher-hero-side,
+        body.dark-mode .teacher-hero-metric {
+            border-color: #334155 !important;
+        }
+        body.dark-mode .student-hero-stat,
+        body.dark-mode .teacher-hero-metric,
+        body.dark-mode .student-mini-card {
+            background: rgba(15, 23, 42, 0.72) !important;
+            color: #e5e7eb !important;
+        }
+        body.dark-mode .student-hero-stat-label,
+        body.dark-mode .teacher-hero-metric-label,
+        body.dark-mode .student-mini-label {
+            color: #94a3b8 !important;
+        }
+        body.dark-mode .student-hero-stat-value,
+        body.dark-mode .teacher-hero-metric-value,
+        body.dark-mode .student-mini-value,
+        body.dark-mode .student-rank-pill {
+            color: #f8fafc !important;
+        }
+        body.dark-mode .student-rank-pill {
+            background: linear-gradient(135deg, #1e3a8a, #1d4ed8) !important;
+        }
+        body.dark-mode .student-quick-btn {
+            background: linear-gradient(180deg, #111827, #0f172a) !important;
+            border-color: #334155 !important;
+            color: #e5e7eb !important;
+            box-shadow: none !important;
+        }
+        body.dark-mode .teacher-hero-quick {
+            background: linear-gradient(180deg, #111827, #0f172a) !important;
+            border-color: #334155 !important;
+            box-shadow: 0 8px 18px rgba(2, 6, 23, 0.22) !important;
+        }
+        body.dark-mode .teacher-hero-side {
+            background: linear-gradient(180deg, #111827, #0f172a) !important;
+            border-color: #334155 !important;
+            box-shadow: 0 8px 18px rgba(2, 6, 23, 0.22) !important;
+            padding: 12px;
+            gap: 12px;
+        }
+        body.dark-mode .teacher-info-card {
+            background: linear-gradient(180deg, #162033, #0f172a) !important;
+            border-color: #42506a !important;
+            box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.05);
+        }
+        body.dark-mode .teacher-info-kicker {
+            color: #93c5fd !important;
+        }
+        body.dark-mode .teacher-info-title {
+            color: #f8fafc !important;
+        }
+        body.dark-mode .teacher-info-text {
+            color: #cbd5e1 !important;
+        }
+        body.dark-mode #app-screen.teacher-view {
+            background:
+                radial-gradient(circle at top left, rgba(59, 130, 246, 0.12), transparent 24%),
+                linear-gradient(180deg, #0b1220 0%, #111827 100%) !important;
+        }
+        body.dark-mode .teacher-hero-main {
+            background:
+                radial-gradient(circle at top right, rgba(96, 165, 250, 0.12), transparent 20%),
+                linear-gradient(145deg, #162033 0%, #0f172a 58%, #0b1220 100%) !important;
+            box-shadow: 0 18px 36px rgba(2, 6, 23, 0.34) !important;
+        }
+        body.dark-mode .teacher-hero-visual {
+            background:
+                radial-gradient(circle at center, rgba(255,255,255,0.06), rgba(255,255,255,0) 58%),
+                linear-gradient(145deg, #162033, #101827) !important;
+            border-color: #42506a !important;
+        }
+        body.dark-mode .teacher-hero-core {
+            background: linear-gradient(145deg, #2563eb, #0ea5e9);
+        }
+        body.dark-mode .teacher-hero-rail-item {
+            color: #cbd5e1 !important;
+        }
+        body.dark-mode .teacher-hero-rail-track {
+            background: rgba(71, 85, 105, 0.46);
+        }
+        body.dark-mode .teacher-hero-main .teacher-hero-text,
+        body.dark-mode .teacher-hero-main .teacher-hero-title,
+        body.dark-mode .teacher-hero-main .teacher-hero-kicker {
+            position: relative;
+            z-index: 1;
+        }
+        body.dark-mode .teacher-hero-text {
+            color: #cbd5e1 !important;
+        }
+        body.dark-mode .teacher-hero-metrics {
+            gap: 12px;
+        }
+        body.dark-mode .teacher-hero-metric {
+            background: linear-gradient(180deg, #1e293b, #172033) !important;
+            border-color: #475569 !important;
+            box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.06);
+        }
+        body.dark-mode .teacher-hero-metric-label {
+            color: #93c5fd !important;
+        }
+        body.dark-mode .teacher-hero-metric-value {
+            color: #f8fafc !important;
+        }
+        body.dark-mode .teacher-hero-signal {
+            background: linear-gradient(180deg, #162033, #101827) !important;
+            border-color: #42506a !important;
+            box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.04);
+        }
+        body.dark-mode .teacher-hero-signal-kicker {
+            color: #93c5fd !important;
+        }
+        body.dark-mode .teacher-hero-signal-title {
+            color: #f8fafc !important;
+        }
+        body.dark-mode .teacher-hero-signal-text {
+            color: #cbd5e1 !important;
+        }
+        body.dark-mode .teacher-info-bar {
+            background: rgba(71, 85, 105, 0.46);
+        }
+        body.dark-mode #app-screen.teacher-view > .app-header {
+            background: rgba(15, 23, 42, 0.88) !important;
+            border-color: #334155 !important;
+            box-shadow: 0 10px 24px rgba(2, 6, 23, 0.34) !important;
+        }
+        body.dark-mode #app-screen.teacher-view #user-welcome,
+        body.dark-mode #app-screen.teacher-view #user-menu-trigger {
+            color: #f8fafc !important;
+        }
+        body.dark-mode #app-screen.teacher-view #user-menu-trigger,
+        body.dark-mode #app-screen.teacher-view #theme-toggle-app {
+            background: #111827 !important;
+            border-color: #334155 !important;
+            box-shadow: none !important;
+        }
+        body.dark-mode #app-screen.teacher-view #teacher-analytics,
+        body.dark-mode #app-screen.teacher-view #top-students-card,
+        body.dark-mode #app-screen.teacher-view #student-homework-shell,
+        body.dark-mode #app-screen.teacher-view #block-homework-section {
+            background: linear-gradient(180deg, #0f172a, #111827) !important;
+        }
+        body.dark-mode #app-screen.teacher-view #teacher-home-tabs,
+        body.dark-mode #app-screen.teacher-view #block-homework-assign-tabs,
+        body.dark-mode #app-screen.teacher-view #student-tabs,
+        body.dark-mode #app-screen.teacher-view #activities-tabs,
+        body.dark-mode #app-screen.teacher-view #lessons-tabs,
+        body.dark-mode #app-screen.teacher-view #quiz-tabs,
+        body.dark-mode #app-screen.teacher-view #block-homework-tabs,
+        body.dark-mode #app-screen.teacher-view #compute-homework-tabs {
+            background: #0f1b33 !important;
+            border-color: #334155 !important;
+        }
+        body.dark-mode #app-screen.teacher-view .tab-btn {
+            color: #cbd5e1 !important;
+        }
+        body.dark-mode #app-screen.teacher-view .tab-btn.active {
+            background: linear-gradient(180deg, #1e293b, #0f172a) !important;
+            color: #f8fafc !important;
+            box-shadow: none !important;
+        }
+        body.dark-mode #app-screen.teacher-view .teacher-app-stats,
+        body.dark-mode #app-screen.teacher-view .teacher-type-panel,
+        body.dark-mode #app-screen.teacher-view .teacher-pie-panel,
+        body.dark-mode #app-screen.teacher-view .stats-summary-grid .stat-card,
+        body.dark-mode #app-screen.teacher-view .teacher-mini-stats-grid .stat-card,
+        body.dark-mode #app-screen.teacher-view .teacher-app-stats-tile,
+        body.dark-mode #app-screen.teacher-view .teacher-app-stats-btn-tile,
+        body.dark-mode #app-screen.teacher-view .list-item {
+            background: linear-gradient(180deg, #111827, #0f172a) !important;
+            border-color: #334155 !important;
+            box-shadow: none !important;
+        }
+        @media (max-width: 1100px) {
+            #app-screen.teacher-view #teacher-hero-panel {
+                grid-template-columns: 1fr;
+            }
+            .teacher-hero-metrics {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+            .teacher-hero-topline,
+            .teacher-hero-signal-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        @keyframes teacherOrbFloat {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(8px); }
+        }
+        @keyframes teacherPulseRing {
+            0% { opacity: 0.72; transform: scale(0.92); }
+            100% { opacity: 0; transform: scale(1.18); }
+        }
+        @keyframes teacherDotFloat {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+        @media (max-width: 720px) {
+            #app-screen.teacher-view > .app-header {
+                grid-template-columns: minmax(0, 1fr) auto auto;
+                gap: 10px;
+                padding: 12px 14px;
+                align-items: start;
+            }
+            #app-screen.teacher-view #theme-toggle-app {
+                grid-column: 2;
+                grid-row: 1;
+                justify-self: end;
+            }
+            #app-screen.teacher-view #user-menu {
+                grid-column: 3;
+                grid-row: 1;
+                justify-self: end;
+                align-self: start;
+                justify-content: flex-end;
+                width: auto;
+            }
+            #app-screen.teacher-view #user-welcome {
+                display: none !important;
+            }
+            #app-screen.teacher-view #user-menu-trigger {
+                padding: 8px 12px;
+                min-height: 38px;
+                font-size: 0.85rem;
+            }
+            .teacher-hero-metrics,
+            .teacher-quick-grid {
+                grid-template-columns: 1fr;
+            }
+        }
         /* Anasayfa kartlarını esnek tut */
         #tasks-section,
         #activities-section,
@@ -173,6 +1472,12 @@
             min-height: 0;
             overflow: auto;
             flex: 1;
+        }
+        #app-screen.student-view .student-combined-wrap .tabs {
+            margin-top: 0 !important;
+        }
+        #app-screen.student-view .student-combined-wrap .tab-content {
+            margin-top: 0 !important;
         }
         .student-shell-body {
             display: contents;
@@ -462,6 +1767,8 @@
             gap: 12px;
             height: 520px;
             min-height: 520px;
+            width: 100%;
+            justify-self: stretch;
         }
         #app-screen.student-view .student-shell-head {
             display: block;
@@ -502,7 +1809,7 @@
             height: 100%;
             min-height: 0;
             margin-bottom: 0;
-            overflow: hidden;
+            overflow: visible;
             display: flex;
             flex-direction: column;
         }
@@ -513,25 +1820,35 @@
             grid-template-columns: 1fr 1fr;
             gap: 10px;
             align-items: stretch;
+            overflow: visible;
+        }
+        #teacher-analytics .teacher-top-wrap > .chart-container {
+            min-height: 360px;
+            height: auto !important;
+            display: flex;
+            align-items: stretch;
+            overflow: visible !important;
         }
         #teacher-analytics .teacher-type-chart {
-            height: 100% !important;
+            height: auto !important;
             min-height: 0 !important;
             margin: 0 !important;
         }
         #teacher-analytics .teacher-main-chart {
-            height: 100% !important;
-            min-height: 0 !important;
+            height: auto !important;
+            min-height: 360px !important;
             margin: 0 !important;
             display: flex;
             align-items: stretch;
             justify-content: stretch;
             align-self: stretch;
+            overflow: visible !important;
         }
         #teacher-analytics .teacher-type-panel,
         #teacher-analytics .teacher-pie-panel {
             width: 100%;
             height: 100%;
+            min-height: 360px;
             border: 1px solid #dbeafe;
             border-radius: 14px;
             background: linear-gradient(145deg, #ffffff, #f8fbff);
@@ -540,9 +1857,11 @@
             grid-template-rows: auto minmax(170px, 1fr);
             gap: 4px;
             align-content: stretch;
+            overflow: visible;
         }
         #teacher-analytics .teacher-pie-panel {
-            grid-template-rows: auto minmax(170px, 1fr) auto;
+            grid-template-rows: auto 1fr auto;
+            padding: 6px 10px 20px;
         }
         #teacher-analytics .teacher-type-title,
         #teacher-analytics .teacher-pie-title {
@@ -556,52 +1875,61 @@
         #teacher-analytics .teacher-pie-wrap {
             min-height: 0;
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: center;
             padding-top: 0;
             padding-bottom: 0;
+            height: auto;
+            min-height: 110px;
+            flex: 1 1 auto;
         }
         #teacher-analytics .teacher-type-wrap canvas {
             width: 100% !important;
             height: 100% !important;
-            max-height: 220px;
+            max-height: 240px;
         }
         #teacher-analytics .teacher-pie-wrap canvas {
             width: 100% !important;
             height: 100% !important;
-            max-height: 195px;
+            max-height: 130px;
         }
         #teacher-analytics .teacher-pie-wrap {
-            align-items: flex-start;
-            padding-top: 48px !important;
-            padding-bottom: 12px !important;
+            padding-top: 18px !important;
+            padding-bottom: 0 !important;
         }
         #teacher-analytics #class-chart-summary {
             display: grid;
             grid-template-columns: 1fr 1fr 1fr;
             gap: 6px;
-            margin-top: 22px !important;
-            transform: translateY(8px);
+            margin-top: 0 !important;
+            align-self: end;
+            min-height: 52px;
+            padding-top: 0;
+            margin-bottom: 26px;
         }
         #teacher-analytics .pie-summary-item {
             border-radius: 10px;
-            padding: 6px 4px;
+            padding: 3px 4px;
             text-align: center;
             border: 1px solid #e2e8f0;
             background: #fff;
+            min-height: 42px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
         #teacher-analytics .pie-summary-item.completed { border-color: #86efac; background: #f0fdf4; }
         #teacher-analytics .pie-summary-item.pending { border-color: #fca5a5; background: #fff1f2; }
         #teacher-analytics .pie-summary-item.total { border-color: #bfdbfe; background: #eff6ff; }
         #teacher-analytics .pie-summary-val {
             font-weight: 800;
-            font-size: 0.9rem;
+            font-size: 0.82rem;
             color: #0f172a;
             line-height: 1.1;
         }
         #teacher-analytics .pie-summary-label {
             margin-top: 1px;
-            font-size: 0.64rem;
+            font-size: 0.58rem;
             color: #475569;
             line-height: 1.1;
         }
@@ -662,36 +1990,182 @@
             color: #1e3a8a;
             letter-spacing: 0.2px;
         }
-        #top-students-list .top-student-row,
-        #leaderboard-list .top-student-row {
-            display: grid;
-            grid-template-columns: auto auto 1fr auto;
+        #student-top-students-card {
+            position: relative;
+            overflow: hidden;
+            border: 1px solid #bfdbfe;
+            background:
+                radial-gradient(circle at top right, rgba(255,255,255,0.95), rgba(219,234,254,0.88)),
+                linear-gradient(140deg, #eff6ff, #f8fafc);
+            height: 100%;
+            max-height: 520px;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            height: 520px !important;
+            row-gap: 0;
+            margin-bottom: 0;
+            padding-bottom: 0;
+            box-sizing: border-box;
+        }
+        #student-top-students-card::before {
+            content: "";
+            position: absolute;
+            top: -48px;
+            right: -30px;
+            width: 150px;
+            height: 150px;
+            border-radius: 999px;
+            background: radial-gradient(circle, rgba(59,130,246,0.25) 0%, rgba(59,130,246,0) 72%);
+            pointer-events: none;
+        }
+        #student-top-students-card h4 {
+            margin-top: 0;
+            color: #1e3a8a;
+            letter-spacing: 0.2px;
+        }
+        #student-top-students-list {
+            max-height: none;
+            overflow: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 2px !important;
+            white-space: normal;
+            flex: 1;
+            min-height: 0;
+            padding: 0;
+            margin: 0;
+        }
+        #top-students-list {
+            gap: 6px !important;
+        }
+        #student-top-students-list .top-student-row {
+            min-height: 48px;
+            display: flex;
             align-items: center;
             gap: 10px;
-            padding: 10px 12px;
-            border-radius: 12px;
+            padding: 7px 12px;
+            margin: 0 !important;
+            border-radius: 10px;
             border: 1px solid #dbeafe;
-            background: rgba(255,255,255,0.86);
-            box-shadow: 0 8px 20px rgba(30, 64, 175, 0.08);
+            background: rgba(255,255,255,0.96);
+            font-weight: 700;
+            color: #0f172a;
+            line-height: 1.56;
             transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
-        #top-students-list .top-student-row:hover,
-        #leaderboard-list .top-student-row:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 12px 24px rgba(30, 64, 175, 0.16);
+        #student-top-students-list .top-student-meta,
+        #top-students-list .top-student-meta {
+            margin-top: 0 !important;
+            line-height: 1;
         }
-        #top-students-list .top-rank-badge,
-        #leaderboard-list .top-rank-badge {
-            min-width: 34px;
-            height: 34px;
+        #student-top-students-card * {
+            margin-top: 0;
+            margin-bottom: 0;
+        }
+        #student-top-students-list .top-student-row + .top-student-row {
+            margin-top: 0 !important;
+        }
+        #student-top-students-list .top-student-row > div:nth-child(3) {
+            flex: 1;
+            min-width: 0;
+        }
+        #student-top-students-list .top-rank-badge {
+            min-width: 30px;
+            height: 30px;
             border-radius: 999px;
             display: flex;
             align-items: center;
             justify-content: center;
             color: #fff;
             font-weight: 700;
-            font-size: 0.9rem;
+            font-size: 0.75rem;
             background: linear-gradient(135deg, #3b82f6, #2563eb);
+        }
+        #student-top-students-list .top-student-row.rank-1 .top-rank-badge { background: linear-gradient(135deg, #f59e0b, #d97706); }
+        #student-top-students-list .top-student-row.rank-2 .top-rank-badge { background: linear-gradient(135deg, #94a3b8, #64748b); }
+        #student-top-students-list .top-student-row.rank-3 .top-rank-badge { background: linear-gradient(135deg, #f97316, #ea580c); }
+        #student-top-students-list .top-student-name {
+            font-weight: 700;
+            color: #0f172a;
+            line-height: 1.1;
+            font-size: 0.98rem;
+            font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+            letter-spacing: -0.01em;
+            text-align: left;
+            white-space: nowrap;
+        }
+        #student-top-students-list .top-student-meta {
+            color: #64748b;
+            font-size: 0.8rem;
+            margin-top: 0;
+            white-space: nowrap;
+        }
+        #student-top-students-list .top-student-xp {
+            font-weight: 800;
+            color: #047857;
+            background: #ecfdf5;
+            border: 1px solid #a7f3d0;
+            border-radius: 999px;
+            padding: 4px 6px;
+            font-size: 0.82rem;
+            white-space: nowrap;
+        }
+        #student-top-students-list .top-student-avatar {
+            width: 34px;
+            height: 34px;
+            border-radius: 999px;
+            overflow: hidden;
+            border: 1px solid #bfdbfe;
+            background: #eff6ff;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #student-top-students-list .top-student-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        #student-top-students-list .top-student-medal {
+            margin-left: 6px;
+            font-size: 0.82rem;
+            display: inline-block;
+            vertical-align: middle;
+            white-space: nowrap;
+        }
+        #top-students-list .top-student-row,
+        #leaderboard-list .top-student-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            border: 1px solid #dbeafe;
+            background: rgba(255,255,255,0.96);
+            font-weight: 700;
+            color: #0f172a;
+            line-height: 1.05;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        #top-students-list .top-student-row > div:nth-child(3),
+        #leaderboard-list .top-student-row > div:nth-child(3) {
+            flex: 1;
+            min-width: 0;
+        }
+        #top-students-list .top-rank-badge,
+        #leaderboard-list .top-rank-badge {
+              min-width: 30px;
+              height: 30px;
+              border-radius: 999px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              color: #fff;
+              font-weight: 700;
+              font-size: 0.75rem; /* smaller */
+              background: linear-gradient(135deg, #3b82f6, #2563eb);
         }
         #top-students-list .top-student-row.rank-1 .top-rank-badge,
         #leaderboard-list .top-student-row.rank-1 .top-rank-badge { background: linear-gradient(135deg, #f59e0b, #d97706); }
@@ -703,13 +2177,17 @@
         #leaderboard-list .top-student-name {
             font-weight: 700;
             color: #0f172a;
-            line-height: 1.2;
+            line-height: 1.1;
+            font-size: 0.98rem;
+            font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+            letter-spacing: -0.01em;
+            text-align: left;
         }
         #top-students-list .top-student-meta,
         #leaderboard-list .top-student-meta {
-            color: #475569;
-            font-size: 0.82rem;
-            margin-top: 2px;
+            color: #64748b;
+            font-size: 0.8rem;
+            margin-top: 0;
         }
         #top-students-list .top-student-xp,
         #leaderboard-list .top-student-xp {
@@ -718,9 +2196,79 @@
             background: #ecfdf5;
             border: 1px solid #a7f3d0;
             border-radius: 999px;
-            padding: 5px 9px;
+            padding: 4px 6px;
             font-size: 0.82rem;
             white-space: nowrap;
+        }
+
+        /* Teacher & student top lists should match */
+        #top-students-list,
+        #leaderboard-list {
+            max-height: none;
+            overflow: visible;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            white-space: normal;
+        }
+        #leaderboard-list .top-student-row,
+        #top-students-list .top-student-row {
+            width: 100%;
+        }
+
+        #top-students-list .top-student-row,
+        #leaderboard-list .top-student-row {
+            min-height: 48px;
+        }
+
+        /* Leaderboard (student view) — follow teacher list layout */
+        #leaderboard-list {
+            align-items: flex-start;
+        }
+
+        /* Make each leaderboard item a horizontal card: avatar | name/meta | xp */
+        #leaderboard-list .top-student-row {
+            flex-direction: row;
+        }
+
+        /* Rank badge and avatar sizing */
+        #leaderboard-list .top-rank-badge { font-size: 0.9rem; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:999px; background:#f1f5f9; }
+        #leaderboard-list .top-student-avatar { margin-right: 6px; }
+        #leaderboard-list .top-student-avatar img {
+            width: 44px;
+            height: 44px;
+            border-radius: 999px;
+            object-fit: cover;
+            border: 1px solid rgba(203, 213, 225, 0.6);
+        }
+
+        /* Ensure the name/meta column uses available space and aligns correctly */
+        #leaderboard-list .top-student-row > div:nth-child(3) {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: flex-start;
+            flex: 1 1 auto;
+            min-width: 0; /* allow ellipsis to work */
+            gap: 2px;
+        }
+
+        #leaderboard-list .top-student-name { font-size: 1.06rem; font-weight: 700; margin:0; display:block; width:100%; overflow: hidden; text-overflow: ellipsis; }
+        #leaderboard-list .top-student-meta { font-size: 0.82rem; color:#64748b; margin-top:2px; }
+
+        /* XP badge aligns to the right and doesn't shrink */
+        #leaderboard-list .top-student-xp { font-size: 0.98rem; padding: 6px 10px; border-radius: 999px; background:#ecfdf5; color:#047857; font-weight:800; margin-left: 12px; flex: 0 0 auto; }
+
+        /* Align student apps panel and leaderboard vertically and give them matching padding */
+        #app-screen.student-view > #student-apps-shell,
+        #app-screen.student-view > #leaderboard-section,
+        #app-screen.student-view > #student-homework-shell {
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            box-sizing: border-box;
+            align-self: start;
         }
         #top-students-list .top-student-avatar,
         #leaderboard-list .top-student-avatar {
@@ -744,6 +2292,27 @@
         #leaderboard-list .top-student-medal {
             margin-left: 6px;
             font-size: 0.82rem;
+            display: inline-block;
+            vertical-align: middle;
+            white-space: nowrap;
+        }
+
+        /* Ensure avatars are visible in leaderboard rows */
+        #top-students-list .top-student-avatar,
+        #leaderboard-list .top-student-avatar {
+            display: inline-flex;
+        }
+
+        /* Prevent name/meta/xp from wrapping to the next line */
+        #top-students-list .top-student-name,
+        #leaderboard-list .top-student-name,
+        #top-students-list .top-student-meta,
+        #leaderboard-list .top-student-meta,
+        #top-students-list .top-student-xp,
+        #leaderboard-list .top-student-xp {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         .container { width: 100%; max-width: 1440px; margin: 12px auto; padding: 12px; overflow-x: hidden; }
         .form-control { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
@@ -4968,6 +6537,54 @@
         body.dark-mode #student-stats-bar .completed-summary .item.xp-item .v {
             font-size: 115% !important;
         }
+        body.dark-mode #app-screen.student-view #student-homework-shell,
+        body.dark-mode #app-screen.student-view #student-apps-shell,
+        body.dark-mode #app-screen.student-view #leaderboard-section,
+        body.dark-mode #app-screen.student-view .student-spark-card,
+        body.dark-mode #app-screen.student-view .student-quick-card,
+        body.dark-mode #app-screen.student-view .student-mini-card,
+        body.dark-mode #app-screen.student-view .status-split .tab-content {
+            background: linear-gradient(180deg, #111827, #0f172a) !important;
+            border-color: #334155 !important;
+            box-shadow: 0 10px 24px rgba(2, 6, 23, 0.34) !important;
+        }
+        body.dark-mode #app-screen.student-view .student-combined-wrap .tabs {
+            background: #0f1b33 !important;
+            border-color: #334155 !important;
+        }
+        body.dark-mode #app-screen.student-view .student-combined-wrap .tab-btn {
+            color: #cbd5e1 !important;
+        }
+        body.dark-mode #app-screen.student-view .student-combined-wrap .tab-btn.active {
+            background: linear-gradient(135deg, #2563eb, #0ea5e9) !important;
+            color: #ffffff !important;
+            box-shadow: none !important;
+        }
+        body.dark-mode #app-screen.teacher-view #teacher-analytics #stats-content > .card,
+        body.dark-mode #app-screen.teacher-view #top-students-card,
+        body.dark-mode #app-screen.teacher-view #student-homework-shell,
+        body.dark-mode #app-screen.teacher-view #block-homework-section {
+            box-shadow: 0 14px 28px rgba(2, 6, 23, 0.36) !important;
+        }
+        body.dark-mode #app-screen.teacher-view .stat-number,
+        body.dark-mode #app-screen.teacher-view h4,
+        body.dark-mode #app-screen.teacher-view .teacher-app-stats-title,
+        body.dark-mode #app-screen.teacher-view .top-student-name {
+            color: #f8fafc !important;
+        }
+        body.dark-mode #app-screen.teacher-view .stat-label,
+        body.dark-mode #app-screen.teacher-view .top-student-meta,
+        body.dark-mode #app-screen.teacher-view .teacher-type-title,
+        body.dark-mode #app-screen.teacher-view .teacher-pie-title {
+            color: #cbd5e1 !important;
+        }
+        body.dark-mode #app-screen.teacher-view .top-student-xp {
+            color: #93c5fd !important;
+        }
+        body.dark-mode #app-screen.teacher-view .btn.btn-primary {
+            background: linear-gradient(180deg, #3b82f6, #2563eb) !important;
+            color: #ffffff !important;
+        }
 
         /* Mobil uyumluluk */
         img, canvas { max-width: 100%; height: auto; }
@@ -4986,6 +6603,25 @@
             .container { width: 100%; max-width: 100%; margin: 0 auto; padding: 12px; overflow-x: hidden; }
             body { overflow-x: hidden !important; }
             #app-screen { width: 100%; max-width: 100%; overflow-x: hidden; }
+            #app-screen.teacher-view #header-center-logo {
+                display: none !important;
+            }
+            #open-menu {
+                position: static !important;
+                width: 42px;
+                height: 42px;
+                padding: 0 !important;
+                border-radius: 14px !important;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 0 8px 0 0;
+                flex: 0 0 42px;
+            }
+            #app-screen.student-view > .app-header,
+            #app-screen.teacher-view > .app-header {
+                padding-left: 14px !important;
+            }
             .card { border-radius: 10px; padding: 12px; }
             .tabs { flex-direction: column; }
             .tab-btn { width: 100%; }
@@ -5058,9 +6694,9 @@
             #app-screen.student-view > #student-homework-shell,
             #app-screen.student-view > #student-apps-shell,
             #app-screen.student-view > #leaderboard-section {
-                height: 460px;
-                min-height: 460px;
-                overflow: hidden;
+                height: auto;
+                min-height: 0;
+                overflow: visible;
             }
             #app-screen.student-view #student-homework-combined .tab-content,
             #app-screen.student-view #student-apps-combined .tab-content,
@@ -5582,6 +7218,14 @@
         }
 
         @media (min-width: 1400px) {
+            #app-screen.student-view {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+            #app-screen.student-view > #student-homework-shell,
+            #app-screen.student-view > #student-apps-shell {
+                width: 100%;
+                justify-self: stretch;
+            }
             #app-screen.teacher-view #teacher-analytics {
                 grid-column: 1 / 8;
             }
@@ -5858,6 +7502,250 @@
             margin-top: auto;
             border-radius: 12px;
         }
+        /* Student panel release polish */
+        #app-screen.student-view {
+            align-items: start;
+        }
+        #app-screen.student-view > .app-header {
+            display: grid;
+            grid-template-columns: auto 1fr auto auto;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 18px;
+            margin-bottom: 0;
+            border-radius: 24px;
+            background: rgba(255, 255, 255, 0.84);
+            border: 1px solid rgba(219, 234, 254, 0.96);
+            box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
+            backdrop-filter: blur(14px);
+        }
+        #app-screen.student-view #student-total-time {
+            justify-self: start;
+            align-self: center;
+        }
+        #app-screen.student-view #theme-toggle-app,
+        #app-screen.student-view #user-menu-trigger {
+            min-height: 46px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #app-screen.student-view #theme-toggle-app {
+            width: 46px;
+            height: 46px;
+            padding: 0;
+        }
+        #app-screen.student-view #user-menu {
+            align-items: center;
+            gap: 10px;
+        }
+        #app-screen.student-view #user-menu-trigger {
+            padding: 10px 18px;
+            text-align: center;
+            white-space: nowrap;
+        }
+        #app-screen.student-view #student-hero-panel,
+        #app-screen.student-view .student-hero-main,
+        #app-screen.student-view .student-spark-card,
+        #app-screen.student-view .student-quick-card,
+        #app-screen.student-view .student-mini-card,
+        #app-screen.student-view .student-shell-head,
+        #app-screen.student-view #leaderboard-section {
+            text-align: center;
+        }
+        #app-screen.student-view .student-hero-main {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100%;
+        }
+        #app-screen.student-view .student-hero-message,
+        #app-screen.student-view .student-hero-progress-note,
+        #app-screen.student-view .student-shell-head p {
+            margin-left: auto;
+            margin-right: auto;
+        }
+        #app-screen.student-view .student-hero-stats,
+        #app-screen.student-view .student-mini-grid,
+        #app-screen.student-view .student-quick-grid {
+            align-items: stretch;
+        }
+        #app-screen.student-view .student-hero-stat,
+        #app-screen.student-view .student-mini-card,
+        #app-screen.student-view .student-quick-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+        #app-screen.student-view .student-hero-progress {
+            width: 100%;
+            max-width: 680px;
+        }
+        #app-screen.student-view .student-hero-progress-head {
+            justify-content: center;
+            text-align: center;
+        }
+        #app-screen.student-view .student-hero-progress-head span,
+        #app-screen.student-view .student-hero-progress-head strong {
+            flex: 0 0 auto;
+        }
+        #app-screen.student-view .student-rank-pill {
+            justify-content: center;
+        }
+        #app-screen.student-view #student-homework-shell,
+        #app-screen.student-view #student-apps-shell,
+        #app-screen.student-view #leaderboard-section {
+            height: auto !important;
+            min-height: clamp(360px, 42vh, 520px) !important;
+            overflow: hidden;
+        }
+        #app-screen.student-view #student-homework-shell,
+        #app-screen.student-view #student-apps-shell {
+            display: flex !important;
+            flex-direction: column;
+            gap: 14px;
+        }
+        #app-screen.student-view .student-shell-head {
+            display: flex !important;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            margin: 0;
+        }
+        #app-screen.student-view .student-shell-head h3 {
+            text-align: center;
+            line-height: 1.2;
+        }
+        #app-screen.student-view .student-shell-head p {
+            max-width: 62ch;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+        #app-screen.student-view .student-combined-wrap {
+            display: flex !important;
+            flex-direction: column;
+            flex: 1 1 auto;
+            min-height: 0;
+            gap: 0;
+        }
+        #app-screen.student-view .student-combined-wrap .tabs {
+            align-self: center;
+            justify-content: center;
+        }
+        #app-screen.student-view .status-split {
+            align-items: stretch;
+        }
+        #app-screen.student-view .status-split .tab-content {
+            display: flex;
+            flex-direction: column;
+            min-height: 250px;
+        }
+        #app-screen.student-view .status-split .tab-content > ul,
+        #app-screen.student-view #leaderboard-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 100%;
+        }
+        #app-screen.student-view #student-homework-shell .list-item,
+        #app-screen.student-view #student-apps-shell .list-item {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 14px;
+        }
+        #app-screen.student-view #student-homework-shell .list-item > :first-child,
+        #app-screen.student-view #student-apps-shell .list-item > :first-child {
+            min-width: 0;
+            text-align: left;
+        }
+        #app-screen.student-view #student-homework-shell .list-item > :last-child,
+        #app-screen.student-view #student-apps-shell .list-item > :last-child {
+            justify-self: end;
+        }
+        #app-screen.student-view #leaderboard-section .card-header,
+        #app-screen.student-view #leaderboard-section h3,
+        #app-screen.student-view #leaderboard-section p {
+            text-align: center;
+        }
+        #app-screen.student-view #leaderboard-list .top-student-row {
+            align-items: center;
+        }
+        body.dark-mode #app-screen.student-view > .app-header {
+            background: rgba(15, 23, 42, 0.88) !important;
+            border-color: #334155 !important;
+            box-shadow: 0 14px 30px rgba(2, 6, 23, 0.34) !important;
+        }
+        body.dark-mode #app-screen.student-view #theme-toggle-app,
+        body.dark-mode #app-screen.student-view #user-menu-trigger {
+            background: #111827 !important;
+            border-color: #334155 !important;
+            color: #f8fafc !important;
+            box-shadow: none !important;
+        }
+        body.dark-mode #app-screen.student-view .student-hero-progress {
+            background: rgba(15, 23, 42, 0.7) !important;
+            border: 1px solid rgba(71, 85, 105, 0.45);
+        }
+        body.dark-mode #app-screen.student-view .student-hero-progress-head,
+        body.dark-mode #app-screen.student-view .student-hero-progress-note {
+            color: #e2e8f0 !important;
+        }
+        body.dark-mode #app-screen.student-view .student-hero-progress-track {
+            background: rgba(71, 85, 105, 0.48) !important;
+        }
+        body.dark-mode #app-screen.student-view #student-homework-shell .list-item,
+        body.dark-mode #app-screen.student-view #student-apps-shell .list-item,
+        body.dark-mode #app-screen.student-view #leaderboard-list .top-student-row {
+            background: linear-gradient(180deg, #162033, #0f172a) !important;
+            border: 1px solid #334155 !important;
+            box-shadow: none !important;
+        }
+        @media (max-width: 900px) {
+            #app-screen.student-view > .app-header {
+                grid-template-columns: auto 1fr auto auto;
+                padding: 12px 14px;
+                gap: 10px;
+            }
+            #app-screen.student-view #header-center-logo {
+                display: none;
+            }
+            #app-screen.student-view #student-homework-shell,
+            #app-screen.student-view #student-apps-shell,
+            #app-screen.student-view #leaderboard-section {
+                min-height: 0 !important;
+            }
+        }
+        @media (max-width: 640px) {
+            #app-screen.student-view .student-hero-progress-head {
+                flex-direction: column;
+                gap: 6px;
+            }
+            #app-screen.student-view #student-homework-shell .list-item,
+            #app-screen.student-view #student-apps-shell .list-item {
+                grid-template-columns: 1fr;
+                justify-items: center;
+                text-align: center;
+            }
+            #app-screen.student-view #student-homework-shell .list-item > :first-child,
+            #app-screen.student-view #student-apps-shell .list-item > :first-child,
+            #app-screen.student-view #student-homework-shell .list-item > :last-child,
+            #app-screen.student-view #student-apps-shell .list-item > :last-child {
+                text-align: center;
+                justify-self: center;
+            }
+            #app-screen.student-view .student-shell-head p,
+            #app-screen.student-view .student-hero-message,
+            #app-screen.student-view .student-spark-sub,
+            #app-screen.student-view .student-quick-btn span,
+            #app-screen.student-view .student-mini-meta {
+                max-width: 28ch;
+            }
+        }
         body.dark-mode .apps-hub-modal-content { background: #0f172a; border-color: #334155; }
         body.dark-mode .apps-hub-card { background: #111827; border-color: #334155; }
         body.dark-mode .apps-hub-card-image { background: #0b1220; }
@@ -6113,6 +8001,80 @@
                     <div id="home-overview-lessons-meta" class="home-overview-meta">Yükleniyor...</div>
                 </div>
             </div>
+            <div id="student-hero-panel">
+                <div class="student-hero-main">
+                    <div class="student-hero-kicker">Seviye haritan hazır</div>
+                    <h2 id="student-hero-greeting" class="student-hero-title">Bugün neyi tamamlamak istersin?</h2>
+                    <p id="student-hero-message" class="student-hero-message">Bekleyen görevlerini seç, ilerlemeni artır ve yeni puanlar kazan.</p>
+                    <div class="student-hero-stats">
+                        <div class="student-hero-stat">
+                            <div class="student-hero-stat-label">Toplam XP</div>
+                            <div id="student-hero-xp" class="student-hero-stat-value">0 XP</div>
+                        </div>
+                        <div class="student-hero-stat">
+                            <div class="student-hero-stat-label">Tamamlanan</div>
+                            <div id="student-hero-completed" class="student-hero-stat-value">0</div>
+                        </div>
+                        <div class="student-hero-stat">
+                            <div class="student-hero-stat-label">Bekleyen</div>
+                            <div id="student-hero-pending" class="student-hero-stat-value">0</div>
+                        </div>
+                        <div class="student-hero-stat">
+                            <div class="student-hero-stat-label">Quiz Puanı</div>
+                            <div id="student-hero-quiz" class="student-hero-stat-value">0</div>
+                        </div>
+                        <div class="student-hero-stat">
+                            <div class="student-hero-stat-label">Sınıf Sıralaması</div>
+                            <div id="student-hero-class-rank" class="student-hero-stat-value">—</div>
+                        </div>
+                    </div>
+                    <div class="student-hero-progress">
+                        <div class="student-hero-progress-head">
+                            <span>Genel ilerleme</span>
+                            <strong id="student-hero-progress-text">%0</strong>
+                        </div>
+                        <div class="student-hero-progress-track">
+                            <div id="student-hero-progress-fill" class="student-hero-progress-fill"></div>
+                        </div>
+                        <div id="student-hero-progress-note" class="student-hero-progress-note">Hedeflerini tamamladikca bar dolacak.</div>
+                    </div>
+                    <!-- removed old spark-card; class ranking now shown as a hero stat -->
+                </div>
+                <div class="student-hero-side">
+                    <div class="student-quick-card" style="display:none;">&nbsp;</div>
+                    <div class="card" id="student-top-students-card">
+                        <h4>Öğrenci Başarı Listesi (İlk 6)</h4>
+                        <div id="student-top-students-list"></div>
+                    </div>
+                </div>
+                <div class="student-mini-grid">
+                    <div class="student-mini-card">
+                        <div class="student-mini-label">Ödevler</div>
+                        <div id="student-mini-tasks" class="student-mini-value">0</div>
+                        <div id="student-mini-tasks-meta" class="student-mini-meta">0 bekleyen</div>
+                    </div>
+                    <div class="student-mini-card">
+                        <div class="student-mini-label">Etkinlikler</div>
+                        <div id="student-mini-activities" class="student-mini-value">0</div>
+                        <div id="student-mini-activities-meta" class="student-mini-meta">0 bekleyen</div>
+                    </div>
+                    <div class="student-mini-card">
+                        <div class="student-mini-label">Blok Kodlama</div>
+                        <div id="student-mini-block" class="student-mini-value">0</div>
+                        <div id="student-mini-block-meta" class="student-mini-meta">0 bekleyen</div>
+                    </div>
+                    <div class="student-mini-card">
+                        <div class="student-mini-label">Compute It</div>
+                        <div id="student-mini-compute" class="student-mini-value">0</div>
+                        <div id="student-mini-compute-meta" class="student-mini-meta">0 bekleyen</div>
+                    </div>
+                    <div class="student-mini-card">
+                        <div class="student-mini-label">Dersler</div>
+                        <div id="student-mini-lessons" class="student-mini-value">0</div>
+                        <div id="student-mini-lessons-meta" class="student-mini-meta">0 bekleyen</div>
+                    </div>
+                </div>
+            </div>
             <!-- Öğrenci İstatistikleri -->
             <div id="student-stats-bar" style="display: none;">
                 <div class="stats-grid" style="margin-bottom: 12px;">
@@ -6164,6 +8126,111 @@
                 </div>
                 <div style="margin-top:8px;">
                     <!-- central student open button removed per UI change -->
+                </div>
+            </div>
+            <div id="teacher-hero-panel">
+                <div class="teacher-hero-main">
+                    <div class="teacher-hero-kicker">Öğretmen kontrol merkezi</div>
+                    <div class="teacher-hero-topline">
+                        <div>
+                            <h2 id="teacher-hero-title" class="teacher-hero-title">Sınıf akışı hazır.</h2>
+                            <p id="teacher-hero-text" class="teacher-hero-text">Kısa sinyallerle sınıfın ritmini anında okuyun.</p>
+                        </div>
+                        <div class="teacher-hero-visual" aria-hidden="true">
+                            <div class="teacher-hero-core"></div>
+                            <div class="teacher-hero-dot dot-a"></div>
+                            <div class="teacher-hero-dot dot-b"></div>
+                            <div class="teacher-hero-dot dot-c"></div>
+                            <div class="teacher-hero-rail">
+                                <div class="teacher-hero-rail-item">
+                                    <span>Katılım</span>
+                                    <div class="teacher-hero-rail-track"><div id="teacher-rail-attendance" class="teacher-hero-rail-fill"></div></div>
+                                    <strong id="teacher-rail-attendance-text">%0</strong>
+                                </div>
+                                <div class="teacher-hero-rail-item">
+                                    <span>İlerleme</span>
+                                    <div class="teacher-hero-rail-track"><div id="teacher-rail-progress" class="teacher-hero-rail-fill"></div></div>
+                                    <strong id="teacher-rail-progress-text">%0</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="teacher-hero-metrics">
+                        <div class="teacher-hero-metric">
+                            <div class="teacher-hero-metric-label">Toplam Öğrenci</div>
+                            <div id="teacher-hero-total-students" class="teacher-hero-metric-value">0</div>
+                        </div>
+                        <div class="teacher-hero-metric">
+                            <div class="teacher-hero-metric-label">Aktif Öğrenci</div>
+                            <div id="teacher-hero-active-students" class="teacher-hero-metric-value">0</div>
+                        </div>
+                        <div class="teacher-hero-metric">
+                            <div class="teacher-hero-metric-label">Ort. Tamamlama</div>
+                            <div id="teacher-hero-avg-completion" class="teacher-hero-metric-value">%0</div>
+                        </div>
+                        <div class="teacher-hero-metric">
+                            <div class="teacher-hero-metric-label">Toplam XP</div>
+                            <div id="teacher-hero-total-xp" class="teacher-hero-metric-value">0</div>
+                        </div>
+                    </div>
+                    <div class="teacher-hero-signal-grid">
+                        <div class="teacher-hero-signal">
+                            <div class="teacher-hero-signal-kicker">Odak</div>
+                            <div id="teacher-hero-focus-title" class="teacher-hero-signal-title">Hazırlanıyor</div>
+                            <div id="teacher-hero-focus-text" class="teacher-hero-signal-text">Bugünün ilk sinyali.</div>
+                        </div>
+                        <div class="teacher-hero-signal">
+                            <div class="teacher-hero-signal-kicker">Güç</div>
+                            <div id="teacher-hero-strong-title" class="teacher-hero-signal-title">Hazırlanıyor</div>
+                            <div id="teacher-hero-strong-text" class="teacher-hero-signal-text">Öne çıkan kategori.</div>
+                        </div>
+                        <div class="teacher-hero-signal">
+                            <div class="teacher-hero-signal-kicker">Ritim</div>
+                            <div id="teacher-hero-rhythm-title" class="teacher-hero-signal-title">Hazırlanıyor</div>
+                            <div id="teacher-hero-rhythm-text" class="teacher-hero-signal-text">Üretim temposu sinyali.</div>
+                        </div>
+                    </div>
+                    <div style="display:none;">
+                        <span id="stats-task-completions">0</span>
+                        <span id="stats-activity-completions">0</span>
+                        <span id="stats-block-completions">0</span>
+                        <span id="stats-compute-completions">0</span>
+                    </div>
+                </div>
+                <div class="teacher-hero-side">
+                    <div class="teacher-hero-quick">
+                        <h3>Sınıf sinyalleri</h3>
+                        <div class="teacher-quick-grid">
+                            <div class="teacher-info-card">
+                                <div class="teacher-info-kicker">Katılım</div>
+                                <div id="teacher-info-attendance-title" class="teacher-info-title">Öğrenciler yükleniyor</div>
+                                <div class="teacher-info-bar"><span id="teacher-info-attendance-bar"></span></div>
+                                <div id="teacher-info-attendance-text" class="teacher-info-text">Aktiflik durumu.</div>
+                            </div>
+                            <div class="teacher-info-card">
+                                <div class="teacher-info-kicker">İlerleme</div>
+                                <div id="teacher-info-progress-title" class="teacher-info-title">Tamamlama verisi hazırlanıyor</div>
+                                <div class="teacher-info-bar"><span id="teacher-info-progress-bar"></span></div>
+                                <div id="teacher-info-progress-text" class="teacher-info-text">Genel tamamlama.</div>
+                            </div>
+                            <div class="teacher-info-card">
+                                <div class="teacher-info-kicker">Destek</div>
+                                <div id="teacher-info-support-title" class="teacher-info-title">Takip önerisi hazırlanıyor</div>
+                                <div class="teacher-info-bar"><span id="teacher-info-support-bar"></span></div>
+                                <div id="teacher-info-support-text" class="teacher-info-text">Destek sinyali.</div>
+                            </div>
+                            <div class="teacher-info-card">
+                                <div class="teacher-info-kicker">Motivasyon</div>
+                                <div id="teacher-info-motivation-title" class="teacher-info-title">Başarı özeti hazırlanıyor</div>
+                                <div class="teacher-info-bar"><span id="teacher-info-motivation-bar"></span></div>
+                                <div id="teacher-info-motivation-text" class="teacher-info-text">Üretim ve başarı.</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="teacher-hero-quick">
+                        <h3>Durum notu</h3>
+                        <p id="teacher-hero-status-note">Akış özeti hazırlanıyor.</p>
+                    </div>
                 </div>
             </div>
 
@@ -6228,8 +8295,10 @@
 
             <div class="card" id="student-homework-shell">
                 <div class="student-shell-head">
-                    <h3>📚 Ödevlerim</h3>
-                    <p>Ödev, etkinlik ve ders içeriklerin tek alanda listelenir.</p>
+                    <div>
+                        <h3>📚 Görev Merkezi</h3>
+                        <p>Ödev, etkinlik ve derslerini tek ekranda takip et. Önce bekleyenleri bitir, sonra tamamladıklarını kontrol et.</p>
+                    </div>
                 </div>
                 <div id="teacher-home-tabs" class="tabs" style="display:none; margin-top:10px;">
                     <button class="tab-btn active" data-home-tab="tasks" onclick="switchTeacherHomeTab('tasks')">Ödevler</button>
@@ -6435,8 +8504,10 @@
 
             <div class="card" id="student-apps-shell">
                 <div class="student-shell-head">
-                    <h3>🧩 Uygulamalar</h3>
-                    <p>Blok Kodlama, 3D Blok Kodlama, Flowchart, Çizgi Oyunu ve Compute It içerikleri.</p>
+                    <div>
+                        <h3>🧩 Uygulama Atölyesi</h3>
+                        <p>Blok Kodlama, 3D Blok, Python Quiz Lab, Code Robot ve Compute It çalışmalarını burada aç.</p>
+                    </div>
                 </div>
                 <div id="student-apps-combined" class="student-combined-wrap">
                     <div id="student-apps-tabs" class="tabs">
@@ -6600,13 +8671,8 @@
                 </div>
             </div>
 
-            <!-- Liderlik Tablosu (Öğrenci) -->
-            <div class="card" id="leaderboard-section">
-                <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px;">
-                    <h3 style="margin:0;">🏆 Liderlik Tablosu</h3>
-                </div>
-                <ul id="leaderboard-list" style="padding: 0; list-style: none;"></ul>
-            </div>
+            <!-- Liderlik Tablosu (Öğrenci) - moved into hero side -->
+            <!-- (original instance removed, moved into hero-side earlier) -->
 
         </div>
 
