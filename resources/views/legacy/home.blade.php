@@ -10749,10 +10749,6 @@ Ayşe, Yılmaz, ayse, 123456, 9, B"></textarea>
             <div id="live-player-question" class="live-player-question"></div>
             <div id="live-player-options" class="live-player-options"></div>
             <div id="live-player-info" class="live-player-info"></div>
-            <div style="margin-top:10px;">
-                <h4 style="margin:0 0 8px;">Canlı Sıralama</h4>
-                <div id="live-player-rank" style="max-height:180px;overflow:auto;"></div>
-            </div>
             <button id="btn-close-live-player" class="btn" style="margin-top:12px;width:100%;background:#eee;">Kapat</button>
         </div>
     </div>

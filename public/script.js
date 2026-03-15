@@ -4517,7 +4517,12 @@ async function renderStudentLiveQuestion() {
   // Intro ve ilk render gecikmesini azaltmak için önce local cache/pending kullan.
   let existingAnswer = studentLivePendingAnswers.get(answerKey) || studentLiveAnswerCache.get(answerKey) || null;
   if (!existingAnswer) {
-    existingAnswer = await resolveStudentLiveAnswer(session.id, qIndex);
+    resolveStudentLiveAnswer(session.id, qIndex).then((ans) => {
+      const current = activeStudentLiveSession;
+      if (!current || String(current.id || "") !== String(session.id || "")) return;
+      if (Number(current.currentIndex || 0) !== qIndex) return;
+      if (ans) renderStudentLiveQuestion();
+    }).catch(() => {});
   }
   const title = document.getElementById("live-player-title");
   const qBox = document.getElementById("live-player-question");
