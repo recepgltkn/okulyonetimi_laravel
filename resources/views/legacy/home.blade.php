@@ -8591,9 +8591,9 @@
                         </div>
                         <p class="login-sub">Paneline devam etmek için kullanıcı bilgilerini gir.</p>
                         <label for="email">Kullanıcı Adı / E-posta</label>
-                        <input type="text" id="email" class="form-control" placeholder="E-posta veya Kullanıcı Adı">
+                        <input type="text" id="email" name="email" class="form-control" placeholder="E-posta veya Kullanıcı Adı">
                         <label for="password">Şifre</label>
-                        <input type="password" id="password" class="form-control" placeholder="Şifre">
+                        <input type="password" id="password" name="password" class="form-control" placeholder="Şifre">
                         <div class="login-actions">
                             <button id="btn-login" type="button" class="btn btn-success" style="flex: 1;">Giriş Yap</button>
                         </div>
