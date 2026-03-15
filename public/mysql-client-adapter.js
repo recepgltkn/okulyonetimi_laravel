@@ -3,8 +3,8 @@ const APP_BASE_URL = String(
 ).replace(/\/+$/, "");
 const API_BASE = `${APP_BASE_URL}/api/client`;
 const AUTH_KEY = "mysql_auth_user";
-const WATCH_INTERVAL_MS = 5000;
-const WATCH_INTERVAL_HIDDEN_MS = 15000;
+const WATCH_INTERVAL_MS = 1000;
+const WATCH_INTERVAL_HIDDEN_MS = 5000;
 const WATCH_BACKOFF_MAX_MS = 60000;
 
 let currentUser = null;
@@ -136,9 +136,17 @@ function subscribeWatch(target, cb) {
     }
     const rows = (result.snapshot.docs || []).map((d) => {
       const data = d.data() || {};
-      const ver = data.updatedAt ?? data.updated_at ?? data.createdAt ?? data.created_at ?? "";
+      const ver = data.updatedAt
+        ?? data.updated_at
+        ?? data.updatedAtMs
+        ?? data.updated_at_ms
+        ?? data.createdAt
+        ?? data.created_at
+        ?? "";
+      // Live quiz oturumlarında soru geçişleri updatedAt olmadan değişebiliyor.
+      const liveSessionState = `${data.status ?? ""}|${data.currentIndex ?? ""}|${data.endsAtMs ?? ""}|${data.isLocked ? 1 : 0}`;
       // Prefer IDs + timestamps; fallback still includes shallow shape.
-      return `${d.id}|${typeof ver === "object" ? JSON.stringify(ver) : String(ver)}|${Object.keys(data).length}`;
+      return `${d.id}|${typeof ver === "object" ? JSON.stringify(ver) : String(ver)}|${liveSessionState}|${Object.keys(data).length}`;
     });
     return rows.join("||");
   };
@@ -305,4 +313,3 @@ export function httpsCallable(_functions, name) {
     return { data: res?.data };
   };
 }
-

@@ -531,6 +531,9 @@ let teacherLiveMonitorOpen = false;
 let teacherLiveMonitorRenderRaf = null;
 let studentLiveSubmittingAnswerKeys = new Set();
 let studentLivePendingAnswers = new Map();
+let liveSessionFallbackAdvancingIds = new Set();
+let studentLiveDoubleXpIntroShown = new Set();
+let liveQuizCorrectChoice = "";
 let liveQuizResultRepairCache = new Set();
 let myStatsSummaryCache = null;
 let teacherCertificateStudents = [];
@@ -2484,12 +2487,40 @@ async function readLiveQuizImageFile(file) {
     showNotice("Sadece görsel dosyası yükleyin.", "#e74c3c");
     return "";
   }
-  return await new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ""));
-    reader.onerror = () => resolve("");
-    reader.readAsDataURL(file);
-  });
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("image-load-failed"));
+      el.src = objectUrl;
+    });
+    const maxSide = 1400;
+    const w = Number(img.naturalWidth || img.width || 0);
+    const h = Number(img.naturalHeight || img.height || 0);
+    if (!w || !h) throw new Error("invalid-image-size");
+    const scale = Math.min(1, maxSide / Math.max(w, h));
+    const targetW = Math.max(1, Math.round(w * scale));
+    const targetH = Math.max(1, Math.round(h * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = targetW;
+    canvas.height = targetH;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("canvas-context-failed");
+    ctx.drawImage(img, 0, 0, targetW, targetH);
+
+    // Metadata'sız yeniden encode: DB packet boyutunu ciddi azaltır.
+    let dataUrl = canvas.toDataURL("image/webp", 0.78);
+    if (!dataUrl || dataUrl === "data:,") {
+      dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+    }
+    return String(dataUrl || "");
+  } catch (_err) {
+    showNotice("Görsel işlenemedi. Farklı bir görsel deneyin.", "#e74c3c");
+    return "";
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
 }
 
 function cloneLiveQuizQuestion(q = {}) {
@@ -2505,8 +2536,37 @@ function cloneLiveQuizQuestion(q = {}) {
     pairs: Array.isArray(q.pairs) ? q.pairs.map((p) => ({ left: p?.left || "", right: p?.right || "" })) : [],
     correct: q.correct || "",
     durationSec: normalizedDurationSec,
-    xp: Math.max(0, Number(q.xp ?? MAX_QUESTION_XP))
+    xp: Math.max(0, Number(q.xp ?? MAX_QUESTION_XP)),
+    doubleXp: !!q.doubleXp
   };
+}
+
+function getLiveAutoDurationSec(questionText = "", type = "multiple") {
+  const textLen = Math.max(0, String(questionText || "").trim().length);
+  const base = type === "matching" ? 35 : type === "truefalse" ? 15 : 20;
+  const byText = Math.ceil(textLen / 35) * 5;
+  return Math.max(10, Math.min(60, base + byText));
+}
+
+function setLiveCorrectChoice(value = "") {
+  const v = String(value || "").trim();
+  liveQuizCorrectChoice = v;
+  document.querySelectorAll("[data-correct-option]").forEach((btn) => {
+    const isActive = String(btn.getAttribute("data-correct-option") || "") === v;
+    btn.classList.toggle("btn-success", isActive);
+    btn.classList.toggle("btn", true);
+    btn.style.opacity = isActive ? "1" : "0.55";
+  });
+}
+
+function getLiveCorrectFromInputs(type = "multiple") {
+  if (type === "matching") return "";
+  if (type === "truefalse") {
+    if (liveQuizCorrectChoice === "A") return "doğru";
+    if (liveQuizCorrectChoice === "B") return "yanlış";
+    return "";
+  }
+  return liveQuizCorrectChoice;
 }
 
 function fillLiveQuizEditorFromQuestion(q = {}) {
@@ -2516,9 +2576,17 @@ function fillLiveQuizEditorFromQuestion(q = {}) {
   document.getElementById("live-q-b").value = q.options?.[1] || "";
   document.getElementById("live-q-c").value = q.options?.[2] || "";
   document.getElementById("live-q-d").value = q.options?.[3] || "";
-  document.getElementById("live-q-correct").value = q.correct || "";
-  document.getElementById("live-q-duration").value = Math.max(5, Number(q.durationSec ?? q.duration ?? 0) || 30);
-  document.getElementById("live-q-xp").value = String(Math.max(0, Number(q.xp ?? MAX_QUESTION_XP)));
+  const qType = q.type || "multiple";
+  const existingCorrect = String(q.correct || "").trim();
+  if (qType === "truefalse") {
+    setLiveCorrectChoice(existingCorrect === "doğru" ? "A" : existingCorrect === "yanlış" ? "B" : "");
+  } else {
+    setLiveCorrectChoice(existingCorrect);
+  }
+  document.getElementById("live-q-duration").value = String(Math.max(5, Number(q.durationSec ?? q.duration ?? 0) || 30));
+  document.getElementById("live-q-xp").value = String(Math.max(5, Number(q.xp ?? 10)));
+  const qDoubleXp = document.getElementById("live-q-double-xp");
+  if (qDoubleXp) qDoubleXp.checked = !!q.doubleXp;
   setLiveQuizImagePreview(q.imageDataUrl || "");
   const imgInput = document.getElementById("live-q-image");
   if (imgInput) imgInput.value = "";
@@ -2562,16 +2630,19 @@ function removeLiveQuizQuestion(index) {
   liveQuizItems.splice(index, 1);
   if (!liveQuizItems.length) {
     liveQuizSelectedQuestionIndex = -1;
-    ["live-q-text","live-q-a","live-q-b","live-q-c","live-q-d","live-q-correct","live-q-match-pairs"].forEach((id) => {
+    ["live-q-text","live-q-a","live-q-b","live-q-c","live-q-d","live-q-match-pairs"].forEach((id) => {
       const el = document.getElementById(id); if (el) el.value = "";
     });
     setLiveQuizImagePreview("");
     const imgInput = document.getElementById("live-q-image");
     if (imgInput) imgInput.value = "";
     const qDuration = document.getElementById("live-q-duration");
-    if (qDuration) qDuration.value = "30";
+    if (qDuration) qDuration.value = "auto";
     const qXp = document.getElementById("live-q-xp");
-    if (qXp) qXp.value = String(MAX_QUESTION_XP);
+    if (qXp) qXp.value = "10";
+    const qDoubleXp = document.getElementById("live-q-double-xp");
+    if (qDoubleXp) qDoubleXp.checked = false;
+    setLiveCorrectChoice("");
   } else {
     liveQuizSelectedQuestionIndex = Math.max(0, Math.min(index, liveQuizItems.length - 1));
     fillLiveQuizEditorFromQuestion(liveQuizItems[liveQuizSelectedQuestionIndex] || {});
@@ -2615,8 +2686,13 @@ function renderLiveQuizBuilderPreview() {
   const options = qType === "truefalse"
     ? ["Doğru", "Yanlış"]
     : [a || "A seçeneği", b || "B seçeneği", c || "C seçeneği", d || "D seçeneği"];
+  const correctValue = getLiveCorrectFromInputs(qType);
   previewGrid.innerHTML = options.map((opt, i) => `
-    <div class="live-quiz-preview-item">${qType === "truefalse" ? opt : `${String.fromCharCode(65 + i)}) ${opt}`}</div>
+    <div class="live-quiz-preview-item">${
+      qType === "truefalse"
+        ? `${opt}${normalizeTrueFalseValue(correctValue) === normalizeTrueFalseValue(opt) ? " ✅" : ""}`
+        : `${String.fromCharCode(65 + i)}) ${opt}${correctValue === String.fromCharCode(65 + i) ? " ✅" : ""}`
+    }</div>
   `).join("");
 }
 
@@ -2637,15 +2713,13 @@ function updateLiveQuizEditorForType() {
       el.value = "";
     }
   });
-  const correct = document.getElementById("live-q-correct");
-  if (correct) {
-    correct.placeholder = isTrueFalse
-      ? "Doğru cevap: doğru / yanlış"
-      : isMatching
-        ? "Eşleştirme tipinde otomatik kontrol edilir"
-        : "Doğru seçenek (A/B/C/D)";
-    correct.disabled = isMatching;
-    if (isMatching) correct.value = "";
+  document.querySelectorAll("[data-correct-option]").forEach((btn, idx) => {
+    const show = !isMatching && (!isTrueFalse ? true : idx < 2);
+    btn.style.display = show ? "inline-flex" : "none";
+  });
+  if (isMatching) setLiveCorrectChoice("");
+  if (isTrueFalse && !["A", "B"].includes(liveQuizCorrectChoice)) {
+    setLiveCorrectChoice("A");
   }
   if (pairsInput) {
     pairsInput.style.display = isMatching ? "block" : "none";
@@ -2666,7 +2740,7 @@ function renderLiveQuizQuestionList() {
     row.className = `live-quiz-question-row ${i===liveQuizSelectedQuestionIndex ? "active" : ""}`;
     row.draggable = true;
     const questionDuration = Math.max(5, Number(q?.durationSec ?? q?.duration ?? 0) || 30);
-    const questionXP = Math.max(0, Number(q?.xp ?? MAX_QUESTION_XP));
+    const questionXP = Math.max(0, Number(q?.xp ?? MAX_QUESTION_XP)) * (q?.doubleXp ? 2 : 1);
     row.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
         <div style="min-width:0;flex:1;">
@@ -2677,7 +2751,7 @@ function renderLiveQuizQuestionList() {
               : q?.type === "matching"
                 ? "Sürükle-Bırak Eşleştirme"
                 : "Çoktan Seçmeli"
-          }${q?.imageDataUrl ? " • Görselli" : ""} • ${questionDuration} sn • ${questionXP} XP • Sürükle-bırak ile sırala</div>
+          }${q?.imageDataUrl ? " • Görselli" : ""} • ${questionDuration} sn • ${questionXP} XP${q?.doubleXp ? " (2x)" : ""} • Sürükle-bırak ile sırala</div>
         </div>
         <div style="display:flex;gap:4px;">
           <button class="btn" data-act="copy" style="padding:4px 7px;font-size:12px;background:#eef2ff;color:#1e3a8a;">Kopya</button>
@@ -2731,16 +2805,19 @@ function resetLiveQuizEditor() {
   liveQuizSelectedQuestionIndex = -1;
   liveQuizEditingId = null;
   const ids = [
-    "live-quiz-title","live-quiz-class","live-quiz-section","live-q-text","live-q-a","live-q-b","live-q-c","live-q-d","live-q-correct","live-q-match-pairs"
+    "live-quiz-title","live-quiz-class","live-quiz-section","live-q-text","live-q-a","live-q-b","live-q-c","live-q-d","live-q-match-pairs"
   ];
   ids.forEach((id) => { const el = document.getElementById(id); if (el) el.value = ""; });
   setLiveQuizImagePreview("");
   const imgInput = document.getElementById("live-q-image");
   if (imgInput) imgInput.value = "";
   const qDur = document.getElementById("live-q-duration");
-  if (qDur) qDur.value = 30;
+  if (qDur) qDur.value = "auto";
   const qXp = document.getElementById("live-q-xp");
-  if (qXp) qXp.value = String(MAX_QUESTION_XP);
+  if (qXp) qXp.value = "10";
+  const qDoubleXp = document.getElementById("live-q-double-xp");
+  if (qDoubleXp) qDoubleXp.checked = false;
+  setLiveCorrectChoice("");
   const qType = document.getElementById("live-q-type");
   if (qType) qType.value = "multiple";
   updateLiveQuizEditorForType();
@@ -3178,6 +3255,11 @@ function startTeacherHomeQuizListener() {
 }
 
 async function saveLiveQuiz() {
+  const draftQuestion = buildLiveQuizQuestionFromEditor(false);
+  if (draftQuestion) {
+    if (liveQuizSelectedQuestionIndex >= 0) liveQuizItems[liveQuizSelectedQuestionIndex] = draftQuestion;
+    else liveQuizItems.push(draftQuestion);
+  }
   const title = (document.getElementById("live-quiz-title")?.value || "").trim();
   const targetClass = (document.getElementById("live-quiz-class")?.value || "").trim();
   const targetSection = (document.getElementById("live-quiz-section")?.value || "").trim();
@@ -3201,7 +3283,12 @@ async function saveLiveQuiz() {
     resetLiveQuizEditor();
     loadTeacherLiveQuizList();
   } catch (e) {
-    showNotice("Quiz kaydedilemedi.", "#e74c3c");
+    const msg = String(e?.message || "");
+    if (msg.toLowerCase().includes("packet bigger than")) {
+      showNotice("Quiz kaydedilemedi: Görsel boyutu çok büyük. Daha küçük görsel seçin.", "#e74c3c");
+    } else {
+      showNotice("Quiz kaydedilemedi.", "#e74c3c");
+    }
   }
 }
 
@@ -3726,6 +3813,46 @@ function startTeacherLiveTicker() {
       setTimeout(() => { liveAutoProgressing = false; }, 500);
     }
   }, 500);
+}
+
+async function tryFallbackAdvanceLiveSession(live) {
+  if (!live?.id || String(live.status || "") !== "live") return;
+  const sessionId = String(live.id);
+  if (liveSessionFallbackAdvancingIds.has(sessionId)) return;
+  const now = Date.now();
+  const endsAtMs = Number(live.endsAtMs || 0);
+  if (!endsAtMs || now < endsAtMs) return;
+  const total = Array.isArray(live.questions) ? live.questions.length : 0;
+  const idx = Number(live.currentIndex || 0);
+  // Son soruya gelindiyse bitirme akışı öğretmen tarafında kalsın.
+  if (idx + 1 >= total) return;
+  liveSessionFallbackAdvancingIds.add(sessionId);
+  try {
+    const ref = doc(db, "liveQuizSessions", sessionId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return;
+    const current = snap.data() || {};
+    if (String(current.status || "") !== "live") return;
+    const currentIdx = Number(current.currentIndex || 0);
+    const currentEndsAt = Number(current.endsAtMs || 0);
+    if (currentIdx !== idx || !currentEndsAt || Date.now() < currentEndsAt) return;
+    const nextQuestion = current.questions?.[currentIdx + 1] || null;
+    const nextDuration = Math.max(
+      5,
+      Number(nextQuestion?.durationSec ?? nextQuestion?.duration ?? 0) || Math.max(10, Number(current.questionDurationSec || 30))
+    );
+    await updateDoc(ref, {
+      currentIndex: currentIdx + 1,
+      endsAtMs: Date.now() + (nextDuration * 1000),
+      isLocked: false
+    });
+  } catch (_e) {
+    // Sessiz fallback: asıl akış öğretmen panelinde devam eder.
+  } finally {
+    setTimeout(() => {
+      liveSessionFallbackAdvancingIds.delete(sessionId);
+    }, 700);
+  }
 }
 
 function renderLiveTeacherRank(rows = []) {
@@ -4383,11 +4510,13 @@ function startStudentLiveQuizListener() {
       studentLiveAnswerCache = new Map();
       studentLiveSubmittingAnswerKeys = new Set();
       studentLivePendingAnswers = new Map();
+      studentLiveDoubleXpIntroShown = new Set();
     }
     const invite = document.getElementById("live-quiz-invite");
     const inviteText = document.getElementById("live-quiz-invite-text");
     if (!invite || !inviteText) return;
     if (live) {
+      tryFallbackAdvanceLiveSession(live);
       inviteText.innerText = `“${live.quizTitle || "Canlı Quiz"}” başladı. Katılmak için tıklayın.`;
       const playerOpen = document.getElementById("live-quiz-player")?.style.display === "flex";
       if (!playerOpen) {
@@ -4404,6 +4533,7 @@ function startStudentLiveQuizListener() {
       studentLiveAnswerCache = new Map();
       studentLiveSubmittingAnswerKeys = new Set();
       studentLivePendingAnswers = new Map();
+      studentLiveDoubleXpIntroShown = new Set();
       invite.style.display = "none";
       closeLivePlayer(true);
     }
@@ -4429,9 +4559,14 @@ async function resolveStudentLiveAnswer(sessionId, qIndex) {
 async function renderStudentLiveQuestion() {
   const session = activeStudentLiveSession;
   if (!session) return;
-  const q = session.questions?.[Number(session.currentIndex || 0)] || null;
   const qIndex = Number(session.currentIndex || 0);
-  const existingAnswer = await resolveStudentLiveAnswer(session.id, qIndex);
+  const q = session.questions?.[qIndex] || null;
+  const answerKey = `${session.id}_${qIndex}_${currentUserId}`;
+  // Intro ve ilk render gecikmesini azaltmak için önce local cache/pending kullan.
+  let existingAnswer = studentLivePendingAnswers.get(answerKey) || studentLiveAnswerCache.get(answerKey) || null;
+  if (!existingAnswer) {
+    existingAnswer = await resolveStudentLiveAnswer(session.id, qIndex);
+  }
   const title = document.getElementById("live-player-title");
   const qBox = document.getElementById("live-player-question");
   const oBox = document.getElementById("live-player-options");
@@ -4440,6 +4575,32 @@ async function renderStudentLiveQuestion() {
   if (!q) {
     if (qBox) qBox.innerText = "Soru bulunamadı.";
     if (oBox) oBox.innerHTML = "";
+    return;
+  }
+  const introKey = `${session.id}_${qIndex}`;
+  if (q?.doubleXp && !existingAnswer && !studentLiveDoubleXpIntroShown.has(introKey)) {
+    studentLiveDoubleXpIntroShown.add(introKey);
+    if (qBox) {
+      qBox.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;min-height:120px;">
+        <div id="live-doublexp-intro" style="font-size:1.35rem;font-weight:900;color:#f97316;text-shadow:0 6px 20px rgba(249,115,22,.35);">🔥 2 KAT PUAN SORUSU! 🔥</div>
+      </div>`;
+      const introEl = document.getElementById("live-doublexp-intro");
+      if (introEl) {
+        introEl.animate(
+          [
+            { opacity: 0, transform: "scale(0.85)" },
+            { opacity: 1, transform: "scale(1.1)" },
+            { opacity: 1, transform: "scale(1)" },
+            { opacity: 1, transform: "scale(1)" },
+            { opacity: 0.95, transform: "scale(0.98)" }
+          ],
+          { duration: 2200, easing: "ease-out" }
+        );
+      }
+    }
+    if (oBox) oBox.innerHTML = "";
+    if (info) info.innerText = "Bu soruda puan 2 kat!";
+    setTimeout(() => renderStudentLiveQuestion(), 2400);
     return;
   }
   if (qBox) {
@@ -4461,7 +4622,7 @@ async function renderStudentLiveQuestion() {
     qBox.appendChild(text);
   }
   if (info) {
-    const questionXP = Math.max(0, Number(q?.xp ?? MAX_QUESTION_XP));
+    const questionXP = Math.max(0, Number(q?.xp ?? MAX_QUESTION_XP)) * (q?.doubleXp ? 2 : 1);
     const statusText = existingAnswer?.pending
       ? "Cevabın gönderiliyor..."
       : existingAnswer
@@ -4504,7 +4665,11 @@ async function renderStudentLiveQuestion() {
         }
       }
       const keyText = q.type === "truefalse" ? (selectedKey === "doğru" ? "D" : "Y") : String.fromCharCode(65 + i);
-      const optText = q.type === "truefalse" ? (selectedKey === "doğru" ? "Doğru" : "Yanlış") : `${opt}`;
+      const optTextRaw = q.type === "truefalse" ? (selectedKey === "doğru" ? "Doğru" : "Yanlış") : `${opt}`;
+      const isCorrectOption = q.type === "truefalse"
+        ? normalizeTrueFalseValue(q?.correct) === normalizeTrueFalseValue(selectedKey)
+        : String(q?.correct || "").trim().toUpperCase() === selectedKey;
+      const optText = existingAnswer && isCorrectOption ? `${optTextRaw} ✅` : optTextRaw;
       btn.innerHTML = `<span class="opt-key">${keyText}</span><span class="opt-text">${optText}</span>`;
       btn.disabled = !!session.isLocked || !!existingAnswer || studentLiveSubmittingAnswerKeys.has(`${session.id}_${qIndex}_${currentUserId}`);
       btn.onclick = () => submitStudentLiveAnswer(opt, i);
@@ -4534,6 +4699,12 @@ function renderStudentMatchingQuestion(question, session, existingAnswer) {
   const answeredPersisted = !!existingAnswer?.answeredAtMs || !!existingAnswer?.pending;
   const usedValues = new Set(Object.values(initialMap).map((v) => String(v || "")));
   const chips = pairs.map((p) => String(p?.right || "")).filter(Boolean);
+  const chipOrderKey = `__chipOrder_${session?.id || ""}_${Number(session?.currentIndex || 0)}`;
+  let chipOrder = Array.isArray(window[chipOrderKey]) ? window[chipOrderKey] : null;
+  if (!chipOrder || chipOrder.length !== chips.length) {
+    chipOrder = chips.slice().sort(() => Math.random() - 0.5);
+    window[chipOrderKey] = chipOrder;
+  }
   oBox.innerHTML = `
     <div class="live-match-board">
       <div class="live-match-grid">
@@ -4551,9 +4722,9 @@ function renderStudentMatchingQuestion(question, session, existingAnswer) {
           `).join("")}
         </div>
       </div>
-      <div class="live-match-col-title" style="margin-top:8px;">Sağ Kartlar</div>
+      <div class="live-match-col-title" style="margin-top:8px;">Karışık Kartlar</div>
       <div class="live-match-chip-wrap" id="live-match-chip-wrap">
-        ${chips.map((text, i) => `
+        ${chipOrder.map((text, i) => `
           <div class="live-match-chip ${usedValues.has(text) ? "used" : ""}" draggable="${answeredPersisted ? "false" : "true"}" data-chip="${i}" data-value="${encodeURIComponent(text)}">${text}</div>
         `).join("")}
       </div>
@@ -4564,18 +4735,42 @@ function renderStudentMatchingQuestion(question, session, existingAnswer) {
   const localMap = { ...initialMap };
   const chipWrap = document.getElementById("live-match-chip-wrap");
   oBox.querySelectorAll(".live-match-chip").forEach((chip) => {
-    chip.addEventListener("dragstart", () => {
+    chip.addEventListener("dragstart", (ev) => {
       if (chip.classList.contains("used")) return;
       livePlayerMatchingDragKey = String(chip.dataset.value || "");
+      try {
+        if (ev?.dataTransfer) ev.dataTransfer.setData("text/plain", livePlayerMatchingDragKey);
+      } catch {}
     });
     chip.addEventListener("dragend", () => {
       livePlayerMatchingDragKey = "";
+    });
+    chip.addEventListener("click", () => {
+      if (chip.classList.contains("used")) return;
+      const prev = oBox.querySelector(".live-match-chip.selected");
+      if (prev && prev !== chip) prev.classList.remove("selected");
+      chip.classList.toggle("selected");
+      livePlayerMatchingDragKey = chip.classList.contains("selected") ? String(chip.dataset.value || "") : "";
     });
   });
   oBox.querySelectorAll(".live-match-dropzone").forEach((zone) => {
     zone.addEventListener("dragover", (ev) => ev.preventDefault());
     zone.addEventListener("drop", (ev) => {
       ev.preventDefault();
+      const transferRaw = (() => {
+        try { return String(ev?.dataTransfer?.getData("text/plain") || ""); } catch { return ""; }
+      })();
+      const raw = decodeURIComponent(String(transferRaw || livePlayerMatchingDragKey || ""));
+      if (!raw) return;
+      const left = decodeURIComponent(String(zone.dataset.left || ""));
+      if (!left) return;
+      Object.keys(localMap).forEach((k) => {
+        if (String(localMap[k] || "") === raw) delete localMap[k];
+      });
+      localMap[left] = raw;
+      renderStudentMatchingQuestion(question, session, { selectedMap: localMap });
+    });
+    zone.addEventListener("click", () => {
       const raw = decodeURIComponent(String(livePlayerMatchingDragKey || ""));
       if (!raw) return;
       const left = decodeURIComponent(String(zone.dataset.left || ""));
@@ -4717,7 +4912,7 @@ async function submitStudentLiveAnswer(opt, idx) {
       return;
     }
     const isCorrect = isLiveAnswerCorrect(q, selectedKey);
-    const questionXP = Math.max(0, Number(q?.xp ?? MAX_QUESTION_XP));
+    const questionXP = Math.max(0, Number(q?.xp ?? MAX_QUESTION_XP)) * (q?.doubleXp ? 2 : 1);
     const xp = isCorrect ? questionXP : 0;
     const answerPayload = {
       userId: currentUserId,
@@ -4800,7 +4995,7 @@ async function submitStudentLiveMatchingAnswer(selectedMap = {}) {
       return;
     }
     const isCorrect = isLiveAnswerCorrect(q, normalizedMap);
-    const questionXP = Math.max(0, Number(q?.xp ?? MAX_QUESTION_XP));
+    const questionXP = Math.max(0, Number(q?.xp ?? MAX_QUESTION_XP)) * (q?.doubleXp ? 2 : 1);
     const xp = isCorrect ? questionXP : 0;
     const answerPayload = {
       userId: currentUserId,
@@ -9594,9 +9789,9 @@ document.getElementById("tab-live-quiz-results")?.addEventListener("click", () =
   setLiveQuizTab("results");
 });
 
-document.getElementById("btn-add-live-quiz-question")?.addEventListener("click", () => {
+function prepareNewLiveQuizQuestionForm() {
   liveQuizSelectedQuestionIndex = -1;
-  ["live-q-text","live-q-a","live-q-b","live-q-c","live-q-d","live-q-correct","live-q-match-pairs"].forEach((id) => {
+  ["live-q-text","live-q-a","live-q-b","live-q-c","live-q-d","live-q-match-pairs"].forEach((id) => {
     const el = document.getElementById(id); if (el) el.value = "";
   });
   setLiveQuizImagePreview("");
@@ -9606,48 +9801,84 @@ document.getElementById("btn-add-live-quiz-question")?.addEventListener("click",
   if (t) t.value = "multiple";
   updateLiveQuizEditorForType();
   const qDuration = document.getElementById("live-q-duration");
-  if (qDuration) qDuration.value = "30";
+  if (qDuration) qDuration.value = "auto";
   const qXp = document.getElementById("live-q-xp");
-  if (qXp) qXp.value = String(MAX_QUESTION_XP);
+  if (qXp) qXp.value = "10";
+  const qDoubleXp = document.getElementById("live-q-double-xp");
+  if (qDoubleXp) qDoubleXp.checked = false;
+  setLiveCorrectChoice("A");
   renderLiveQuizBuilderPreview();
   renderLiveQuizQuestionList();
+}
+
+document.getElementById("btn-add-live-quiz-question")?.addEventListener("click", () => {
+  prepareNewLiveQuizQuestionForm();
 });
 
-document.getElementById("btn-save-live-quiz-question")?.addEventListener("click", () => {
+function buildLiveQuizQuestionFromEditor(notifyOnError = true) {
   const type = document.getElementById("live-q-type")?.value || "multiple";
   const question = (document.getElementById("live-q-text")?.value || "").trim();
-  if (!question) return showNotice("Soru metni gerekli.", "#e74c3c");
-  const rawDurationSec = Number(document.getElementById("live-q-duration")?.value || 30);
-  const durationSec = Math.max(5, Number.isFinite(rawDurationSec) ? rawDurationSec : 30);
-  const xp = Math.max(0, Number(document.getElementById("live-q-xp")?.value ?? MAX_QUESTION_XP));
-  const payload = { type, question, imageDataUrl: currentLiveQuizImageDataUrl || "", options: [], pairs: [], correct: "", durationSec, xp };
+  if (!question) return null;
+  const durationRaw = String(document.getElementById("live-q-duration")?.value || "30").trim();
+  const durationSec = durationRaw === "auto" ? getLiveAutoDurationSec(question, type) : Math.max(5, Number(durationRaw) || 30);
+  const xp = Math.max(5, Number(document.getElementById("live-q-xp")?.value ?? 10) || 10);
+  const doubleXp = !!document.getElementById("live-q-double-xp")?.checked;
+  const payload = { type, question, imageDataUrl: currentLiveQuizImageDataUrl || "", options: [], pairs: [], correct: "", durationSec, xp, doubleXp };
+
   if (type === "truefalse") {
     payload.options = ["doğru", "yanlış"];
-    payload.correct = (document.getElementById("live-q-correct")?.value || "").trim().toLowerCase();
-    if (!["doğru","yanlış"].includes(payload.correct)) return showNotice("Doğru cevap doğru/yanlış olmalı.", "#e74c3c");
-  } else if (type === "matching") {
+    payload.correct = getLiveCorrectFromInputs(type);
+    if (!["doğru","yanlış"].includes(payload.correct)) {
+      if (notifyOnError) showNotice("Doğru cevap doğru/yanlış olmalı.", "#e74c3c");
+      return null;
+    }
+    return payload;
+  }
+  if (type === "matching") {
     const pairsText = document.getElementById("live-q-match-pairs")?.value || "";
     const pairs = parseLiveMatchingPairsFromText(pairsText);
-    if (pairs.length < 2) return showNotice("Eşleştirme için en az 2 satır girin (Sol = Sağ).", "#e74c3c");
+    if (pairs.length < 2) {
+      if (notifyOnError) showNotice("Eşleştirme için en az 2 satır girin (Sol = Sağ).", "#e74c3c");
+      return null;
+    }
     payload.pairs = pairs;
     payload.options = pairs.map((p) => p.right);
     payload.correct = "";
-  } else {
-    const opts = ["live-q-a","live-q-b","live-q-c","live-q-d"].map((id) => (document.getElementById(id)?.value || "").trim()).filter(Boolean);
-    if (opts.length < 2) return showNotice("En az 2 seçenek gerekli.", "#e74c3c");
-    const corr = (document.getElementById("live-q-correct")?.value || "").trim().toUpperCase();
-    if (!["A","B","C","D"].includes(corr)) return showNotice("Doğru seçenek A/B/C/D olmalı.", "#e74c3c");
-    payload.options = opts;
-    payload.correct = corr;
+    return payload;
   }
-  if (liveQuizSelectedQuestionIndex >= 0) liveQuizItems[liveQuizSelectedQuestionIndex] = payload;
+  const opts = ["live-q-a","live-q-b","live-q-c","live-q-d"].map((id) => (document.getElementById(id)?.value || "").trim()).filter(Boolean);
+  if (opts.length < 2) {
+    if (notifyOnError) showNotice("En az 2 seçenek gerekli.", "#e74c3c");
+    return null;
+  }
+  const corr = getLiveCorrectFromInputs(type);
+  if (!["A","B","C","D"].includes(corr)) {
+    if (notifyOnError) showNotice("Doğru seçenek A/B/C/D olmalı.", "#e74c3c");
+    return null;
+  }
+  payload.options = opts;
+  payload.correct = corr;
+  return payload;
+}
+
+document.getElementById("btn-save-live-quiz-question")?.addEventListener("click", () => {
+  const wasEditingExistingQuestion = liveQuizSelectedQuestionIndex >= 0;
+  const payload = buildLiveQuizQuestionFromEditor(true);
+  if (!payload) {
+    const question = (document.getElementById("live-q-text")?.value || "").trim();
+    if (!question) showNotice("Soru metni gerekli.", "#e74c3c");
+    return;
+  }
+  if (wasEditingExistingQuestion) liveQuizItems[liveQuizSelectedQuestionIndex] = payload;
   else {
     liveQuizItems.push(payload);
     liveQuizSelectedQuestionIndex = liveQuizItems.length - 1;
   }
   renderLiveQuizBuilderPreview();
   renderLiveQuizQuestionList();
-  showNotice("Soru kaydedildi.", "#2ecc71");
+  // Hızlı soru üretimi için kaydet sonrası yeni soru formunu otomatik aç.
+  prepareNewLiveQuizQuestionForm();
+  showNotice(wasEditingExistingQuestion ? "Soru güncellendi. Yeni soru formu hazır." : "Soru kaydedildi. Yeni soru formu hazır.", "#2ecc71");
 });
 
 document.getElementById("live-q-image")?.addEventListener("change", async (ev) => {
@@ -9664,9 +9895,22 @@ document.getElementById("live-q-image")?.addEventListener("change", async (ev) =
   setLiveQuizImagePreview(dataUrl);
   renderLiveQuizBuilderPreview();
 });
+document.getElementById("btn-live-q-image-clear")?.addEventListener("click", () => {
+  const imgInput = document.getElementById("live-q-image");
+  if (imgInput) imgInput.value = "";
+  setLiveQuizImagePreview("");
+  renderLiveQuizBuilderPreview();
+});
 
-["live-q-text","live-q-type","live-q-a","live-q-b","live-q-c","live-q-d","live-q-correct","live-q-duration","live-q-xp","live-q-match-pairs"].forEach((id) => {
+["live-q-text","live-q-type","live-q-a","live-q-b","live-q-c","live-q-d","live-q-duration","live-q-xp","live-q-match-pairs"].forEach((id) => {
   document.getElementById(id)?.addEventListener("input", renderLiveQuizBuilderPreview);
+  document.getElementById(id)?.addEventListener("change", renderLiveQuizBuilderPreview);
+});
+document.querySelectorAll("[data-correct-option]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    setLiveCorrectChoice(String(btn.getAttribute("data-correct-option") || ""));
+    renderLiveQuizBuilderPreview();
+  });
 });
 document.getElementById("live-q-type")?.addEventListener("change", () => {
   updateLiveQuizEditorForType();

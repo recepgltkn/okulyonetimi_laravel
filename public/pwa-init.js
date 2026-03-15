@@ -52,7 +52,6 @@
   function setupInstallPrompt() {
     const button = createInstallButton();
     window.addEventListener("beforeinstallprompt", (event) => {
-      event.preventDefault();
       deferredPrompt = event;
       button.style.display = "inline-flex";
       button.style.alignItems = "center";

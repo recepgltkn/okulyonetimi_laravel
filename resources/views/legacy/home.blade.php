@@ -5411,6 +5411,38 @@
         #live-q-d { background: #16a34a !important; }
         #live-q-a::placeholder, #live-q-b::placeholder, #live-q-c::placeholder, #live-q-d::placeholder { color: rgba(255,255,255,0.92); }
         #live-q-c::placeholder { color: rgba(31,41,55,0.85); }
+        .live-q-correct-mark {
+            width: 44px;
+            height: 44px;
+            min-width: 44px;
+            padding: 0 !important;
+            border-radius: 999px !important;
+            border: 2px solid #16a34a !important;
+            background: linear-gradient(180deg, #86efac 0%, #22c55e 100%) !important;
+            color: #064e3b !important;
+            font-size: 24px !important;
+            font-weight: 900 !important;
+            line-height: 1 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            text-align: center !important;
+            box-shadow: 0 8px 20px rgba(34, 197, 94, 0.4);
+            transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+            opacity: 0.9;
+        }
+        .live-q-correct-mark:hover {
+            transform: translateY(-1px) scale(1.03);
+            filter: saturate(1.18);
+            box-shadow: 0 12px 26px rgba(22, 163, 74, 0.5);
+        }
+        .live-q-correct-mark.btn-success {
+            border-color: #15803d !important;
+            background: linear-gradient(180deg, #4ade80 0%, #16a34a 100%) !important;
+            color: #ffffff !important;
+            box-shadow: 0 14px 30px rgba(22, 163, 74, 0.58);
+            opacity: 1;
+        }
         .lesson-question-builder {
             border: 1px solid #dbeafe;
             border-radius: 14px;
@@ -10564,12 +10596,25 @@ Ayşe, Yılmaz, ayse, 123456, 9, B"></textarea>
                             <label for="live-q-image" class="live-quiz-media-label">+ Medya Ekle</label>
                             <input id="live-q-image" type="file" accept="image/*">
                             <div id="live-q-image-preview" class="live-quiz-media-preview">Soruya görsel ekleyebilirsin.</div>
+                            <button id="btn-live-q-image-clear" type="button" class="btn" style="margin-top:8px;background:#fee2e2;color:#991b1b;">Görseli Kaldır</button>
                         </div>
                         <div class="live-quiz-options-grid">
-                            <input id="live-q-a" class="form-control live-quiz-option-input" placeholder="A seçeneği">
-                            <input id="live-q-b" class="form-control live-quiz-option-input" placeholder="B seçeneği">
-                            <input id="live-q-c" class="form-control live-quiz-option-input" placeholder="C seçeneği">
-                            <input id="live-q-d" class="form-control live-quiz-option-input" placeholder="D seçeneği">
+                            <div style="display:flex;gap:8px;align-items:center;">
+                                <button type="button" class="btn live-q-correct-mark" data-correct-option="A">✓</button>
+                                <input id="live-q-a" class="form-control live-quiz-option-input" placeholder="A seçeneği">
+                            </div>
+                            <div style="display:flex;gap:8px;align-items:center;">
+                                <button type="button" class="btn live-q-correct-mark" data-correct-option="B">✓</button>
+                                <input id="live-q-b" class="form-control live-quiz-option-input" placeholder="B seçeneği">
+                            </div>
+                            <div style="display:flex;gap:8px;align-items:center;">
+                                <button type="button" class="btn live-q-correct-mark" data-correct-option="C">✓</button>
+                                <input id="live-q-c" class="form-control live-quiz-option-input" placeholder="C seçeneği">
+                            </div>
+                            <div style="display:flex;gap:8px;align-items:center;">
+                                <button type="button" class="btn live-q-correct-mark" data-correct-option="D">✓</button>
+                                <input id="live-q-d" class="form-control live-quiz-option-input" placeholder="D seçeneği">
+                            </div>
                         </div>
                         <textarea id="live-q-match-pairs" class="form-control" rows="4" style="display:none;margin-top:8px;" placeholder="Her satır: Sol İfade = Sağ İfade&#10;Ör: CPU = İşlemci"></textarea>
                     </div>
@@ -10590,15 +10635,41 @@ Ayşe, Yılmaz, ayse, 123456, 9, B"></textarea>
                     </div>
                     <div class="live-quiz-right-block">
                         <div class="label">Zaman sınırı</div>
-                        <input id="live-q-duration" class="form-control" type="number" min="5" value="30" placeholder="Bu soru için süre/sn">
+                        <select id="live-q-duration" class="form-control">
+                            <option value="auto">Otomatik</option>
+                            <option value="10">10 sn</option>
+                            <option value="15">15 sn</option>
+                            <option value="20">20 sn</option>
+                            <option value="25">25 sn</option>
+                            <option value="30" selected>30 sn</option>
+                            <option value="35">35 sn</option>
+                            <option value="40">40 sn</option>
+                            <option value="45">45 sn</option>
+                            <option value="50">50 sn</option>
+                            <option value="55">55 sn</option>
+                            <option value="60">60 sn</option>
+                        </select>
                     </div>
                     <div class="live-quiz-right-block">
                         <div class="label">Puanlar</div>
-                        <input id="live-q-xp" class="form-control" type="number" min="0" value="9" placeholder="Bu soru için XP">
+                        <select id="live-q-xp" class="form-control">
+                            <option value="5">5 XP</option>
+                            <option value="10" selected>10 XP</option>
+                            <option value="15">15 XP</option>
+                            <option value="20">20 XP</option>
+                            <option value="25">25 XP</option>
+                            <option value="30">30 XP</option>
+                            <option value="35">35 XP</option>
+                            <option value="40">40 XP</option>
+                            <option value="45">45 XP</option>
+                            <option value="50">50 XP</option>
+                        </select>
+                        <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px;color:#334155;">
+                            <input id="live-q-double-xp" type="checkbox">
+                            2 kat puan
+                        </label>
                     </div>
                     <div class="live-quiz-right-block">
-                        <div class="label">Doğru cevap</div>
-                        <input id="live-q-correct" class="form-control" placeholder="Doğru seçenek (A/B/C/D ya da doğru/yanlış)">
                         <button id="btn-save-live-quiz-question" class="btn btn-primary" style="width:100%;margin-top:6px;">Soruyu Kaydet / Güncelle</button>
                     </div>
                     <div class="live-quiz-actions-footer">
