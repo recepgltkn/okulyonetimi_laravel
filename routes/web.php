@@ -1,10 +1,15 @@
 <?php
 
+use App\Http\Controllers\ClientDataController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return view('legacy.home');
 });
+
+// Shared hosting / stale frontend compatibility:
+// older clients may still POST to /login instead of /api/client/auth/login.
+Route::post('/login', [ClientDataController::class, 'login']);
 
 Route::get('/block-3d-runner', fn () => response()->file(public_path('block-3d-runner/index.html')));
 Route::get('/block-grid-runner', fn () => response()->file(public_path('block-grid-runner/index.html')));

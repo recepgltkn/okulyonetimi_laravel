@@ -1,4 +1,7 @@
-const API_BASE = "/api/client";
+const APP_BASE_URL = String(
+  document.querySelector('meta[name="app-base-url"]')?.content || window.location.origin
+).replace(/\/+$/, "");
+const API_BASE = `${APP_BASE_URL}/api/client`;
 
 async function api(path, method = "GET", body = null) {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -41,4 +44,3 @@ export function getAuthInstance() {
 }
 
 export default { saveGameState, loadGameState, saveStudentReport, getAuthInstance };
-

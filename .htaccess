@@ -1,7 +1,10 @@
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
-    # If the request is not already under /public, redirect there.
-    RewriteCond %{REQUEST_URI} !/public/
-    RewriteRule ^(.*)$ /dogu/okulyonetimi_laravel/public/$1 [R=302,L]
+    # Shared hosting compatibility:
+    # serve the Laravel app from the project root without hardcoded absolute paths.
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ public/$1 [L]
 </IfModule>
