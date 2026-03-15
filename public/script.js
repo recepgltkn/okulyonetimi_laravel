@@ -531,9 +531,9 @@ let teacherLiveMonitorOpen = false;
 let teacherLiveMonitorRenderRaf = null;
 let studentLiveSubmittingAnswerKeys = new Set();
 let studentLivePendingAnswers = new Map();
-let liveSessionFallbackAdvancingIds = new Set();
 let studentLiveDoubleXpIntroShown = new Set();
 let liveQuizCorrectChoice = "";
+let studentLiveLocalQuestionTimer = { key: "", endsAtMs: 0 };
 let liveQuizResultRepairCache = new Set();
 let myStatsSummaryCache = null;
 let teacherCertificateStudents = [];
@@ -3815,45 +3815,9 @@ function startTeacherLiveTicker() {
   }, 500);
 }
 
-async function tryFallbackAdvanceLiveSession(live) {
-  if (!live?.id || String(live.status || "") !== "live") return;
-  const sessionId = String(live.id);
-  if (liveSessionFallbackAdvancingIds.has(sessionId)) return;
-  const now = Date.now();
-  const endsAtMs = Number(live.endsAtMs || 0);
-  if (!endsAtMs || now < endsAtMs) return;
-  const total = Array.isArray(live.questions) ? live.questions.length : 0;
-  const idx = Number(live.currentIndex || 0);
-  // Son soruya gelindiyse bitirme akışı öğretmen tarafında kalsın.
-  if (idx + 1 >= total) return;
-  liveSessionFallbackAdvancingIds.add(sessionId);
-  try {
-    const ref = doc(db, "liveQuizSessions", sessionId);
-    const snap = await getDoc(ref);
-    if (!snap.exists()) return;
-    const current = snap.data() || {};
-    if (String(current.status || "") !== "live") return;
-    const currentIdx = Number(current.currentIndex || 0);
-    const currentEndsAt = Number(current.endsAtMs || 0);
-    if (currentIdx !== idx || !currentEndsAt || Date.now() < currentEndsAt) return;
-    const nextQuestion = current.questions?.[currentIdx + 1] || null;
-    const nextDuration = Math.max(
-      5,
-      Number(nextQuestion?.durationSec ?? nextQuestion?.duration ?? 0) || Math.max(10, Number(current.questionDurationSec || 30))
-    );
-    await updateDoc(ref, {
-      currentIndex: currentIdx + 1,
-      endsAtMs: Date.now() + (nextDuration * 1000),
-      isLocked: false
-    });
-  } catch (_e) {
-    // Sessiz fallback: asıl akış öğretmen panelinde devam eder.
-  } finally {
-    setTimeout(() => {
-      liveSessionFallbackAdvancingIds.delete(sessionId);
-    }, 700);
-  }
-}
+// Öğrenci istemcisinden oturum ilerletmeyiz.
+// Soru geçişinin tek otoritesi öğretmen oturumudur.
+async function tryFallbackAdvanceLiveSession(_live) {}
 
 function renderLiveTeacherRank(rows = []) {
   const box = document.getElementById("live-session-rank");
@@ -4045,39 +4009,26 @@ function renderTeacherLiveMonitor(live = activeLiveSession) {
     answerMap.set(uid, row);
   });
 
-  const rows = [];
-  (teacherLiveMonitorStudents || []).forEach((student) => {
-    rows.push({
-      userId: student.id,
-      name: student.name || student.id || "-",
-      className: student.className || "",
-      section: student.section || "",
-      score: scoreMap.get(String(student.id || "")) || null,
-      answer: answerMap.get(String(student.id || "")) || null
-    });
-  });
-  answerMap.forEach((answer, uid) => {
-    if (rows.find((r) => String(r.userId) === uid)) return;
+  // Sadece quize gerçekten katılanlar: answer veya score kaydı bulunan kullanıcılar.
+  const studentMetaMap = new Map(
+    (teacherLiveMonitorStudents || []).map((s) => [String(s.id || ""), s])
+  );
+  const participantIds = new Set([
+    ...Array.from(answerMap.keys()),
+    ...Array.from(scoreMap.keys())
+  ]);
+  const rows = Array.from(participantIds).map((uid) => {
+    const answer = answerMap.get(uid) || null;
     const score = scoreMap.get(uid) || null;
-    rows.push({
+    const studentMeta = studentMetaMap.get(uid) || null;
+    return {
       userId: uid,
-      name: answer.name || score?.name || uid,
-      className: "",
-      section: "",
+      name: studentMeta?.name || answer?.name || score?.name || uid || "-",
+      className: studentMeta?.className || "",
+      section: studentMeta?.section || "",
       score,
       answer
-    });
-  });
-  scoreMap.forEach((score, uid) => {
-    if (rows.find((r) => String(r.userId) === uid)) return;
-    rows.push({
-      userId: uid,
-      name: score.name || uid,
-      className: "",
-      section: "",
-      score,
-      answer: answerMap.get(uid) || null
-    });
+    };
   });
 
   rows.sort((a, b) => {
@@ -4105,7 +4056,7 @@ function renderTeacherLiveMonitor(live = activeLiveSession) {
   `;
 
   if (!rows.length) {
-    listEl.innerHTML = `<div class="empty-state" style="grid-column:1/-1;">Bu canlı quiz için öğrenci bulunamadı.</div>`;
+    listEl.innerHTML = `<div class="empty-state" style="grid-column:1/-1;">Henüz quize katılan öğrenci yok.</div>`;
     return;
   }
   listEl.innerHTML = rows.map((row) => {
@@ -4511,12 +4462,12 @@ function startStudentLiveQuizListener() {
       studentLiveSubmittingAnswerKeys = new Set();
       studentLivePendingAnswers = new Map();
       studentLiveDoubleXpIntroShown = new Set();
+      studentLiveLocalQuestionTimer = { key: "", endsAtMs: 0 };
     }
     const invite = document.getElementById("live-quiz-invite");
     const inviteText = document.getElementById("live-quiz-invite-text");
     if (!invite || !inviteText) return;
     if (live) {
-      tryFallbackAdvanceLiveSession(live);
       inviteText.innerText = `“${live.quizTitle || "Canlı Quiz"}” başladı. Katılmak için tıklayın.`;
       const playerOpen = document.getElementById("live-quiz-player")?.style.display === "flex";
       if (!playerOpen) {
@@ -4534,6 +4485,7 @@ function startStudentLiveQuizListener() {
       studentLiveSubmittingAnswerKeys = new Set();
       studentLivePendingAnswers = new Map();
       studentLiveDoubleXpIntroShown = new Set();
+      studentLiveLocalQuestionTimer = { key: "", endsAtMs: 0 };
       invite.style.display = "none";
       closeLivePlayer(true);
     }
@@ -4571,6 +4523,10 @@ async function renderStudentLiveQuestion() {
   const qBox = document.getElementById("live-player-question");
   const oBox = document.getElementById("live-player-options");
   const info = document.getElementById("live-player-info");
+  const effectiveEndsAtMs = getStudentLiveEffectiveEndsAtMs(session);
+  const now = Date.now();
+  const leftSec = Math.max(0, Math.floor((effectiveEndsAtMs - now) / 1000));
+  const isQuestionTimeOver = leftSec <= 0;
   if (title) title.innerText = `${session.quizTitle || "Canlı Quiz"} • ${Number(session.currentIndex || 0) + 1}/${(session.questions || []).length}`;
   if (!q) {
     if (qBox) qBox.innerText = "Soru bulunamadı.";
@@ -4627,7 +4583,7 @@ async function renderStudentLiveQuestion() {
       ? "Cevabın gönderiliyor..."
       : existingAnswer
       ? `Bu soruyu cevapladın: ${existingAnswer.selectedKey || existingAnswer.selected || "Yanıt kaydedildi"}`
-      : (session.isLocked ? "Bu soru öğretmen tarafından kilitlendi." : `Doğru cevap +${questionXP} XP`);
+      : ((session.isLocked || isQuestionTimeOver) ? "Bu soru süresi doldu. Sonraki soru bekleniyor." : `Doğru cevap +${questionXP} XP`);
     info.innerText = statusText;
   }
   if (q.type === "matching") {
@@ -4639,7 +4595,7 @@ async function renderStudentLiveQuestion() {
         : (session.isLocked ? "Bu soru öğretmen tarafından kilitlendi." : "Eşleşmeleri sürükle-bırak ile tamamlayın.");
       info.innerText = statusText;
     }
-    renderStudentMatchingQuestion(q, session, existingAnswer);
+    renderStudentMatchingQuestion(q, session, existingAnswer, isQuestionTimeOver);
     return;
   }
   if (oBox) {
@@ -4671,14 +4627,14 @@ async function renderStudentLiveQuestion() {
         : String(q?.correct || "").trim().toUpperCase() === selectedKey;
       const optText = existingAnswer && isCorrectOption ? `${optTextRaw} ✅` : optTextRaw;
       btn.innerHTML = `<span class="opt-key">${keyText}</span><span class="opt-text">${optText}</span>`;
-      btn.disabled = !!session.isLocked || !!existingAnswer || studentLiveSubmittingAnswerKeys.has(`${session.id}_${qIndex}_${currentUserId}`);
+      btn.disabled = !!session.isLocked || isQuestionTimeOver || !!existingAnswer || studentLiveSubmittingAnswerKeys.has(`${session.id}_${qIndex}_${currentUserId}`);
       btn.onclick = () => submitStudentLiveAnswer(opt, i);
       oBox.appendChild(btn);
     });
   }
 }
 
-function renderStudentMatchingQuestion(question, session, existingAnswer) {
+function renderStudentMatchingQuestion(question, session, existingAnswer, isQuestionTimeOver = false) {
   const oBox = document.getElementById("live-player-options");
   if (!oBox) return;
   const pairs = Array.isArray(question?.pairs) ? question.pairs : [];
@@ -4696,7 +4652,7 @@ function renderStudentMatchingQuestion(question, session, existingAnswer) {
           return {};
         }
       })();
-  const answeredPersisted = !!existingAnswer?.answeredAtMs || !!existingAnswer?.pending;
+  const answeredPersisted = !!existingAnswer?.answeredAtMs || !!existingAnswer?.pending || !!isQuestionTimeOver;
   const usedValues = new Set(Object.values(initialMap).map((v) => String(v || "")));
   const chips = pairs.map((p) => String(p?.right || "")).filter(Boolean);
   const chipOrderKey = `__chipOrder_${session?.id || ""}_${Number(session?.currentIndex || 0)}`;
@@ -4883,6 +4839,10 @@ async function submitStudentLiveAnswer(opt, idx) {
   const qIndex = Number(session.currentIndex || 0);
   const q = session.questions?.[qIndex];
   if (!q) return;
+  if (Date.now() >= getStudentLiveEffectiveEndsAtMs(session)) {
+    showNotice("Bu sorunun süresi doldu. Sonraki soruyu bekleyin.", "#f39c12");
+    return;
+  }
   const submitKey = `${session.id}_${qIndex}_${currentUserId}`;
   if (studentLiveSubmittingAnswerKeys.has(submitKey)) return;
   studentLiveSubmittingAnswerKeys.add(submitKey);
@@ -4903,11 +4863,10 @@ async function submitStudentLiveAnswer(opt, idx) {
   const answerId = `${currentUserId}_${qIndex}`;
   const ansRef = doc(db, "liveQuizSessions", session.id, "answers", answerId);
   try {
-    const already = await getDoc(ansRef);
-    if (already.exists()) {
+    const cachedExisting = studentLiveAnswerCache.get(submitKey) || studentLivePendingAnswers.get(submitKey);
+    if (cachedExisting?.answeredAtMs) {
       studentLivePendingAnswers.delete(submitKey);
       showNotice("Bu soruyu zaten cevapladın.", "#f39c12");
-      studentLiveAnswerCache.set(submitKey, already.data());
       renderStudentLiveQuestion();
       return;
     }
@@ -4967,6 +4926,10 @@ async function submitStudentLiveMatchingAnswer(selectedMap = {}) {
   const qIndex = Number(session.currentIndex || 0);
   const q = session.questions?.[qIndex];
   if (!q || q.type !== "matching") return;
+  if (Date.now() >= getStudentLiveEffectiveEndsAtMs(session)) {
+    showNotice("Bu sorunun süresi doldu. Sonraki soruyu bekleyin.", "#f39c12");
+    return;
+  }
   const submitKey = `${session.id}_${qIndex}_${currentUserId}`;
   if (studentLiveSubmittingAnswerKeys.has(submitKey)) return;
   studentLiveSubmittingAnswerKeys.add(submitKey);
@@ -4986,11 +4949,10 @@ async function submitStudentLiveMatchingAnswer(selectedMap = {}) {
   const answerId = `${currentUserId}_${qIndex}`;
   const ansRef = doc(db, "liveQuizSessions", session.id, "answers", answerId);
   try {
-    const already = await getDoc(ansRef);
-    if (already.exists()) {
+    const cachedExisting = studentLiveAnswerCache.get(submitKey) || studentLivePendingAnswers.get(submitKey);
+    if (cachedExisting?.answeredAtMs) {
       studentLivePendingAnswers.delete(submitKey);
       showNotice("Bu soruyu zaten cevapladın.", "#f39c12");
-      studentLiveAnswerCache.set(submitKey, already.data());
       renderStudentLiveQuestion();
       return;
     }
@@ -5083,6 +5045,25 @@ function updateLivePlayerTimer(leftSeconds) {
   timer.classList.toggle("danger", safe > 0 && safe <= 5);
 }
 
+function getStudentLiveEffectiveEndsAtMs(session) {
+  if (!session) return 0;
+  const qIndex = Number(session.currentIndex || 0);
+  const key = `${String(session.id || "")}_${qIndex}`;
+  const q = session.questions?.[qIndex] || null;
+  const durationSec = Math.max(5, Number(q?.durationSec ?? q?.duration ?? session?.questionDurationSec ?? 30) || 30);
+  if (studentLiveLocalQuestionTimer.key !== key) {
+    studentLiveLocalQuestionTimer = {
+      key,
+      endsAtMs: Date.now() + (durationSec * 1000)
+    };
+  }
+  // Öğrenciye soru geç gelirse hak kaybını önlemek için lokal süreyi baz al.
+  return Math.max(
+    Number(session?.endsAtMs || 0),
+    Number(studentLiveLocalQuestionTimer.endsAtMs || 0)
+  );
+}
+
 function openLivePlayer() {
   const modal = document.getElementById("live-quiz-player");
   if (!modal || !activeStudentLiveSession) return;
@@ -5096,12 +5077,30 @@ function openLivePlayer() {
     const rankCard = rankBox.closest(".card");
     if (rankCard) rankCard.style.display = "none";
   }
-  updateLivePlayerTimer(Math.max(0, Math.floor(((activeStudentLiveSession?.endsAtMs || 0) - Date.now()) / 1000)));
+  updateLivePlayerTimer(Math.max(0, Math.floor((getStudentLiveEffectiveEndsAtMs(activeStudentLiveSession) - Date.now()) / 1000)));
   if (livePlayerTick) clearInterval(livePlayerTick);
   livePlayerTick = setInterval(() => {
-    const left = Math.max(0, Math.floor(((activeStudentLiveSession?.endsAtMs || 0) - Date.now()) / 1000));
+    const left = Math.max(0, Math.floor((getStudentLiveEffectiveEndsAtMs(activeStudentLiveSession) - Date.now()) / 1000));
     updateLivePlayerTimer(left);
-    if (left <= 0) {
+    if (left === 0) {
+      const live = activeStudentLiveSession;
+      const idx = Number(live?.currentIndex || 0);
+      const total = Math.max(0, Number(Array.isArray(live?.questions) ? live.questions.length : 0));
+      // Son soruda süre dolup state senkronu gecikirse öğrenci ekranı takılı kalmasın.
+      if (live && total > 0 && idx + 1 >= total) {
+        setTimeout(() => {
+          if (!activeStudentLiveSession) return;
+          const cur = activeStudentLiveSession;
+          const curIdx = Number(cur?.currentIndex || 0);
+          const curTotal = Math.max(0, Number(Array.isArray(cur?.questions) ? cur.questions.length : 0));
+          const stillLast = curTotal > 0 && curIdx + 1 >= curTotal;
+          const stillExpired = Date.now() >= Number(cur?.endsAtMs || 0);
+          if (stillLast && stillExpired) {
+            closeLivePlayer(true);
+            showNotice("Quiz süresi doldu.", "#4a90e2");
+          }
+        }, 1800);
+      }
       renderStudentLiveQuestion();
     }
   }, 500);
@@ -5118,6 +5117,7 @@ function closeLivePlayer(force = false) {
   livePlayerTick = null;
   stopStudentLiveScoresListener();
   studentLiveAnswerCache = new Map();
+  studentLiveLocalQuestionTimer = { key: "", endsAtMs: 0 };
 }
 
 document.getElementById("btn-download-student-pdf").onclick = async function () {
