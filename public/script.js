@@ -13236,11 +13236,19 @@ function updateModalStats(taskId) {
 }
 
 /* ================= GİRİŞ / KAYIT ================= */
-document.getElementById("btn-login").onclick = async function () {
-  const email = document.getElementById("email").value;
-  const pass = document.getElementById("password").value;
+const loginButtonEl = document.getElementById("btn-login");
+if (loginButtonEl) loginButtonEl.onclick = async function () {
+  const emailInput = document.getElementById("email");
+  const passwordInput = document.getElementById("password");
+  const email = emailInput?.value || "";
+  const pass = passwordInput?.value || "";
   const loginBtn = document.getElementById("btn-login");
   const loginScreen = document.getElementById("login-screen");
+
+  if (!emailInput || !passwordInput) {
+    showNotice("Giriş formu yüklenemedi.", "#e74c3c");
+    return;
+  }
 
   if (!email || !pass) {
     showNotice("E-posta ve şifre girin!", "#e74c3c");

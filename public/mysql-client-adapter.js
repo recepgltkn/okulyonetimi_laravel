@@ -1,4 +1,7 @@
-const API_BASE = "/api/client";
+const APP_BASE_URL = String(
+  document.querySelector('meta[name="app-base-url"]')?.content || window.location.origin
+).replace(/\/+$/, "");
+const API_BASE = `${APP_BASE_URL}/api/client`;
 const AUTH_KEY = "mysql_auth_user";
 const WATCH_INTERVAL_MS = 5000;
 const WATCH_INTERVAL_HIDDEN_MS = 15000;
@@ -302,5 +305,4 @@ export function httpsCallable(_functions, name) {
     return { data: res?.data };
   };
 }
-
 
