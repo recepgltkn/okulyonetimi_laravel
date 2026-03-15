@@ -40,6 +40,10 @@ async function api(path, method = "GET", body = null) {
   const headers = { "Content-Type": "application/json" };
   const uid = String(currentUser?.uid || currentUser?.id || "").trim();
   const token = String(currentUser?.token || "").trim();
+  const needsAuth = !/\/auth\/(login|register)/.test(path);
+  if (needsAuth && (!uid || !token)) {
+    throw new Error("unauthenticated");
+  }
   if (uid) headers["X-Client-Uid"] = uid;
   if (token) {
     headers["X-Client-Token"] = token;
@@ -51,8 +55,13 @@ async function api(path, method = "GET", body = null) {
     body: body ? JSON.stringify(body) : null,
   });
   const json = await res.json().catch(() => ({}));
-  if (res.status === 401 && !/\/auth\/(login|register)/.test(path)) {
-    persistAuthUser(null);
+  if (res.status === 401 && needsAuth) {
+    console.warn("API 401 unauthenticated", {
+      path,
+      uid: uid || null,
+      hasToken: !!token
+    });
+    if (uid && token) persistAuthUser(null);
   }
   if (!res.ok) throw new Error(json?.message || `HTTP ${res.status}`);
   return json;

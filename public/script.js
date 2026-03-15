@@ -44,6 +44,7 @@ const db = getStore(app);
 const functions = getFunctions(app);
 const deleteUserByAdmin = httpsCallable(functions, "deleteUserByAdmin");
 const setUserPasswordByAdmin = httpsCallable(functions, "setUserPasswordByAdmin");
+const getMyStatsSummary = httpsCallable(functions, "getMyStats");
 const isLocalDevHost = ["127.0.0.1", "localhost"].includes(String(window.location.hostname || "").toLowerCase());
 const APP_BASE_URL = String(
   document.querySelector('meta[name="app-base-url"]')?.content || window.location.origin
@@ -70,16 +71,23 @@ const BLOCK_XP_EASY = 5;
 const BLOCK_XP_MEDIUM = 12;
 const BLOCK_XP_HARD = 21;
 const MANUAL_TASK_APPROVAL_XP = 5;
-const AVATAR_DEFAULT_ID = "spark";
+const AVATAR_DEFAULT_ID = "3d-robot";
 const AVATAR_CATALOG = [
-  { id: "spark", name: "Kıvılcım", cost: 0, gradient: "linear-gradient(135deg,#93c5fd,#2563eb)", tone: "#f6c28b", hair: "#3f2a1d", shirt: "#2563eb", hairStyle: "short", eye: "#1f2937" },
-  { id: "leo", name: "Leo", cost: 120, gradient: "linear-gradient(135deg,#fde68a,#f59e0b)", tone: "#f3bc86", hair: "#4a2d1a", shirt: "#f59e0b", hairStyle: "spike", eye: "#111827" },
-  { id: "nova", name: "Nova", cost: 220, gradient: "linear-gradient(135deg,#c4b5fd,#7c3aed)", tone: "#f2bd92", hair: "#2d1a57", shirt: "#7c3aed", hairStyle: "wave", eye: "#1f2937" },
-  { id: "rio", name: "Rio", cost: 340, gradient: "linear-gradient(135deg,#86efac,#10b981)", tone: "#f0b98a", hair: "#0f172a", shirt: "#10b981", hairStyle: "tech", eye: "#111827" },
-  { id: "luna", name: "Luna", cost: 460, gradient: "linear-gradient(135deg,#fbcfe8,#ec4899)", tone: "#f4c8a1", hair: "#7c2d5c", shirt: "#ec4899", hairStyle: "long", eye: "#1f2937" },
-  { id: "max", name: "Max", cost: 580, gradient: "linear-gradient(135deg,#fdba74,#ea580c)", tone: "#efb587", hair: "#2f241e", shirt: "#ea580c", hairStyle: "crew", eye: "#111827" },
-  { id: "zen", name: "Zen", cost: 720, gradient: "linear-gradient(135deg,#a7f3d0,#059669)", tone: "#f2c193", hair: "#1e293b", shirt: "#059669", hairStyle: "round", eye: "#111827" },
-  { id: "aurora", name: "Aurora", cost: 900, gradient: "linear-gradient(135deg,#f9a8d4,#be185d)", tone: "#f5c8a5", hair: "#43216a", shirt: "#be185d", hairStyle: "hero", eye: "#1f2937" }
+  { id: "3d-robot", name: "Robo", cost: 0, image: "avatars/3d/robot.png", gradient: "linear-gradient(135deg,#e2e8f0,#94a3b8)" },
+  { id: "3d-ninja", name: "Ninja", cost: 120, image: "avatars/3d/ninja.png", gradient: "linear-gradient(135deg,#bbf7d0,#4ade80)" },
+  { id: "3d-ninja-light", name: "Ninja Işık", cost: 180, image: "avatars/3d/ninja-light.png", gradient: "linear-gradient(135deg,#fef3c7,#f59e0b)" },
+  { id: "3d-ninja-dark", name: "Ninja Gece", cost: 220, image: "avatars/3d/ninja-dark.png", gradient: "linear-gradient(135deg,#c7d2fe,#4338ca)" },
+  { id: "3d-astro", name: "Kozmo", cost: 260, image: "avatars/3d/astronaut.png", gradient: "linear-gradient(135deg,#bae6fd,#38bdf8)" },
+  { id: "3d-astro-light", name: "Kozmo Işık", cost: 300, image: "avatars/3d/astronaut-light.png", gradient: "linear-gradient(135deg,#fecdd3,#fb7185)" },
+  { id: "3d-astro-dark", name: "Kozmo Gece", cost: 340, image: "avatars/3d/astronaut-dark.png", gradient: "linear-gradient(135deg,#a7f3d0,#34d399)" },
+  { id: "3d-man-astro", name: "Yıldız", cost: 380, image: "avatars/3d/man-astronaut.png", gradient: "linear-gradient(135deg,#fcd34d,#f59e0b)" },
+  { id: "3d-nova", name: "Nova", cost: 420, image: "avatars/3d/woman-astronaut.png", gradient: "linear-gradient(135deg,#c4b5fd,#7c3aed)" },
+  { id: "3d-man-hero", name: "Kahraman", cost: 480, image: "avatars/3d/man-superhero.png", gradient: "linear-gradient(135deg,#fca5a5,#f97316)" },
+  { id: "3d-woman-hero", name: "Kahraman+", cost: 540, image: "avatars/3d/woman-superhero.png", gradient: "linear-gradient(135deg,#fbcfe8,#ec4899)" },
+  { id: "3d-hero-tech", name: "Tekno", cost: 600, image: "avatars/3d/man-superhero.png", gradient: "linear-gradient(135deg,#bae6fd,#22d3ee)" },
+  { id: "3d-hero-space", name: "Uzaycı", cost: 660, image: "avatars/3d/astronaut.png", gradient: "linear-gradient(135deg,#ddd6fe,#8b5cf6)" },
+  { id: "3d-hero-stealth", name: "Gölge", cost: 720, image: "avatars/3d/ninja-dark.png", gradient: "linear-gradient(135deg,#e2e8f0,#64748b)" },
+  { id: "3d-hero-cosmo", name: "Kozmik", cost: 780, image: "avatars/3d/astronaut-light.png", gradient: "linear-gradient(135deg,#fed7aa,#fb923c)" }
 ];
 
 function clampNumber(value, min, max) {
@@ -455,6 +463,13 @@ let lessonQuestionTimerInterval = null;
 let lessonSlideAutosaveTimer = null;
 let lessonCanvasElements = [];
 let lessonCanvasDrag = null;
+
+// Debug helper for browser console (non-intrusive).
+window.__lessonDebug = function () {
+  const st = lessonPlayerState;
+  const slide = st?.lesson?.slides?.[st?.index ?? 0] || null;
+  return { state: st, slide };
+};
 let selectedLessonCanvasElementId = null;
 let lessonTextModalResolve = null;
 let selectedLessonThemeId = "aurora";
@@ -493,10 +508,19 @@ let teacherHomeLatestRankingRows = [];
 let teacherHomeLatestResultsMeta = "";
 let teacherQuizResultSessions = [];
 let teacherSelectedQuizSessionId = "";
+let teacherClassSignals = {
+  topActive: null,
+  topCompletion: null,
+  topXP: null,
+  leastActive: null,
+  maxAvgXP: 0,
+  totalClasses: 0
+};
 let studentLiveAnswerCache = new Map();
 let livePlayerMatchingDragKey = "";
 let liveQuizDragIndex = -1;
 let leaderboardRowsCache = [];
+let leaderboardRowsLoadPromise = null;
 let loginCardsStudentsCache = [];
 let teacherLiveMonitorScores = [];
 let teacherLiveMonitorAnswers = [];
@@ -508,6 +532,7 @@ let teacherLiveMonitorRenderRaf = null;
 let studentLiveSubmittingAnswerKeys = new Set();
 let studentLivePendingAnswers = new Map();
 let liveQuizResultRepairCache = new Set();
+let myStatsSummaryCache = null;
 let teacherCertificateStudents = [];
 let teacherCertificateMetricsCache = new Map();
 let flowNodes = [];
@@ -1994,7 +2019,81 @@ function showLoadingNotice(msg = "Rapor hazırlanıyor...", color = "#1d4ed8") {
   };
 }
 
+let reportLoadingOverlayEl = null;
+function showReportLoadingOverlay(msg = "Rapor hazırlanıyor, lütfen bekleyin") {
+  if (reportLoadingOverlayEl) return;
+  const overlay = document.createElement("div");
+  overlay.id = "report-loading-overlay";
+  overlay.style.cssText = `
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.35);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50080;
+  `;
+  const box = document.createElement("div");
+  box.style.cssText = `
+    background: #ffffff;
+    border-radius: 14px;
+    padding: 16px 22px;
+    font-weight: 700;
+    color: #0f172a;
+    box-shadow: 0 16px 30px rgba(15, 23, 42, 0.2);
+    border: 1px solid #e2e8f0;
+    text-align: center;
+  `;
+  box.textContent = msg;
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+  reportLoadingOverlayEl = overlay;
+}
+
+function hideReportLoadingOverlay() {
+  if (!reportLoadingOverlayEl) return;
+  try { reportLoadingOverlayEl.remove(); } catch (e) {}
+  reportLoadingOverlayEl = null;
+}
+
 let completionCelebrationCleanup = null;
+let badgeQuizStatsCache = null;
+let badgeQuizStatsAt = 0;
+
+const BADGE_DEFS = [
+  { id: "quiz-5", name: "Soru Ustası", icon: "❓", metric: "quizCompleted", target: 5, desc: "5 canlı quiz tamamlayınca kazanılır." },
+  { id: "quiz-10", name: "Quiz Şampiyonu", icon: "🏆", metric: "quizCompleted", target: 10, desc: "10 canlı quiz tamamlayınca kazanılır." },
+  { id: "quiz-20", name: "Bilgi Avcısı", icon: "📚", metric: "quizCompleted", target: 20, desc: "20 canlı quiz tamamlayınca kazanılır." },
+  { id: "quiz-50", name: "Bilgi Efsanesi", icon: "👑", metric: "quizCompleted", target: 50, desc: "50 canlı quiz tamamlayınca kazanılır." },
+  { id: "task-3", name: "Görev Başlangıcı", icon: "✅", metric: "tasksCompleted", target: 3, desc: "3 ödevi tamamlayınca kazanılır." },
+  { id: "task-5", name: "Görev Ustası", icon: "🧭", metric: "tasksCompleted", target: 5, desc: "5 ödevi tamamlayınca kazanılır." },
+  { id: "task-10", name: "Görev Kaptanı", icon: "🚀", metric: "tasksCompleted", target: 10, desc: "10 ödevi tamamlayınca kazanılır." },
+  { id: "task-20", name: "Görev Efsanesi", icon: "🏅", metric: "tasksCompleted", target: 20, desc: "20 ödevi tamamlayınca kazanılır." },
+  { id: "act-3", name: "Etkinlik Kaşifi", icon: "🎯", metric: "activitiesCompleted", target: 3, desc: "3 etkinliği tamamlayınca kazanılır." },
+  { id: "act-5", name: "Etkinlik Ustası", icon: "🧠", metric: "activitiesCompleted", target: 5, desc: "5 etkinliği tamamlayınca kazanılır." },
+  { id: "act-10", name: "Etkinlik Maratonu", icon: "🏃", metric: "activitiesCompleted", target: 10, desc: "10 etkinliği tamamlayınca kazanılır." },
+  { id: "act-20", name: "Etkinlik Efsanesi", icon: "🌟", metric: "activitiesCompleted", target: 20, desc: "20 etkinliği tamamlayınca kazanılır." },
+  { id: "block-3", name: "Kodlama Ustası", icon: "💻", metric: "blockCompleted", target: 3, desc: "3 blok kodlama tamamlayınca kazanılır." },
+  { id: "block-5", name: "Kodlama Şefi", icon: "🧩", metric: "blockCompleted", target: 5, desc: "5 blok kodlama tamamlayınca kazanılır." },
+  { id: "block-10", name: "Kodlama Efsanesi", icon: "🛠️", metric: "blockCompleted", target: 10, desc: "10 blok kodlama tamamlayınca kazanılır." },
+  { id: "compute-3", name: "Mantık Ustası", icon: "🧮", metric: "computeCompleted", target: 3, desc: "3 Compute It görevi tamamlayınca kazanılır." },
+  { id: "compute-5", name: "Algoritma Şefi", icon: "📐", metric: "computeCompleted", target: 5, desc: "5 Compute It görevi tamamlayınca kazanılır." },
+  { id: "compute-10", name: "Algoritma Efsanesi", icon: "⚙️", metric: "computeCompleted", target: 10, desc: "10 Compute It görevi tamamlayınca kazanılır." },
+  { id: "lesson-3", name: "Ders Kaşifi", icon: "📘", metric: "lessonsCompleted", target: 3, desc: "3 dersi tamamlayınca kazanılır." },
+  { id: "lesson-5", name: "Ders Ustası", icon: "📗", metric: "lessonsCompleted", target: 5, desc: "5 dersi tamamlayınca kazanılır." },
+  { id: "lesson-10", name: "Ders Efsanesi", icon: "📙", metric: "lessonsCompleted", target: 10, desc: "10 dersi tamamlayınca kazanılır." },
+  { id: "total-10", name: "Bilişim Başlangıç", icon: "🧩", metric: "totalCompleted", target: 10, desc: "Toplam 10 görev/etkinlik tamamlayınca kazanılır." },
+  { id: "total-25", name: "Bilişim Ustası", icon: "🧠", metric: "totalCompleted", target: 25, desc: "Toplam 25 görev/etkinlik tamamlayınca kazanılır." },
+  { id: "total-50", name: "Bilişim Efsanesi", icon: "🚀", metric: "totalCompleted", target: 50, desc: "Toplam 50 görev/etkinlik tamamlayınca kazanılır." },
+  { id: "xp-100", name: "XP Toplayıcı", icon: "💎", metric: "xp", target: 100, desc: "Toplam 100 XP’ye ulaşınca kazanılır." },
+  { id: "xp-300", name: "XP Ustası", icon: "🏆", metric: "xp", target: 300, desc: "Toplam 300 XP’ye ulaşınca kazanılır." },
+  { id: "xp-600", name: "XP Efsanesi", icon: "👑", metric: "xp", target: 600, desc: "Toplam 600 XP’ye ulaşınca kazanılır." },
+  { id: "rate-40", name: "İstikrar", icon: "📈", metric: "completionRate", target: 40, desc: "Genel tamamlama oranı %40’ı geçince kazanılır." },
+  { id: "rate-70", name: "Azimli", icon: "🔥", metric: "completionRate", target: 70, desc: "Genel tamamlama oranı %70’i geçince kazanılır." },
+  { id: "rate-90", name: "Disiplinli", icon: "🏁", metric: "completionRate", target: 90, desc: "Genel tamamlama oranı %90’ı geçince kazanılır." }
+];
 function showCompletionCelebration({
   title = "Tebrikler!",
   message = "Ödev tamamlandı.",
@@ -4836,10 +4935,12 @@ async function downloadStudentPdf() {
     return;
   }
   const hideLoadingNotice = showLoadingNotice("Rapor hazırlanıyor...");
+  showReportLoadingOverlay("Rapor hazırlanıyor, lütfen bekleyin");
   try {
     await openStudentReportWindow(currentStudentDetail);
   } finally {
     hideLoadingNotice();
+    hideReportLoadingOverlay();
   }
 }
 
@@ -4912,6 +5013,8 @@ if (logoutSideBtn) logoutSideBtn.onclick = async function () {
   if (contentModalEl) contentModalEl.style.display = "none";
   const myStatsModalEl = document.getElementById("my-stats-modal");
   if (myStatsModalEl) myStatsModalEl.style.display = "none";
+  const badgesModalEl = document.getElementById("badges-modal");
+  if (badgesModalEl) badgesModalEl.style.display = "none";
   const certificatesModalEl = document.getElementById("certificates-modal");
   if (certificatesModalEl) certificatesModalEl.style.display = "none";
   const teacherCertificatesModalEl = document.getElementById("teacher-certificates-modal");
@@ -4968,6 +5071,10 @@ document.getElementById("profile-modal").onclick = function(e) {
 document.getElementById("my-stats-modal").onclick = function(e) {
   if (e.target === this && myStatsModal) myStatsModal.style.display = "none";
 };
+
+document.getElementById("badges-modal")?.addEventListener("click", function(e) {
+  if (e.target === this && badgesModal) badgesModal.style.display = "none";
+});
 
 document.getElementById("certificates-modal").onclick = function(e) {
   if (e.target === this && certificatesModal) certificatesModal.style.display = "none";
@@ -5265,6 +5372,7 @@ function buildAvatarHairSvg(style, color) {
 }
 
 function buildAvatarImageDataUri(avatar) {
+  if (avatar?.image) return appUrl(String(avatar.image));
   const tone = avatar?.tone || "#f6c28b";
   const eye = avatar?.eye || "#1f2937";
   const shirt = avatar?.shirt || "#2563eb";
@@ -5581,8 +5689,79 @@ function buildPieSvg(completed, total, label, color) {
       <circle cx="${cx}" cy="${cy}" r="${radius}" fill="none" stroke="#e5e7eb" stroke-width="10"/>
       <circle cx="${cx}" cy="${cy}" r="${radius}" fill="none" stroke="${color}" stroke-width="10"
         stroke-linecap="round" stroke-dasharray="${dash} ${gap}" transform="rotate(-90 ${cx} ${cy})"/>
-      <text x="${cx}" y="${cy - 3}" text-anchor="middle" fill="#111827" font-size="12" font-weight="700">%${pct}</text>
+      <text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle" fill="#111827" font-size="12" font-weight="700">%${pct}</text>
       <text x="${cx}" y="${cy + 11}" text-anchor="middle" fill="#6b7280" font-size="8">${label}</text>
+    </svg>
+  `;
+}
+
+function buildDonePendingBarSvg(done, total, doneColor, pendingColor) {
+  const safeTotal = Math.max(0, Number(total || 0));
+  const safeDone = Math.min(Math.max(0, Number(done || 0)), safeTotal);
+  const safePending = Math.max(0, safeTotal - safeDone);
+  const w = 140;
+  const h = 32;
+  const pad = 6;
+  const innerW = w - pad * 2;
+  const barH = 8;
+  const doneW = safeTotal > 0 ? Math.round((safeDone / safeTotal) * innerW) : 0;
+  const pendingW = innerW - doneW;
+  const donePct = safeTotal > 0 ? Math.round((safeDone / safeTotal) * 100) : 0;
+  return `
+    <svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="Tamamlandı/Tamamlanmadı">
+      <rect x="${pad}" y="${pad + 6}" width="${innerW}" height="${barH}" rx="999" fill="#e5e7eb"/>
+      <rect x="${pad}" y="${pad + 6}" width="${doneW}" height="${barH}" rx="999" fill="${doneColor}"/>
+      <rect x="${pad + doneW}" y="${pad + 6}" width="${pendingW}" height="${barH}" rx="999" fill="${pendingColor}"/>
+      <text x="${w / 2}" y="${h - 4}" text-anchor="middle" fill="#475569" font-size="9">%${donePct} tamamlandı</text>
+    </svg>
+  `;
+}
+
+function buildCategoryBarChartSvg(labels = [], completed = [], totals = [], barColor = "#3b82f6") {
+  const w = 260;
+  const h = 150;
+  const padLeft = 36;
+  const padRight = 10;
+  const padTop = 10;
+  const padBottom = 26;
+  const innerW = w - padLeft - padRight;
+  const innerH = h - padTop - padBottom;
+  const count = Math.max(1, labels.length);
+  const step = innerW / count;
+  const barW = Math.max(16, Math.min(28, step * 0.55));
+  const safeTotals = labels.map((_, i) => Math.max(0, Number(totals[i] || 0)));
+  const safeCompleted = labels.map((_, i) => Math.max(0, Number(completed[i] || 0)));
+  const percents = labels.map((_, i) => {
+    const total = safeTotals[i];
+    const done = Math.min(safeCompleted[i], total);
+    return total > 0 ? Math.round((done / total) * 100) : 0;
+  });
+  const gridLines = [0, 25, 50, 75, 100];
+  const gridSvg = gridLines.map((g) => {
+    const y = padTop + innerH - (g / 100) * innerH;
+    return `
+      <line x1="${padLeft}" y1="${y}" x2="${w - padRight}" y2="${y}" stroke="#e2e8f0" stroke-width="1"/>
+      <text x="${padLeft - 6}" y="${y + 3}" text-anchor="end" fill="#94a3b8" font-size="9">${g}%</text>
+    `;
+  }).join("");
+  const bars = labels.map((label, i) => {
+    const pct = percents[i];
+    const barH = (pct / 100) * innerH;
+    const x = padLeft + i * step + (step - barW) / 2;
+    const y = padTop + innerH - barH;
+    const countText = `${Math.min(safeCompleted[i], safeTotals[i])}/${safeTotals[i]}`;
+    return `
+      <rect x="${x}" y="${y}" width="${barW}" height="${barH}" rx="6" fill="${barColor}"/>
+      <text x="${x + barW / 2}" y="${padTop + innerH + 14}" text-anchor="middle" fill="#64748b" font-size="9">${label}</text>
+      <text x="${x + barW / 2}" y="${y - 4}" text-anchor="middle" fill="#1f2937" font-size="9">${pct}%</text>
+      <text x="${x + barW / 2}" y="${padTop + innerH + 24}" text-anchor="middle" fill="#94a3b8" font-size="8">${countText}</text>
+    `;
+  }).join("");
+  return `
+    <svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="Kategori Bazlı Tamamlanma">
+      <rect x="0" y="0" width="${w}" height="${h}" fill="#f8fafc" rx="10"/>
+      ${gridSvg}
+      ${bars}
     </svg>
   `;
 }
@@ -6267,6 +6446,16 @@ function normalizeUserRole(rawRole) {
     return "student";
   }
   return role;
+}
+
+function isSystemAdminUser(profile = null) {
+  const role = String(profile?.role || "").trim().toLowerCase();
+  if (role === "admin" || role === "administrator") return true;
+  const username = String(profile?.username || profile?.name || "").trim().toLowerCase();
+  const email = String(profile?.email || "").trim().toLowerCase();
+  if (username === "dogu") return true;
+  if (email === "dogu" || email.startsWith("dogu@")) return true;
+  return false;
 }
 
 function getStrictUserRole(rawRole) {
@@ -8482,7 +8671,7 @@ function applyStudentSidebarMinimalMode() {
   sideMenu.querySelectorAll(".nav-btn").forEach((btn) => {
     btn.style.display = "none";
   });
-  ["btn-open-home", "btn-open-my-stats", "btn-open-certificates", "btn-open-avatar-shop", "btn-logout-side"].forEach((id) => {
+  ["btn-open-home", "btn-open-my-stats", "btn-open-badges", "btn-open-certificates", "btn-open-avatar-shop", "btn-logout-side"].forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.style.display = "block";
   });
@@ -8550,9 +8739,10 @@ function profileTimestampToMs(ts) {
 function setProfileModalRoleMode() {
   const isTeacher = userRole === "teacher";
   const teacherTools = document.getElementById("profile-teacher-tools");
-  if (teacherTools) teacherTools.style.display = isTeacher ? "block" : "none";
+  const isAdmin = isSystemAdminUser(userData);
+  if (teacherTools) teacherTools.style.display = isAdmin ? "block" : "none";
   const approvalsWrap = document.getElementById("profile-change-approvals-wrap");
-  if (approvalsWrap) approvalsWrap.style.display = isTeacher ? "block" : "none";
+  if (approvalsWrap) approvalsWrap.style.display = isAdmin ? "block" : "none";
   const usernameInput = document.getElementById("profile-username");
   if (usernameInput) usernameInput.disabled = !isTeacher;
   const branchInput = document.getElementById("profile-branch");
@@ -8844,6 +9034,10 @@ if (deleteAllStudentsBtn) {
 
 document.getElementById("btn-open-add-student").onclick = async function() {
   if (userRole !== "teacher") return;
+  if (isSystemAdminUser(userData)) {
+    showNotice("Bu hesap sadece öğretmen ekleyebilir.", "#f39c12");
+    return;
+  }
   await refreshAndApplyClassSectionDropdowns();
   if (addStudentModal) addStudentModal.style.display = "flex";
   document.getElementById("side-menu").style.width = "0";
@@ -9533,7 +9727,7 @@ if (slideTypeEl) {
   slideTypeEl.onchange = function () {
     const type = this.value || "content";
     const cArea = document.getElementById("slide-content-area");
-    if (cArea) cArea.style.display = (type === "question") ? "none" : "block";
+    if (cArea) cArea.style.display = "block";
     setLessonQuestionEditorVisibility();
     updateLessonSlidePreview();
   };
@@ -9563,7 +9757,7 @@ if (insertLessonImageBtn) {
   };
 }
 
-["slide-title","slide-image-url","slide-video-url","slide-layout","slide-question-text","slide-question-xp","slide-question-duration","slide-correct-choice","slide-correct-boolean","slide-dragdrop-pairs","slide-option-0","slide-option-1","slide-option-2","slide-option-3"].forEach((id) => {
+["slide-title","slide-image-url","slide-video-url","slide-layout","slide-question-text","slide-question-xp","slide-correct-choice","slide-correct-boolean","slide-dragdrop-pairs","slide-option-0","slide-option-1","slide-option-2","slide-option-3","slide-question-image-url"].forEach((id) => {
   const el = document.getElementById(id);
   if (!el) return;
   el.addEventListener("input", updateLessonSlidePreview);
@@ -9576,6 +9770,15 @@ if (slideQuestionTypeEl) {
     updateLessonSlidePreview();
   });
 }
+document.querySelectorAll(".lesson-option-tick").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const idx = btn.getAttribute("data-correct-idx");
+    const hidden = document.getElementById("slide-correct-choice");
+    if (hidden) hidden.value = String(idx ?? "0");
+    updateLessonCorrectChoiceUI();
+    updateLessonSlidePreview();
+  });
+});
 const slideLayoutEl = document.getElementById("slide-layout");
 if (slideLayoutEl) {
   slideLayoutEl.addEventListener("change", () => {
@@ -9596,6 +9799,21 @@ if (slideImageFileEl) {
     try {
       const dataUrl = await readFileAsDataURL(file);
       const urlInput = document.getElementById("slide-image-url");
+      if (urlInput) urlInput.value = dataUrl;
+      updateLessonSlidePreview();
+    } catch (err) {
+      showNotice("Görsel okunamadı.", "#e74c3c");
+    }
+  });
+}
+const slideQuestionImageFileEl = document.getElementById("slide-question-image-file");
+if (slideQuestionImageFileEl) {
+  slideQuestionImageFileEl.addEventListener("change", async (e) => {
+    const file = e?.target?.files?.[0];
+    if (!file) return;
+    try {
+      const dataUrl = await readFileAsDataURL(file);
+      const urlInput = document.getElementById("slide-question-image-url");
       if (urlInput) urlInput.value = dataUrl;
       updateLessonSlidePreview();
     } catch (err) {
@@ -9838,7 +10056,41 @@ function formatLessonDragdropPairsText(fillAnswers = []) {
 function setLessonQuestionEditorVisibility() {
   const slideType = normalizeLessonSlideType(document.getElementById("slide-type")?.value || "content");
   const questionWrap = document.getElementById("lesson-question-builder");
-  if (questionWrap) questionWrap.style.display = slideType === "content" ? "none" : "grid";
+  const host = document.getElementById("lesson-question-builder-host");
+  const sideBlock = document.getElementById("lesson-question-side");
+  if (questionWrap) {
+    const shouldShow = slideType !== "content";
+    questionWrap.style.display = shouldShow ? "grid" : "none";
+    const target = shouldShow ? host : sideBlock;
+    if (target && questionWrap.parentElement !== target) {
+      target.appendChild(questionWrap);
+    }
+    if (host) host.style.display = shouldShow ? "block" : "none";
+  }
+  updateLessonCorrectChoiceUI();
+  const contentEditor = document.getElementById("slide-content-editor");
+  const mediaRow = document.getElementById("slide-media-row");
+  const codeWrap = document.getElementById("slide-code-editor");
+  const canvasWrap = document.getElementById("slide-canvas-editor");
+  const toolbar = document.querySelector(".lesson-toolbar");
+  const lessonDesc = document.getElementById("lesson-desc");
+  const builderModal = document.getElementById("lesson-builder-modal");
+  if (slideType === "question") {
+    if (contentEditor) contentEditor.style.display = "none";
+    if (mediaRow) mediaRow.style.display = "none";
+    if (codeWrap) codeWrap.style.display = "none";
+    if (canvasWrap) canvasWrap.style.display = "none";
+    if (toolbar) toolbar.style.display = "none";
+    if (lessonDesc) lessonDesc.style.display = "none";
+    if (builderModal) builderModal.classList.add("lesson-question-mode");
+  } else {
+    setLessonCodeEditorVisibility();
+    if (lessonDesc) lessonDesc.style.display = "block";
+    if (contentEditor) contentEditor.style.display = "block";
+    if (mediaRow) mediaRow.style.display = "grid";
+    if (toolbar) toolbar.style.display = "flex";
+    if (builderModal) builderModal.classList.remove("lesson-question-mode");
+  }
 
   const qType = normalizeLessonQuestionType(document.getElementById("slide-question-type")?.value || "multiple");
   const multiWrap = document.getElementById("lesson-question-multiple-fields");
@@ -9879,6 +10131,14 @@ if (quickCodeBtn) {
       codeInput.focus();
     }
     updateLessonSlidePreview();
+  });
+}
+const quickQuestionBtn = document.getElementById("btn-lesson-quick-question");
+if (quickQuestionBtn) {
+  quickQuestionBtn.addEventListener("click", () => {
+    setLessonEditorType("question", "text");
+    const qInput = document.getElementById("slide-question-text");
+    if (qInput) qInput.focus();
   });
 }
 
@@ -10013,7 +10273,7 @@ if (saveLessonBtn) {
       type: normalizeLessonSlideType(slide?.type || "content"),
       questionType: normalizeLessonQuestionType(slide?.questionType || "multiple"),
       questionXP: clampLessonQuestionXP(slide?.questionXP ?? slide?.xp ?? MAX_QUESTION_XP),
-      questionDurationSec: Math.max(5, Number(slide?.questionDurationSec ?? slide?.durationSec ?? 30) || 30),
+      questionDurationSec: 0,
       options: Array.isArray(slide?.options) ? slide.options.map((opt) => String(opt || "").trim()).filter(Boolean) : [],
       fillAnswers: Array.isArray(slide?.fillAnswers) ? slide.fillAnswers.map((pair) => String(pair || "").trim()).filter(Boolean) : []
     }));
@@ -10283,12 +10543,27 @@ document.getElementById("btn-open-my-stats").onclick = async function() {
   if (myStatsModal) myStatsModal.style.display = "flex";
   try {
     await loadMyStatsModal();
+    renderStudentBadges();
   } catch (e) {
     console.error("İstatistik modal açma hatası:", e);
     showNotice("İstatistikler açılırken hata oluştu.", "#e74c3c");
   }
   document.getElementById("side-menu").style.width = "0";
 };
+
+const badgesModal = document.getElementById("badges-modal");
+const openBadgesBtn = document.getElementById("btn-open-badges");
+if (openBadgesBtn) {
+  openBadgesBtn.onclick = async function() {
+    if (userRole !== "student") return;
+    await renderStudentBadges();
+    if (badgesModal) badgesModal.style.display = "flex";
+    document.getElementById("side-menu").style.width = "0";
+  };
+}
+document.getElementById("btn-close-badges")?.addEventListener("click", () => {
+  if (badgesModal) badgesModal.style.display = "none";
+});
 
 const openCertificatesBtn = document.getElementById("btn-open-certificates");
 if (openCertificatesBtn) {
@@ -10324,22 +10599,55 @@ if (closeTeacherCertificatesBtn) {
   };
 }
 
+function openTeacherLessonsModalUI() {
+  if (userRole !== "teacher") return;
+  document.body?.classList?.add("teacher-lessons-modal-open");
+  if (typeof switchTeacherHomeTab === "function") {
+    switchTeacherHomeTab("tasks");
+  } else {
+    const tasksSection = document.getElementById("tasks-section");
+    const activitiesSection = document.getElementById("activities-section");
+    const lessonsSection = document.getElementById("lessons-section");
+    if (tasksSection) tasksSection.style.display = "flex";
+    if (activitiesSection) activitiesSection.style.display = "none";
+    if (lessonsSection) lessonsSection.style.display = "none";
+    document.querySelectorAll("#teacher-home-tabs .tab-btn").forEach((btn) => {
+      btn.classList.toggle("active", String(btn.dataset.homeTab || "").toLowerCase() === "tasks");
+    });
+  }
+  const modal = document.getElementById("teacher-lessons-modal");
+  if (modal) {
+    modal.classList.add("fullscreen");
+    modal.style.display = "flex";
+  }
+  renderTeacherLessonsModalList();
+  document.getElementById("side-menu").style.width = "0";
+}
+
 const openLessonsMenuBtn = document.getElementById("btn-open-lessons");
 if (openLessonsMenuBtn) {
   openLessonsMenuBtn.onclick = function () {
-    if (userRole !== "teacher") return;
-    const modal = document.getElementById("teacher-lessons-modal");
-    if (modal) modal.style.display = "flex";
-    renderTeacherLessonsModalList();
-    document.getElementById("side-menu").style.width = "0";
+    openTeacherLessonsModalUI();
   };
 }
+
+document.addEventListener("click", (e) => {
+  const trigger = e.target?.closest?.("#btn-open-lessons");
+  if (!trigger) return;
+  e.preventDefault();
+  e.stopPropagation();
+  openTeacherLessonsModalUI();
+}, true);
 
 const closeTeacherLessonsModalBtn = document.getElementById("btn-close-teacher-lessons-modal");
 if (closeTeacherLessonsModalBtn) {
   closeTeacherLessonsModalBtn.onclick = function () {
     const modal = document.getElementById("teacher-lessons-modal");
-    if (modal) modal.style.display = "none";
+    if (modal) {
+      modal.style.display = "none";
+      modal.classList.remove("fullscreen");
+    }
+    document.body?.classList?.remove("teacher-lessons-modal-open");
   };
 }
 
@@ -10355,7 +10663,11 @@ if (openLessonBuilderFromModalBtn) {
 const teacherLessonsModalEl = document.getElementById("teacher-lessons-modal");
 if (teacherLessonsModalEl) {
   teacherLessonsModalEl.addEventListener("click", (e) => {
-    if (e.target === teacherLessonsModalEl) teacherLessonsModalEl.style.display = "none";
+    if (e.target === teacherLessonsModalEl) {
+      teacherLessonsModalEl.style.display = "none";
+      teacherLessonsModalEl.classList.remove("fullscreen");
+      document.body?.classList?.remove("teacher-lessons-modal-open");
+    }
   });
 }
 
@@ -10743,22 +11055,24 @@ document.getElementById("btn-close-my-stats").onclick = function() {
 
 document.getElementById("btn-my-stats-report").onclick = async function() {
   if (userRole !== "student") return;
-  if (!currentStudentDetail) await loadMyStatsModal();
-  if (!currentStudentDetail) {
-    showNotice("Rapor verisi henüz hazır değil.", "#e74c3c");
-    return;
-  }
-  if (currentStudentDetail.student && currentStudentDetail.student.id === currentUserId) {
-    currentStudentDetail.student.totalTimeSeconds = getLiveSystemSeconds();
-  }
   const hideLoadingNotice = showLoadingNotice("Rapor hazırlanıyor...");
+  showReportLoadingOverlay("Rapor hazırlanıyor, lütfen bekleyin");
   try {
+    if (!currentStudentDetail) await loadMyStatsModal();
+    if (!currentStudentDetail) {
+      showNotice("Rapor verisi henüz hazır değil.", "#e74c3c");
+      return;
+    }
+    if (currentStudentDetail.student && currentStudentDetail.student.id === currentUserId) {
+      currentStudentDetail.student.totalTimeSeconds = getLiveSystemSeconds();
+    }
     await openStudentReportWindow(currentStudentDetail);
   } catch (e) {
     console.error("Rapor açma hatası:", e);
     showNotice("Rapor açılamadı. Lütfen tekrar deneyin.", "#e74c3c");
   } finally {
     hideLoadingNotice();
+    hideReportLoadingOverlay();
   }
 };
 
@@ -11011,6 +11325,10 @@ async function createTeacherAccount({ firstName, lastName, username, password, b
 
 document.getElementById("btn-add-student-save").onclick = async function () {
   if (userRole !== "teacher") return;
+  if (isSystemAdminUser(userData)) {
+    showNotice("Bu hesap sadece öğretmen ekleyebilir.", "#f39c12");
+    return;
+  }
   const firstName = document.getElementById("add-student-firstname").value.trim();
   const lastName = document.getElementById("add-student-lastname").value.trim();
   const username = document.getElementById("add-student-username").value.trim();
@@ -11075,6 +11393,10 @@ document.getElementById("btn-bulk-student-save").onclick = async function () {
 
 document.getElementById("btn-add-teacher-save").onclick = async function () {
   if (userRole !== "teacher") return;
+  if (!isSystemAdminUser(userData)) {
+    showNotice("Sadece sistem yöneticisi öğretmen ekleyebilir.", "#f39c12");
+    return;
+  }
   const firstName = document.getElementById("add-teacher-firstname").value.trim();
   const lastName = document.getElementById("add-teacher-lastname").value.trim();
   const username = document.getElementById("add-teacher-username").value.trim();
@@ -11113,42 +11435,18 @@ document.getElementById("btn-add-teacher-save").onclick = async function () {
   }
 };
 
-document.getElementById("btn-bulk-teacher-save").onclick = async function () {
-  if (userRole !== "teacher") return;
-  const raw = document.getElementById("bulk-teachers-input").value.trim();
-  const defaultPass = document.getElementById("bulk-teachers-default-password").value;
-  if (!raw) {
-    showNotice("Toplu öğretmen kaydı için veri girin!", "#e74c3c");
-    return;
-  }
-  const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-  let okCount = 0;
-  let failCount = 0;
-  for (const line of lines) {
-    const parts = line.split(",").map(p => p.trim()).filter(Boolean);
-    if (parts.length < 5) {
-      failCount++;
-      continue;
-    }
-    const [firstName, lastName, username, pass, branch, ...assignmentParts] = parts;
-    const assignedRaw = assignmentParts.join(",");
-    const assignedClassSections = parseTeacherClassSectionInput(assignedRaw);
-    const password = pass || defaultPass;
-    if (!password || password.length < 6 || !branch || !assignedClassSections.length) {
-      failCount++;
-      continue;
-    }
-    try {
-      await createTeacherAccount({ firstName, lastName, username, password, branch, assignedClassSections });
-      okCount++;
-    } catch (e) {
-      failCount++;
-    }
-  }
-  showNotice(`Toplu öğretmen kaydı tamamlandı. Başarılı: ${okCount}, Hatalı: ${failCount}`, "#4a90e2");
-};
+const bulkTeacherBtn = document.getElementById("btn-bulk-teacher-save");
+if (bulkTeacherBtn) bulkTeacherBtn.style.display = "none";
+const bulkTeacherTemplateBtn = document.getElementById("btn-download-teacher-template");
+if (bulkTeacherTemplateBtn) bulkTeacherTemplateBtn.style.display = "none";
+const bulkTeacherFile = document.getElementById("bulk-teachers-file");
+if (bulkTeacherFile) bulkTeacherFile.style.display = "none";
+const bulkTeacherInput = document.getElementById("bulk-teachers-input");
+if (bulkTeacherInput) bulkTeacherInput.style.display = "none";
+const bulkTeacherDefaultPass = document.getElementById("bulk-teachers-default-password");
+if (bulkTeacherDefaultPass) bulkTeacherDefaultPass.style.display = "none";
 
-document.getElementById("btn-download-teacher-template").onclick = function () {
+if (bulkTeacherTemplateBtn) bulkTeacherTemplateBtn.onclick = function () {
   const csv = [
     "Ad,Soyad,Kullanıcı Adı,Şifre,Branş,Sınıf/Şube",
     "Ali,Veli,ogretmen.ali,123456,Matematik,5/A|6/B",
@@ -11518,7 +11816,7 @@ document.getElementById("bulk-students-file").onchange = async function (e) {
   }
 };
 
-document.getElementById("bulk-teachers-file").onchange = async function (e) {
+if (bulkTeacherFile) bulkTeacherFile.onchange = async function (e) {
   if (userRole !== "teacher") return;
   const file = e.target.files && e.target.files[0];
   if (!file) return;
@@ -12293,29 +12591,31 @@ onAuthStateChanged(auth, (user) => {
     }
     const activityFilters = document.getElementById("activity-filters");
     if (activityFilters) activityFilters.style.display = "none";
+    const isAdmin = isSystemAdminUser(userData);
+    const teacherUiEnabled = isTeacher;
     const createBtn = document.getElementById("btn-open-create");
-    if (createBtn) createBtn.style.display = isTeacher ? "block" : "none";
+    if (createBtn) createBtn.style.display = teacherUiEnabled ? "block" : "none";
     const studentsBtn = document.getElementById("btn-open-students");
-    if (studentsBtn) studentsBtn.style.display = isTeacher ? "block" : "none";
+    if (studentsBtn) studentsBtn.style.display = teacherUiEnabled ? "block" : "none";
     const classesBtn = document.getElementById("btn-open-classes");
-    if (classesBtn) classesBtn.style.display = isTeacher ? "block" : "none";
+    if (classesBtn) classesBtn.style.display = teacherUiEnabled ? "block" : "none";
     const addStudentBtn = document.getElementById("btn-open-add-student");
-    if (addStudentBtn) addStudentBtn.style.display = isTeacher ? "block" : "none";
+    if (addStudentBtn) addStudentBtn.style.display = teacherUiEnabled ? "block" : "none";
     const booksBtn = document.getElementById("btn-open-books");
-    if (booksBtn) booksBtn.style.display = isTeacher ? "block" : "none";
+    if (booksBtn) booksBtn.style.display = teacherUiEnabled ? "block" : "none";
     const approvalsBtn = document.getElementById("btn-open-approvals");
-    if (approvalsBtn) approvalsBtn.style.display = isTeacher ? "block" : "none";
+    if (approvalsBtn) approvalsBtn.style.display = teacherUiEnabled ? "block" : "none";
     const tasksBtn = document.getElementById("btn-open-tasks");
-    if (tasksBtn) tasksBtn.style.display = isTeacher ? "block" : "none";
+    if (tasksBtn) tasksBtn.style.display = teacherUiEnabled ? "block" : "none";
     const tasksMenuToggleBtn = document.getElementById("btn-toggle-tasks-menu");
     if (tasksMenuToggleBtn) {
       const hasTaskItems = isTeacher && !!((createBtn && createBtn.style.display !== "none") || (tasksBtn && tasksBtn.style.display !== "none") || (approvalsBtn && approvalsBtn.style.display !== "none"));
       tasksMenuToggleBtn.style.display = hasTaskItems ? "block" : "none";
     }
     const reportsBtn = document.getElementById("btn-open-reports");
-    if (reportsBtn) reportsBtn.style.display = isTeacher ? "block" : "none";
+    if (reportsBtn) reportsBtn.style.display = teacherUiEnabled ? "block" : "none";
     const loginCardsBtn = document.getElementById("btn-open-login-cards");
-    if (loginCardsBtn) loginCardsBtn.style.display = isTeacher ? "block" : "none";
+    if (loginCardsBtn) loginCardsBtn.style.display = teacherUiEnabled ? "block" : "none";
     const contentBtn = document.getElementById("btn-open-content");
     if (contentBtn) {
       contentBtn.style.display = isTeacher ? "block" : "none";
@@ -12359,6 +12659,8 @@ onAuthStateChanged(auth, (user) => {
     applyUserDropdownMenuByRole(isTeacher);
     const myStatsBtn = document.getElementById("btn-open-my-stats");
     if (myStatsBtn) myStatsBtn.style.display = isTeacher ? "none" : "block";
+    const badgesBtn = document.getElementById("btn-open-badges");
+    if (badgesBtn) badgesBtn.style.display = isTeacher ? "none" : "block";
     const certificatesBtn = document.getElementById("btn-open-certificates");
     if (certificatesBtn) certificatesBtn.style.display = isTeacher ? "none" : "block";
     const teacherCertificatesBtn = document.getElementById("btn-open-teacher-certificates");
@@ -12489,7 +12791,10 @@ onAuthStateChanged(auth, (user) => {
     loadBlockAssignments();
     loadComputeAssignments();
     loadLessons();
-    if (!isTeacher) loadLeaderboard();
+    if (!isTeacher) {
+      loadLeaderboard();
+      ensureLeaderboardRowsLoaded();
+    }
     if (isTeacher) loadStatsPage();
     } catch (e) {
       console.error("Profil yükleme akışı hatası:", e);
@@ -13871,6 +14176,37 @@ function buildLeaderboardRankedRows(users = []) {
   });
 }
 
+async function ensureLeaderboardRowsLoaded() {
+  if (leaderboardRowsCache.length) return leaderboardRowsCache;
+  if (leaderboardRowsLoadPromise) return leaderboardRowsLoadPromise;
+  leaderboardRowsLoadPromise = (async () => {
+    const q = query(collection(db, "users"), where("role", "==", "student"));
+    const snap = await getDocs(q);
+    const users = [];
+    snap.forEach((docSnap) => {
+      const data = docSnap.data() || {};
+      if (userRole === "student") {
+        const myOwner = String(userData?.ownerTeacherId || userData?.createdBy || "");
+        const studentOwner = String(data?.ownerTeacherId || data?.createdBy || "");
+        if (myOwner && myOwner !== studentOwner) return;
+      }
+      const xp = Math.max(0, Number(getStudentXPValue(data) || 0));
+      users.push({
+        ...data,
+        id: docSnap.id,
+        xp,
+        className: normalizeClassValue(data.className || data.class || data.class_name || ""),
+        section: normalizeSectionValue(data.section || data.section_name || "")
+      });
+    });
+    leaderboardRowsCache = buildLeaderboardRankedRows(users);
+    return leaderboardRowsCache;
+  })().finally(() => {
+    leaderboardRowsLoadPromise = null;
+  });
+  return leaderboardRowsLoadPromise;
+}
+
 function renderLeaderboardPreview(rows = []) {
   const list = document.getElementById("leaderboard-list");
   if (!list) return;
@@ -13880,7 +14216,7 @@ function renderLeaderboardPreview(rows = []) {
     renderStudentAdventureBoard();
     return;
   }
-  const topRows = rows.slice(0, 6);
+  const topRows = rows.slice(0, 7);
   topRows.forEach((u) => {
     const li = document.createElement("li");
     li.className = `top-student-row rank-${Math.min(3, Number(u.rank || 99))}`;
@@ -13921,7 +14257,7 @@ function renderStudentTopStudentsList(rows = []) {
     list.innerHTML = `<div class="empty-state">Sıralama verisi bulunamadı.</div>`;
     return;
   }
-  const topRows = rows.slice(0, 6);
+  const topRows = rows.slice(0, 7);
   topRows.forEach((u, idx) => {
     const row = document.createElement("div");
     row.className = `top-student-row rank-${Math.min(3, Number(u.rank || idx + 1))}`;
@@ -14029,16 +14365,6 @@ function loadLeaderboard() {
     const list = document.getElementById("leaderboard-list");
     const studentTopList = document.getElementById("student-top-students-list");
     if (!list && !studentTopList) return;
-    const reportsXPMap = new Map();
-    try {
-      const rptSnap = await getDocs(collection(db, "studentReports"));
-      rptSnap.forEach((d) => {
-        reportsXPMap.set(d.id, parseXPValue(d.data()?.totalXP));
-      });
-    } catch (e) {
-      console.warn("leaderboard reports xp fallback failed", e);
-    }
-    
     const users = [];
     snap.forEach((docSnap) => {
       const data = docSnap.data();
@@ -14047,26 +14373,22 @@ function loadLeaderboard() {
         const studentOwner = String(data?.ownerTeacherId || data?.createdBy || "");
         if (myOwner && myOwner !== studentOwner) return;
       }
-    const fallbackXP = reportsXPMap.get(docSnap.id) || 0;
-    const isCurrentStudent = String(docSnap.id) === String(currentUserId);
-    const liveXP = isCurrentStudent
-      ? parseXPValue(String(document.getElementById("user-xp")?.innerText || "0"))
-      : 0;
-    const directXp = parseXPValue(data?.xp);
-    const reportXP = parseXPValue(fallbackXP);
-    const baseXP = reportXP > 0
-      ? reportXP
-      : (directXp > 0 ? directXp : getStudentXPValue({ id: docSnap.id, ...data }));
-    const rowXP = isCurrentStudent && liveXP > 0 ? liveXP : baseXP;
-    users.push({
-      id: docSnap.id,
-      name: getUserDisplayName(data),
-      className: String(data.className || "").trim(),
-      section: String(data.section || "").trim(),
-      selectedAvatarId: String(data.selectedAvatarId || AVATAR_DEFAULT_ID),
-      xp: rowXP
+      const isCurrentStudent = String(docSnap.id) === String(currentUserId);
+      const liveXP = isCurrentStudent
+        ? parseXPValue(String(document.getElementById("user-xp")?.innerText || "0"))
+        : 0;
+      const directXp = parseXPValue(data?.xp);
+      const baseXP = directXp > 0 ? directXp : getStudentXPValue({ id: docSnap.id, ...data });
+      const rowXP = isCurrentStudent && liveXP > 0 ? liveXP : baseXP;
+      users.push({
+        id: docSnap.id,
+        name: getUserDisplayName(data),
+        className: normalizeClassValue(data.className || data.class || data.class_name || ""),
+        section: normalizeSectionValue(data.section || data.section_name || ""),
+        selectedAvatarId: String(data.selectedAvatarId || AVATAR_DEFAULT_ID),
+        xp: rowXP
+      });
     });
-  });
     leaderboardRowsCache = buildLeaderboardRankedRows(users);
     if (list) renderLeaderboardPreview(leaderboardRowsCache);
     if (studentTopList) renderStudentTopStudentsList(leaderboardRowsCache);
@@ -15311,6 +15633,80 @@ function buildStudentReportStats(detail) {
   };
 }
 
+function getHeroRankFallbacks() {
+  const classNode = document.getElementById("student-hero-class-rank");
+  const schoolNode = document.getElementById("student-hero-school-rank");
+  const clean = (value) => {
+    const v = String(value || "").trim();
+    if (!v || v === "-" || v === "—") return null;
+    return v;
+  };
+  const classRank = clean(classNode?.textContent);
+  const schoolRank = clean(schoolNode?.textContent);
+  return { classRank, schoolRank };
+}
+
+function getRankFallbacksFromCache(detail) {
+  const uid = String(detail?.student?.id || "");
+  if (!uid) return { classRank: null, schoolRank: null };
+  const rows = Array.isArray(leaderboardRowsCache) ? leaderboardRowsCache : [];
+  if (!rows.length) return { classRank: null, schoolRank: null };
+  const rankIndex = rows.findIndex((row) => String(row?.id || "") === uid);
+  const schoolRank = rankIndex >= 0 ? (Number(rows[rankIndex]?.rank) || rankIndex + 1) : null;
+  const className = normalizeClassValue(detail?.student?.className || detail?.student?.class || detail?.student?.class_name || "");
+  const section = normalizeSectionValue(detail?.student?.section || detail?.student?.section_name || "");
+  const classRows = rows.filter((row) => {
+    const rowClass = normalizeClassValue(row?.className || row?.class || row?.class_name || "");
+    const rowSection = normalizeSectionValue(row?.section || row?.section_name || "");
+    if (className && rowClass !== className) return false;
+    if (section && rowSection !== section) return false;
+    return true;
+  });
+  const classSorted = classRows.slice().sort((a, b) => Number(b?.xp || 0) - Number(a?.xp || 0));
+  const classRankIndex = classSorted.findIndex((row) => String(row?.id || "") === uid);
+  const classRank = classRankIndex >= 0 ? classRankIndex + 1 : null;
+  return { classRank, schoolRank };
+}
+
+function isBlankRank(value) {
+  const v = String(value ?? "").trim();
+  return !v || v === "-" || v === "—" || v === "null" || v === "undefined";
+}
+
+function normalizeClassValue(value) {
+  return normalizeClassSectionText(String(value || "").trim());
+}
+
+function normalizeSectionValue(value) {
+  return normalizeClassSectionText(String(value || "").trim());
+}
+
+async function getRankFallbacksFromFirestore(detail) {
+  try {
+    const ranked = await ensureLeaderboardRowsLoaded();
+    const uid = String(detail?.student?.id || "");
+    if (!uid) return { classRank: null, schoolRank: null };
+    const schoolIndex = ranked.findIndex((row) => String(row?.id || "") === uid);
+    const schoolRank = schoolIndex >= 0 ? (Number(ranked[schoolIndex]?.rank) || schoolIndex + 1) : null;
+    const className = normalizeClassValue(detail?.student?.className || detail?.student?.class || detail?.student?.class_name || "");
+    const section = normalizeSectionValue(detail?.student?.section || detail?.student?.section_name || "");
+    const classRows = ranked.filter((row) => {
+      const rowClass = normalizeClassValue(row?.className || row?.class || row?.class_name || "");
+      const rowSection = normalizeSectionValue(row?.section || row?.section_name || "");
+      if (className && rowClass !== className) return false;
+      if (section && rowSection !== section) return false;
+      return true;
+    });
+    const classSorted = classRows.slice().sort((a, b) => Number(b?.xp || 0) - Number(a?.xp || 0));
+    const classIndex = classSorted.findIndex((row) => String(row?.id || "") === uid);
+    const classRank = classIndex >= 0 ? classIndex + 1 : null;
+    return { classRank, schoolRank };
+  } catch (e) {
+    console.warn("report rank fallback failed", e);
+    return { classRank: null, schoolRank: null };
+  }
+}
+
 async function openStudentReportWindow(detail) {
   const studentName = getUserDisplayName(detail.student);
   const classInfo = detail.student.className && detail.student.section
@@ -15321,16 +15717,19 @@ async function openStudentReportWindow(detail) {
     const systemTimeText = `${sysParts.days}g ${sysParts.hours}s ${sysParts.mins}dk ${sysParts.secs}sn`;
 
   let contentStats = { totalItems: 0, completedItems: 0, totalXP: 0, percent: 0, appSeconds: 0, appList: [] };
+  const appCompletionMap = new Map();
   try {
     const pq = query(collection(db, "contentProgress"), where("userId", "==", detail.student.id));
     const psnap = await getDocs(pq);
     psnap.forEach((docSnap) => {
       const data = docSnap.data();
       const totalItems = data.totalItems || 0;
-      const completedItems = (data.completedItemIds || []).length;
+      const completedItemIds = data.completedItemIds || [];
+      const completedItems = completedItemIds.length;
       contentStats.totalItems += totalItems;
       contentStats.completedItems += completedItems;
       contentStats.totalXP += data.totalXP || 0;
+      const completedSet = new Set(completedItemIds);
       const appUsage = data.appUsage || {};
       Object.entries(appUsage).forEach(([appId, v]) => {
         const seconds = v?.seconds || 0;
@@ -15340,6 +15739,11 @@ async function openStudentReportWindow(detail) {
         const link = v?.link || "";
         contentStats.appSeconds += seconds;
         contentStats.appList.push({ appId, seconds, percent, xp, title, link });
+        if (completedSet.has(appId)) {
+          const prev = appCompletionMap.get(appId) || { appId, title, completed: 0 };
+          prev.completed += 1;
+          appCompletionMap.set(appId, prev);
+        }
       });
     });
     contentStats.percent = contentStats.totalItems > 0
@@ -15351,10 +15755,12 @@ async function openStudentReportWindow(detail) {
   if (!contentStats.appList.length && detail.student?.id === currentUserId) {
     contentProgressMap.forEach((data) => {
       const totalItems = data.totalItems || 0;
-      const completedItems = (data.completedItemIds || []).length;
+      const completedItemIds = data.completedItemIds || [];
+      const completedItems = completedItemIds.length;
       contentStats.totalItems += totalItems;
       contentStats.completedItems += completedItems;
       contentStats.totalXP += data.totalXP || 0;
+      const completedSet = new Set(completedItemIds);
       const appUsage = data.appUsage || {};
       Object.entries(appUsage).forEach(([appId, v]) => {
         const seconds = v?.seconds || 0;
@@ -15364,6 +15770,11 @@ async function openStudentReportWindow(detail) {
         const link = v?.link || "";
         contentStats.appSeconds += seconds;
         contentStats.appList.push({ appId, seconds, percent, xp, title, link });
+        if (completedSet.has(appId)) {
+          const prev = appCompletionMap.get(appId) || { appId, title, completed: 0 };
+          prev.completed += 1;
+          appCompletionMap.set(appId, prev);
+        }
       });
     });
     contentStats.percent = contentStats.totalItems > 0
@@ -15392,6 +15803,20 @@ async function openStudentReportWindow(detail) {
   const blockStats = await fetchBlockRunStats(detail.student.id);
   const computeStats = await fetchComputeRunStats(detail.student.id);
   const quizStats = await fetchStudentQuizStats(detail.student.id);
+  const badgeMetrics = await getStudentBadgeMetrics();
+  const badgeList = buildBadgeProgresses(badgeMetrics).filter((b) => b.earned);
+  const badgeRows = badgeList.length
+    ? badgeList
+        .map((b) => {
+          const tip = escapeHtmlBasic(b.desc || "Rozeti kazanma şartları burada gösterilir.");
+          return `
+            <div class="badge-mini" data-tooltip="${tip}" title="${tip}">
+              <div class="badge-mini-icon">${b.icon}</div>
+              <div class="badge-mini-name">${b.name}</div>
+            </div>`;
+        })
+        .join("")
+    : `<div style="color:#667085;font-size:11px;">Henüz rozet kazanılmadı.</div>`;
   const quizRows = (quizStats.items || []).map((q, i) => `
       <tr>
         <td>${i + 1}. ${q.quizTitle || "Quiz"}</td>
@@ -15404,18 +15829,51 @@ async function openStudentReportWindow(detail) {
         <td>${q.finishedAtMs ? new Date(Number(q.finishedAtMs)).toLocaleDateString("tr-TR") : "-"}</td>
       </tr>
     `).join("");
+  const taskOnlyHistory = (Array.isArray(detail.taskHistory) ? detail.taskHistory : [])
+    .filter((t) => !String(t?.title || "").startsWith("Ders:"));
+  const lessonItems = ((Array.isArray(detail.lessonHistory) && detail.lessonHistory.length)
+    ? detail.lessonHistory
+    : (Array.isArray(detail.taskHistory) ? detail.taskHistory.filter((t) => String(t?.title || "").startsWith("Ders:")) : [])
+  );
+  const lessonTotalCount = lessonItems.length;
+  const lessonCompletedCount = lessonTotalCount;
   const blockAssignmentCounts = getBlockHomeworkAssignmentCounts(blockStats);
   const blockCompletedCount = Math.max(0, Number(blockAssignmentCounts.completedCount || 0));
   const blockTotalCount = Math.max(0, Number(blockAssignmentCounts.totalCount || 0));
   const blockPendingCount = Math.max(0, blockTotalCount - blockCompletedCount);
   const computeAssignmentCounts = getComputeHomeworkAssignmentCounts(computeStats);
-  const computeCompletedCount = Math.max(0, Number(computeAssignmentCounts.completedCount || 0));
-  const computeTotalCount = Math.max(0, Number(computeAssignmentCounts.totalCount || 0));
+  let computeCompletedCount = Math.max(0, Number(computeAssignmentCounts.completedCount || 0));
+  let computeTotalCount = Math.max(0, Number(computeAssignmentCounts.totalCount || 0));
+  if (computeTotalCount === 0 && Math.max(0, Number(computeStats?.totalLevels || 0)) > 0) {
+    computeTotalCount = 1;
+    computeCompletedCount = Math.max(computeCompletedCount, Number(computeStats?.progressPercent || 0) >= 100 ? 1 : 0);
+  }
   const computePendingCount = Math.max(0, computeTotalCount - computeCompletedCount);
-  const combinedTotal = (stats.totalTasks || 0) + totalActivities + blockTotalCount + computeTotalCount + (quizStats.totalQuizzes || 0);
-  const combinedCompleted = (stats.completedCount || 0) + activityCompleted + blockCompletedCount + computeCompletedCount + (quizStats.totalQuizzes || 0);
+  const blockRuns = Array.isArray(blockStats?.runs) ? blockStats.runs : [];
+  const isBlockRunDone = (r) => {
+    const completedLevels = Math.max(0, Number(r?.completedLevels || 0));
+    const totalLevels = Math.max(0, Number(r?.totalLevels || 0));
+    const percent = Math.max(0, Number(r?.percent || 0));
+    return !!r?.completed || percent >= 100 || (totalLevels > 0 && completedLevels >= totalLevels);
+  };
+  const block2dRuns = blockRuns.filter((r) => {
+    const type = getBlockHomeworkType(r?.assignmentType);
+    return type !== "block3d" && type !== "silentteacher" && type !== "lightbot" && type !== "flowchart";
+  });
+  const block3dRuns = blockRuns.filter((r) => getBlockHomeworkType(r?.assignmentType) === "block3d");
+  const pythonRuns = blockRuns.filter((r) => getBlockHomeworkType(r?.assignmentType) === "silentteacher");
+  const block2dTotal = block2dRuns.length;
+  const block2dCompleted = block2dRuns.filter(isBlockRunDone).length;
+  const block3dTotal = block3dRuns.length;
+  const block3dCompleted = block3dRuns.filter(isBlockRunDone).length;
+  const pythonTotal = pythonRuns.length;
+  const pythonCompleted = pythonRuns.filter(isBlockRunDone).length;
+  const quizTotal = Math.max(0, Number(quizStats.totalQuizzes || 0));
+  const quizCompleted = quizTotal;
+  const combinedTotal = (stats.totalTasks || 0) + totalActivities + lessonTotalCount + blockTotalCount + computeTotalCount + (quizStats.totalQuizzes || 0);
+  const combinedCompleted = (stats.completedCount || 0) + activityCompleted + lessonCompletedCount + blockCompletedCount + computeCompletedCount + (quizStats.totalQuizzes || 0);
   const combinedCompletionRate = combinedTotal > 0 ? Math.round((combinedCompleted / combinedTotal) * 100) : 0;
-  const combinedAvgScore = combinedCompletionRate;
+  let combinedAvgScore = combinedCompletionRate;
   const totalXPCombined = Math.max(0, Number(stats.totalXP || getStudentXPValue(detail.student) || 0));
   
   const reportWindow = window.open("", "_blank");
@@ -15424,12 +15882,7 @@ async function openStudentReportWindow(detail) {
     return;
   }
   
-    const taskOnlyHistory = (Array.isArray(detail.taskHistory) ? detail.taskHistory : [])
-      .filter((t) => !String(t?.title || "").startsWith("Ders:"));
-    const lessonHistoryRows = ((Array.isArray(detail.lessonHistory) && detail.lessonHistory.length)
-      ? detail.lessonHistory
-      : (Array.isArray(detail.taskHistory) ? detail.taskHistory.filter((t) => String(t?.title || "").startsWith("Ders:")) : [])
-    ).map((l, i) => `
+    const lessonHistoryRows = lessonItems.map((l, i) => `
       <tr>
         <td>${i + 1}. ${String(l.title || "Ders").replace(/^Ders:\s*/i, "")}</td>
         <td>${l.date || "-"}</td>
@@ -15461,28 +15914,53 @@ async function openStudentReportWindow(detail) {
     `;
     }).join("");
     
-    const appRows = contentStats.appList.map((a, i) => `
+    const formatRunDuration = (seconds) => {
+      const safe = Math.max(0, Number(seconds || 0));
+      const mins = Math.floor(safe / 60);
+      const secs = safe % 60;
+      return `${mins} dk ${secs} sn`;
+    };
+    const codingRuns = [];
+    (Array.isArray(blockStats?.runs) ? blockStats.runs : []).forEach((run) => {
+      const type = getBlockHomeworkType(run?.assignmentType);
+      let appLabel = "Blok Kodlama";
+      if (type === "block3d") appLabel = "3D Blok Kodlama";
+      if (type === "silentteacher") appLabel = "Python Quiz";
+      if (type === "flowchart") appLabel = "Flowchart";
+      if (type === "lightbot") appLabel = "Lightbot";
+      codingRuns.push({
+        app: `${appLabel}${run?.title ? `: ${run.title}` : ""}`,
+        range: run?.rangeText ? `Seviye ${run.rangeText}` : "-",
+        duration: formatRunDuration(run?.durationSeconds || 0),
+        xp: Math.max(0, Number(run?.xp || 0)),
+        percent: Math.max(0, Math.min(100, Number(run?.percent || 0)))
+      });
+    });
+    (Array.isArray(computeStats?.runs) ? computeStats.runs : []).forEach((run) => {
+      codingRuns.push({
+        app: `Compute It${run?.title ? `: ${run.title}` : ""}`,
+        range: run?.rangeText ? `Seviye ${run.rangeText}` : "-",
+        duration: formatRunDuration(run?.durationSeconds || 0),
+        xp: Math.max(0, Number(run?.xp || 0)),
+        percent: Math.max(0, Math.min(100, Number(run?.percent || 0)))
+      });
+    });
+  (Array.isArray(quizStats?.items) ? quizStats.items : []).forEach((qz) => {
+    codingRuns.push({
+      app: `Canlı Quiz: ${qz?.quizTitle || "Quiz"}`,
+      range: "-",
+      duration: formatQuizDurationText(qz?.durationMs, qz?.durationMinutes) || "-",
+      xp: Math.max(0, Number(qz?.xpEarned || 0)),
+      percent: Math.max(0, Math.min(100, Number(qz?.successRate || 0)))
+    });
+  });
+    const codingRows = codingRuns.map((run, i) => `
       <tr>
-        <td>${i + 1}. ${a.title || "Etkinlik"}</td>
-        <td>${Math.floor((a.seconds || 0) / 60)} dk ${(a.seconds || 0) % 60} sn</td>
-        <td>%${a.percent || 0}</td>
-        <td>${a.xp || 0} XP</td>
-      </tr>
-    `).join("");
-    const blockRows = (blockStats.runs || []).map((run, i) => `
-      <tr>
-        <td>${i + 1}. ${run.title || "Blok Kodlama Ödevi"}</td>
-        <td>Seviye ${run.rangeText || "-"}</td>
-        <td>${Math.floor((run.durationSeconds || 0) / 60)} dk ${(run.durationSeconds || 0) % 60} sn</td>
-        <td>${run.xp || 0} XP</td>
-      </tr>
-    `).join("");
-    const computeRows = (computeStats.runs || []).map((run, i) => `
-      <tr>
-        <td>${i + 1}. ${run.title || "Compute It Ödevi"}</td>
-        <td>Seviye ${run.rangeText || "-"}</td>
-        <td>${Math.floor((run.durationSeconds || 0) / 60)} dk ${(run.durationSeconds || 0) % 60} sn</td>
-        <td>${run.xp || 0} XP</td>
+        <td>${i + 1}. ${run.app}</td>
+        <td>${run.range}</td>
+        <td>${run.duration}</td>
+        <td>+${run.xp} XP</td>
+        <td>%${run.percent}</td>
       </tr>
     `).join("");
   const taskCompletedCount = Math.min(Math.max(0, stats.completedCount || 0), stats.totalTasks || 0);
@@ -15491,10 +15969,36 @@ async function openStudentReportWindow(detail) {
   const activityTotalCount = Math.max(0, totalActivities || 0);
   const activityCompletedCount = Math.min(Math.max(0, activityCompleted || 0), activityTotalCount);
   const activityPendingCount = Math.max(0, activityTotalCount - activityCompletedCount);
-  const taskPie = buildPieSvg(taskCompletedCount, taskTotalCount, "Ödev", "#3b82f6");
-  const activityPie = buildPieSvg(activityCompletedCount, activityTotalCount, "Etkinlik", "#22c55e");
-  const blockPie = buildPieSvg(blockCompletedCount, blockTotalCount, "Blok", "#f59e0b");
-  const computePie = buildPieSvg(computeCompletedCount, computeTotalCount, "Compute", "#8b5cf6");
+  const group1Total = taskTotalCount + activityTotalCount + lessonTotalCount;
+  const group1Completed = taskCompletedCount + activityCompletedCount + lessonCompletedCount;
+  const group1Pending = Math.max(0, group1Total - group1Completed);
+  const group2Total = blockTotalCount + computeTotalCount + (quizStats.totalQuizzes || 0);
+  const group2Completed = blockCompletedCount + computeCompletedCount + (quizStats.totalQuizzes || 0);
+  const group2Pending = Math.max(0, group2Total - group2Completed);
+  const group1Chart = buildCategoryBarChartSvg(
+    ["Ödev", "Etkinlik", "Ders"],
+    [taskCompletedCount, activityCompletedCount, lessonCompletedCount],
+    [taskTotalCount, activityTotalCount, lessonTotalCount],
+    "#3b82f6"
+  );
+  const group2Chart = buildCategoryBarChartSvg(
+    ["Quiz", "Blok", "3D", "Compute", "Python"],
+    [quizCompleted, block2dCompleted, block3dCompleted, computeCompletedCount, pythonCompleted],
+    [quizTotal, block2dTotal, block3dTotal, computeTotalCount, pythonTotal],
+    "#8b5cf6"
+  );
+  const workTotalCount = combinedTotal;
+  const workCompletedCount = combinedCompleted;
+  combinedAvgScore = workTotalCount > 0 ? Math.round((workCompletedCount / workTotalCount) * 100) : 0;
+  const heroRanks = getHeroRankFallbacks();
+  const cacheRanks = getRankFallbacksFromCache(detail);
+  let classRank = detail?.classRank ?? detail?.class_rank ?? heroRanks.classRank ?? cacheRanks.classRank ?? "-";
+  let schoolRank = detail?.schoolRank ?? heroRanks.schoolRank ?? cacheRanks.schoolRank ?? "-";
+  if (isBlankRank(schoolRank) || isBlankRank(classRank)) {
+    const remoteRanks = await getRankFallbacksFromFirestore(detail);
+    if (isBlankRank(classRank) && remoteRanks.classRank) classRank = remoteRanks.classRank;
+    if (isBlankRank(schoolRank) && remoteRanks.schoolRank) schoolRank = remoteRanks.schoolRank;
+  }
   
   reportWindow.document.write(`
     <html lang="tr">
@@ -15502,7 +16006,7 @@ async function openStudentReportWindow(detail) {
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <title>Öğrenci Raporu</title>
-      <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+      <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
       <style>
         :root {
           --brand: #3b145f;
@@ -15520,10 +16024,18 @@ async function openStudentReportWindow(detail) {
           .title { font-size: 18px; font-weight: 700; color: var(--brand); text-align: center; letter-spacing: 0.2px; }
           .subtitle { color: var(--muted); font-size: 11px; text-align: center; }
           .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-          .kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
-          .kpi { background: #f8f9ff; border: 1px solid #e4e7ec; border-radius: 8px; padding: 6px; text-align: center; }
-          .kpi .value { font-size: 12.5px; font-weight: 700; color: var(--brand-2); }
-          .kpi .label { font-size: 9.5px; color: var(--muted); }
+        .kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 4px; }
+        .report-right { display: flex; flex-direction: column; justify-content: center; margin-top: -6px; }
+        .kpi { background: #f8f9ff; border: 1px solid #e4e7ec; border-radius: 8px; padding: 6px; text-align: center; }
+        .kpi .value { font-size: 12.5px; font-weight: 700; color: var(--brand-2); }
+        .kpi .label { font-size: 9.5px; color: var(--muted); }
+        .kpi-alt-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
+        .kpi-alt { border-radius: 12px; padding: 8px; color: #0f172a; font-weight: 700; font-size: 12px; }
+        .kpi-alt small { display: block; font-weight: 600; font-size: 10px; color: #475569; margin-top: 2px; }
+        .kpi-alt.a { background: linear-gradient(135deg, #dbeafe, #eff6ff); }
+        .kpi-alt.b { background: linear-gradient(135deg, #dcfce7, #f0fdf4); }
+        .kpi-alt.c { background: linear-gradient(135deg, #fef3c7, #fffbeb); }
+        .kpi-alt.d { background: linear-gradient(135deg, #ede9fe, #f5f3ff); }
           .badge { background: #f3f0ff; color: var(--brand-2); padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
           .progress { height: 8px; background: #e4e7ec; border-radius: 999px; overflow: hidden; }
           .progress > div { height: 100%; background: linear-gradient(90deg, var(--accent), #22c55e); }
@@ -15543,20 +16055,148 @@ async function openStudentReportWindow(detail) {
         .btn-primary { background: var(--accent); color: #fff; }
         .btn-secondary { background: #e5e7eb; color: #111827; }
           .section-title { font-weight: 700; color: var(--ink); margin-bottom: 6px; font-size: 13px; }
+        .badge-mini-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; justify-items: start; }
+        .badge-mini { display: flex; align-items: center; gap: 6px; background: #f8f9ff; border: 1px solid #e4e7ec; border-radius: 10px; padding: 6px 8px; }
+        .badge-mini-icon { width: 28px; height: 28px; border-radius: 8px; background: #e2e8f0; display: grid; place-items: center; }
+        .badge-mini-name { font-size: 11px; font-weight: 600; color: #344054; text-align: left; }
+        .badge-mini[data-tooltip] { position: relative; cursor: help; }
+        .badge-mini[data-tooltip]::after {
+          content: attr(data-tooltip);
+          position: absolute;
+          left: 50%;
+          bottom: calc(100% + 6px);
+          transform: translateX(-50%);
+          background: #111827;
+          color: #fff;
+          padding: 6px 8px;
+          border-radius: 8px;
+          font-size: 10px;
+          white-space: nowrap;
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 0.15s ease;
+          box-shadow: 0 6px 16px rgba(15, 23, 42, 0.25);
+          z-index: 20;
+        }
+        .badge-mini[data-tooltip]:hover::after { opacity: 1; }
+        .report-two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+        .report-two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
         @media (max-width: 720px) {
           .grid { grid-template-columns: 1fr; }
           .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+          .report-two-col { grid-template-columns: 1fr; }
         }
           @page { size: A4; margin: 10mm; }
         @media print {
           body { background: #fff; padding: 0; }
           .card { box-shadow: none; border: 1px solid #e4e7ec; }
-          .actions { display: none; }
+          .actions, .actions.actions-fixed, .no-print { display: none !important; }
+          .report-two-col { grid-template-columns: 1fr; }
+        }
+        :root {
+          --ink: #0f172a;
+          --muted: #475569;
+          --surface: #ffffff;
+          --surface-2: #f8fafc;
+          --brand: #0ea5e9;
+          --brand-2: #f97316;
+          --brand-3: #10b981;
+          --accent: #1d4ed8;
+        }
+        body {
+          font-family: "Manrope", "Segoe UI", Tahoma, Arial, sans-serif;
+          background: radial-gradient(circle at top, #e0f2fe 0%, #f8fafc 48%, #f1f5f9 100%);
+          color: var(--ink);
+          padding: 0;
+          margin: 0;
+        }
+        .page {
+          width: 210mm;
+          min-height: 297mm;
+          margin: 6mm auto;
+          padding: 10mm;
+          background: var(--surface);
+          border-radius: 18px;
+          box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+          page-break-after: always;
+        }
+        .content-page { background: var(--surface); }
+        .card {
+          border-radius: 16px;
+          padding: 14px;
+          margin-bottom: 8px;
+          border: 1px solid #e2e8f0;
+          box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+        }
+        .header { border-top: none; background: linear-gradient(135deg, #ffffff 0%, #eef2ff 100%); }
+        .title { font-family: "Space Grotesk", "Segoe UI", sans-serif; letter-spacing: 0.4px; }
+        .section-title { font-size: 16px; }
+        .kpi .value { font-size: 15px; }
+        .kpi .label { font-size: 11px; }
+        table { font-size: 12px; }
+        .section-title { font-size: 16px; }
+        .kpi .value { font-size: 15px; }
+        .kpi .label { font-size: 11px; }
+        table { font-size: 12px; }
+        .actions.actions-fixed {
+          position: fixed;
+          top: 14px;
+          right: 14px;
+          display: flex;
+          gap: 8px;
+          margin-top: 0;
+          justify-content: flex-end;
+          z-index: 999;
+          background: rgba(255, 255, 255, 0.85);
+          padding: 8px;
+          border-radius: 999px;
+          box-shadow: 0 8px 20px rgba(15, 23, 42, 0.16);
+          backdrop-filter: blur(10px);
+        }
+        .actions.actions-fixed .btn { border-radius: 999px; padding: 8px 14px; font-size: 12px; }
+        .btn-secondary { background: #e2e8f0; color: #0f172a; }
+        .card {
+          background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+          border: 1px solid #e5e7eb;
+        }
+        .header {
+          border-top: 0;
+          background: linear-gradient(135deg, #f0f9ff 0%, #ecfccb 50%, #fff7ed 100%);
+        }
+        .info-pill {
+          background: linear-gradient(135deg, #dbeafe, #eff6ff);
+          border: 1px solid #c7d2fe;
+        }
+        .name-pill {
+          background: linear-gradient(135deg, #ecfccb, #fef9c3);
+          border: 1px solid #fde68a;
+        }
+        .class-pill {
+          background: linear-gradient(135deg, #ffe4e6, #ffedd5);
+          border: 1px solid #fecdd3;
+        }
+        .report-right { display: flex; flex-direction: column; justify-content: center; margin-top: -6px; }
+        .kpi {
+          background: linear-gradient(135deg, #eef2ff 0%, #fdf2f8 100%);
+          border: 1px solid #e2e8f0;
+        }
+        th {
+          background: #f1f5f9;
+        }
+        @page { size: A4; margin: 0; }
+        @media print {
+          body { background: #fff; }
+          .page { margin: 0; box-shadow: none; border-radius: 0; }
+          .actions, .actions.actions-fixed, .no-print { display: none !important; }
         }
       </style>
     </head>
     <body>
-      <div class="page">
+      <div class="actions actions-fixed no-print">
+        <button id="downloadBtn" class="btn btn-primary">Yazdır</button>
+        <button id="closeBtn" class="btn btn-secondary">Kapat</button>
+      </div>
+      <div class="page content-page">
         <div class="card header">
           <div style="flex:1;">
             <img src="logo.png" alt="Logo" class="logo" />
@@ -15564,79 +16204,56 @@ async function openStudentReportWindow(detail) {
             <div class="subtitle">${new Date().toLocaleDateString("tr-TR")} • Kurumsal Öğrenci Takip Sistemi</div>
           </div>
         </div>
-        <div class="card actions" style="margin-top:8px;">
-          <button id="downloadBtn" class="btn btn-primary">PDF İndir</button>
-          <button id="closeBtn" class="btn btn-secondary">Kapat</button>
-        </div>
           <div class="card grid">
             <div>
               <div class="section-title">Öğrenci Bilgileri</div>
-              <div class="info-grid">
-                <div class="info-pill"><strong>Ad:</strong> ${studentName}</div>
-                <div class="info-pill"><strong>Sınıf/Şube:</strong> ${classInfo}</div>
-                <div class="info-pill"><strong>Sıralama:</strong> #${detail.rank}</div>
-                <div class="info-pill"><strong>Toplam Süre:</strong> ${systemTimeText}</div>
-              </div>
+              <div class="info-pill name-pill" style="font-size:18px; font-weight:800;">${studentName}</div>
+              <div class="info-pill class-pill" style="font-size:13px; font-weight:700; margin-top:6px;">${classInfo}</div>
               <div style="margin-top:10px;">
                 <div class="section-title">Tamamlama Oranı</div>
               <div class="mini-bar"><div style="width:${Math.min(100, Math.max(0, combinedCompletionRate || 0))}%;"></div></div>
               <div style="font-size:11px;color:var(--muted);margin-top:4px;">%${combinedCompletionRate} tamamlandı</div>
             </div>
           </div>
-          <div>
+          <div class="report-right">
             <div class="section-title">Genel Performans</div>
-        <div class="kpi-grid">
-          <div class="kpi"><div class="value">${stats.totalTasks}</div><div class="label">Toplam Ödev</div></div>
-          <div class="kpi"><div class="value">${stats.completedCount}</div><div class="label">Tamamlanan</div></div>
+          <div class="kpi-grid">
+          <div class="kpi"><div class="value">${workTotalCount}</div><div class="label">Toplam Ödev</div></div>
+          <div class="kpi"><div class="value">${workCompletedCount}</div><div class="label">Tamamlanan</div></div>
           <div class="kpi"><div class="value">%${combinedAvgScore}</div><div class="label">Ortalama Başarı</div></div>
           <div class="kpi"><div class="value">${totalXPCombined}</div><div class="label">Toplam XP</div></div>
         </div>
-          <div class="kpi-grid" style="margin-top:6px;">
-            <div class="kpi"><div class="value">${appCount}</div><div class="label">Etkinlik Sayısı</div></div>
-            <div class="kpi"><div class="value">%${appAvgPercent}</div><div class="label">Etkinlik Ort.</div></div>
-            <div class="kpi"><div class="value">${Math.floor(contentStats.appSeconds / 60)} dk</div><div class="label">Etkinlik Süre</div></div>
-            <div class="kpi"><div class="value">${contentStats.appList.reduce((sum, a) => sum + (a.xp || 0), 0)}</div><div class="label">Etkinlik XP</div></div>
-          </div>
+        <div class="kpi-alt-grid">
+          <div class="kpi-alt a">Sınıf Sırası: ${classRank}<small>Sınıf/Şube içi</small></div>
+          <div class="kpi-alt b">Okul Sırası: ${schoolRank}<small>Genel sıralama</small></div>
+          <div class="kpi-alt c">Sistem Süresi<small>${systemTimeText}</small></div>
+          <div class="kpi-alt d">Genel İlerleme<small>%${combinedCompletionRate}</small></div>
+        </div>
           </div>
         </div>
           <div class="card">
-            <div class="section-title">Ödev, Etkinlik, Quiz, Blok Kodlama ve Compute It Tamamlama</div>
-            <div style="display:grid; grid-template-columns: repeat(4, minmax(88px, 1fr)); gap:8px; align-items:center;">
-              <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
-                ${taskPie}
-                <div style="font-size:11px; color:#475569;">${taskCompletedCount} / ${taskTotalCount} tamamlandı</div>
+            <div class="section-title">Kategori Bazlı Tamamlanma</div>
+            <div style="display:grid; grid-template-columns: repeat(2, minmax(200px, 1fr)); gap:14px; align-items:start;">
+              <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
+                ${group1Chart}
+                <div style="font-size:11px; color:#475569; text-align:center;">Ödev • Etkinlik • Ders</div>
+                <div style="font-size:11px; color:#475569;">Toplam: ${group1Total} • Tamamlandı: ${group1Completed}</div>
               </div>
-              <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
-                ${activityPie}
-                <div style="font-size:11px; color:#475569;">${activityCompletedCount} / ${activityTotalCount} tamamlandı</div>
-              </div>
-              <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
-                ${blockPie}
-                <div style="font-size:11px; color:#475569;">${blockCompletedCount} / ${blockTotalCount} tamamlandı</div>
-              </div>
-              <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
-                ${computePie}
-                <div style="font-size:11px; color:#475569;">${computeCompletedCount} / ${computeTotalCount} tamamlandı</div>
+              <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
+                ${group2Chart}
+                <div style="font-size:11px; color:#475569; text-align:center;">Kodlama Uygulamaları</div>
+                <div style="font-size:11px; color:#475569;">Toplam: ${group2Total} • Tamamlandı: ${group2Completed}</div>
               </div>
             </div>
-            <div style="display:grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap:6px; margin-top:10px;">
-              <div class="info-pill"><strong>Ödev:</strong> ${taskCompletedCount} tamamlandı, ${taskPendingCount} bekliyor</div>
-              <div class="info-pill"><strong>Etkinlik:</strong> ${activityCompletedCount} tamamlandı, ${activityPendingCount} bekliyor</div>
-              <div class="info-pill"><strong>Quiz:</strong> ${quizStats.totalQuizzes || 0} tamamlandı, doğruluk %${quizStats.avgSuccess || 0}</div>
-              <div class="info-pill"><strong>Blok Kodlama:</strong> ${blockCompletedCount} tamamlandı, ${blockPendingCount} bekliyor</div>
-              <div class="info-pill"><strong>Compute It:</strong> ${computeCompletedCount} tamamlandı, ${computePendingCount} bekliyor</div>
+          </div>
+          <div class="card">
+            <div class="section-title">Kazanılan Rozetler</div>
+            <div class="badge-mini-grid">
+              ${badgeRows}
             </div>
-            <table style="margin-top:10px;">
-            <thead>
-              <tr>
-                <th>Ödev</th><th>Tarih</th><th>Başarı</th><th>Süre</th><th>XP</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${historyRows || "<tr><td colspan='5'>Veri yok.</td></tr>"}
-            </tbody>
-            </table>
-            <div class="section-title" style="margin-top:10px;">Dersler</div>
+          </div>
+          <div class="card">
+            <div class="section-title">Dersler - Ödevler - Etkinlikler</div>
             <table>
               <thead>
                 <tr>
@@ -15647,76 +16264,63 @@ async function openStudentReportWindow(detail) {
                 ${lessonHistoryRows || "<tr><td colspan='5'>Veri yok.</td></tr>"}
               </tbody>
             </table>
-          </div>
-          <div class="card">
-            <div class="section-title">Etkinlikler</div>
+            <div class="section-title" style="margin-top:10px;">Kodlama ve Uygulamalar</div>
             <table>
               <thead>
                 <tr>
-                  <th>Etkinlik</th><th>Süre</th><th>İlerleme</th><th>XP</th>
+                  <th>Uygulama</th><th>Level Aralığı</th><th>Süre</th><th>XP</th><th>İlerleme</th>
                 </tr>
               </thead>
               <tbody>
-                ${appRows || "<tr><td colspan='4'>Veri yok.</td></tr>"}
+                ${codingRows || "<tr><td colspan='5'>Veri yok.</td></tr>"}
               </tbody>
             </table>
           </div>
-          <div class="card">
-            <div class="section-title">Canlı Quiz Sonuçları</div>
-            <div class="kpi-grid" style="margin-bottom:8px;">
-              <div class="kpi"><div class="value">${quizStats.totalQuizzes || 0}</div><div class="label">Quiz</div></div>
-              <div class="kpi"><div class="value">${quizStats.totalCorrect || 0}</div><div class="label">Doğru</div></div>
-              <div class="kpi"><div class="value">${quizStats.totalWrong || 0}</div><div class="label">Yanlış</div></div>
-              <div class="kpi"><div class="value">${quizStats.totalXP || 0}</div><div class="label">Quiz XP</div></div>
+          <div class="report-two-col">
+            <div class="card">
+              <div class="section-title">Dersler • Etkinlik • Ödevler</div>
+              <div class="kpi-grid" style="margin-bottom:8px; grid-template-columns: repeat(3, minmax(0, 1fr));">
+                <div class="kpi"><div class="value">${taskCompletedCount}/${taskTotalCount}</div><div class="label">Ödevler</div></div>
+                <div class="kpi"><div class="value">${activityCompletedCount}/${activityTotalCount}</div><div class="label">Etkinlikler</div></div>
+                <div class="kpi"><div class="value">${lessonCompletedCount}/${lessonTotalCount}</div><div class="label">Dersler</div></div>
+              </div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Kategori</th><th>Tamamlanan</th><th>Toplam</th><th>İlerleme</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td>Ödevler</td><td>${taskCompletedCount}</td><td>${taskTotalCount}</td><td>%${taskTotalCount > 0 ? Math.round((taskCompletedCount / taskTotalCount) * 100) : 0}</td></tr>
+                  <tr><td>Etkinlikler</td><td>${activityCompletedCount}</td><td>${activityTotalCount}</td><td>%${activityTotalCount > 0 ? Math.round((activityCompletedCount / activityTotalCount) * 100) : 0}</td></tr>
+                  <tr><td>Dersler</td><td>${lessonCompletedCount}</td><td>${lessonTotalCount}</td><td>%${lessonTotalCount > 0 ? Math.round((lessonCompletedCount / lessonTotalCount) * 100) : 0}</td></tr>
+                </tbody>
+              </table>
             </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Quiz</th><th>Doğru</th><th>Yanlış</th><th>Cevap</th><th>Başarı</th><th>XP</th><th>Süre</th><th>Tarih</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${quizRows || "<tr><td colspan='8'>Veri yok.</td></tr>"}
-              </tbody>
-            </table>
-          </div>
-          <div class="card">
-            <div class="section-title">Blok Kodlama</div>
-            <div class="kpi-grid" style="margin-bottom:8px;">
-              <div class="kpi"><div class="value">${blockStats.completedLevels}</div><div class="label">Tamamlanan Seviye</div></div>
-              <div class="kpi"><div class="value">${blockStats.totalLevels}</div><div class="label">Toplam Seviye</div></div>
-              <div class="kpi"><div class="value">%${blockStats.progressPercent}</div><div class="label">İlerleme</div></div>
-              <div class="kpi"><div class="value">${Math.floor((blockStats.totalDurationMs || 0) / 60000)} dk</div><div class="label">Toplam Süre</div></div>
+            <div class="card">
+              <div class="section-title">Kodlama ve Uygulamalar</div>
+              <div class="kpi-grid" style="margin-bottom:8px; grid-template-columns: repeat(5, minmax(0, 1fr));">
+                <div class="kpi"><div class="value">${quizCompleted}/${quizTotal}</div><div class="label">Canlı Quiz</div></div>
+                <div class="kpi"><div class="value">${block2dCompleted}/${block2dTotal}</div><div class="label">Blok Kodlama</div></div>
+                <div class="kpi"><div class="value">${block3dCompleted}/${block3dTotal}</div><div class="label">3D Blok</div></div>
+                <div class="kpi"><div class="value">${computeCompletedCount}/${computeTotalCount}</div><div class="label">Compute It</div></div>
+                <div class="kpi"><div class="value">${pythonCompleted}/${pythonTotal}</div><div class="label">Python Quiz</div></div>
+              </div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Uygulama</th><th>Tamamlanan</th><th>Toplam</th><th>İlerleme</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td>Canlı Quiz</td><td>${quizCompleted}</td><td>${quizTotal}</td><td>%${quizTotal > 0 ? Math.round((quizCompleted / quizTotal) * 100) : 0}</td></tr>
+                  <tr><td>Blok Kodlama</td><td>${block2dCompleted}</td><td>${block2dTotal}</td><td>%${block2dTotal > 0 ? Math.round((block2dCompleted / block2dTotal) * 100) : 0}</td></tr>
+                  <tr><td>3D Blok Kodlama</td><td>${block3dCompleted}</td><td>${block3dTotal}</td><td>%${block3dTotal > 0 ? Math.round((block3dCompleted / block3dTotal) * 100) : 0}</td></tr>
+                  <tr><td>Compute It</td><td>${computeCompletedCount}</td><td>${computeTotalCount}</td><td>%${computeTotalCount > 0 ? Math.round((computeCompletedCount / computeTotalCount) * 100) : 0}</td></tr>
+                  <tr><td>Python Quiz</td><td>${pythonCompleted}</td><td>${pythonTotal}</td><td>%${pythonTotal > 0 ? Math.round((pythonCompleted / pythonTotal) * 100) : 0}</td></tr>
+                </tbody>
+              </table>
             </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Ödev</th><th>Level Aralığı</th><th>Süre</th><th>XP</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${blockRows || "<tr><td colspan='4'>Veri yok.</td></tr>"}
-              </tbody>
-            </table>
-          </div>
-          <div class="card">
-            <div class="section-title">Compute It</div>
-            <div class="kpi-grid" style="margin-bottom:8px;">
-              <div class="kpi"><div class="value">${computeStats.completedLevels}</div><div class="label">Tamamlanan Seviye</div></div>
-              <div class="kpi"><div class="value">${computeStats.totalLevels}</div><div class="label">Toplam Seviye</div></div>
-              <div class="kpi"><div class="value">%${computeStats.progressPercent}</div><div class="label">İlerleme</div></div>
-              <div class="kpi"><div class="value">${Math.floor((computeStats.totalDurationMs || 0) / 60000)} dk</div><div class="label">Toplam Süre</div></div>
-            </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Ödev</th><th>Level Aralığı</th><th>Süre</th><th>XP</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${computeRows || "<tr><td colspan='4'>Veri yok.</td></tr>"}
-              </tbody>
-            </table>
           </div>
       </div>
       <script>
@@ -15754,16 +16358,19 @@ async function buildStudentReportHtml(detail) {
   const systemTimeText = `${sysParts.days}g ${sysParts.hours}s ${sysParts.mins}dk ${sysParts.secs}sn`;
 
   let contentStats = { totalItems: 0, completedItems: 0, totalXP: 0, percent: 0, appSeconds: 0, appList: [] };
+  const appCompletionMap = new Map();
   try {
     const pq = query(collection(db, "contentProgress"), where("userId", "==", detail.student.id));
     const psnap = await getDocs(pq);
     psnap.forEach((docSnap) => {
       const data = docSnap.data();
       const totalItems = data.totalItems || 0;
-      const completedItems = (data.completedItemIds || []).length;
+      const completedItemIds = data.completedItemIds || [];
+      const completedItems = completedItemIds.length;
       contentStats.totalItems += totalItems;
       contentStats.completedItems += completedItems;
       contentStats.totalXP += data.totalXP || 0;
+      const completedSet = new Set(completedItemIds);
       const appUsage = data.appUsage || {};
       Object.entries(appUsage).forEach(([appId, v]) => {
         const seconds = v?.seconds || 0;
@@ -15773,6 +16380,11 @@ async function buildStudentReportHtml(detail) {
         const link = v?.link || "";
         contentStats.appSeconds += seconds;
         contentStats.appList.push({ appId, seconds, percent, xp, title, link });
+        if (completedSet.has(appId)) {
+          const prev = appCompletionMap.get(appId) || { appId, title, completed: 0 };
+          prev.completed += 1;
+          appCompletionMap.set(appId, prev);
+        }
       });
     });
     contentStats.percent = contentStats.totalItems > 0
@@ -15784,10 +16396,12 @@ async function buildStudentReportHtml(detail) {
   if (!contentStats.appList.length && detail.student?.id === currentUserId) {
     contentProgressMap.forEach((data) => {
       const totalItems = data.totalItems || 0;
-      const completedItems = (data.completedItemIds || []).length;
+      const completedItemIds = data.completedItemIds || [];
+      const completedItems = completedItemIds.length;
       contentStats.totalItems += totalItems;
       contentStats.completedItems += completedItems;
       contentStats.totalXP += data.totalXP || 0;
+      const completedSet = new Set(completedItemIds);
       const appUsage = data.appUsage || {};
       Object.entries(appUsage).forEach(([appId, v]) => {
         const seconds = v?.seconds || 0;
@@ -15797,6 +16411,11 @@ async function buildStudentReportHtml(detail) {
         const link = v?.link || "";
         contentStats.appSeconds += seconds;
         contentStats.appList.push({ appId, seconds, percent, xp, title, link });
+        if (completedSet.has(appId)) {
+          const prev = appCompletionMap.get(appId) || { appId, title, completed: 0 };
+          prev.completed += 1;
+          appCompletionMap.set(appId, prev);
+        }
       });
     });
     contentStats.percent = contentStats.totalItems > 0
@@ -15836,29 +16455,57 @@ async function buildStudentReportHtml(detail) {
         <td>${q.finishedAtMs ? new Date(Number(q.finishedAtMs)).toLocaleDateString("tr-TR") : "-"}</td>
       </tr>
     `).join("");
-  const blockRows = (blockStats.runs || []).map((run, i) => `
+  const formatRunDuration = (seconds) => {
+    const safe = Math.max(0, Number(seconds || 0));
+    const mins = Math.floor(safe / 60);
+    const secs = safe % 60;
+    return `${mins} dk ${secs} sn`;
+  };
+  const codingRuns = [];
+  (Array.isArray(blockStats?.runs) ? blockStats.runs : []).forEach((run) => {
+    const type = getBlockHomeworkType(run?.assignmentType);
+    let appLabel = "Blok Kodlama";
+    if (type === "block3d") appLabel = "3D Blok Kodlama";
+    if (type === "silentteacher") appLabel = "Python Quiz";
+    if (type === "flowchart") appLabel = "Flowchart";
+    if (type === "lightbot") appLabel = "Lightbot";
+    codingRuns.push({
+      app: `${appLabel}${run?.title ? `: ${run.title}` : ""}`,
+      range: run?.rangeText ? `Seviye ${run.rangeText}` : "-",
+      duration: formatRunDuration(run?.durationSeconds || 0),
+      xp: Math.max(0, Number(run?.xp || 0)),
+      percent: Math.max(0, Math.min(100, Number(run?.percent || 0)))
+    });
+  });
+  (Array.isArray(computeStats?.runs) ? computeStats.runs : []).forEach((run) => {
+    codingRuns.push({
+      app: `Compute It${run?.title ? `: ${run.title}` : ""}`,
+      range: run?.rangeText ? `Seviye ${run.rangeText}` : "-",
+      duration: formatRunDuration(run?.durationSeconds || 0),
+      xp: Math.max(0, Number(run?.xp || 0)),
+      percent: Math.max(0, Math.min(100, Number(run?.percent || 0)))
+    });
+  });
+  (Array.isArray(quizStats?.items) ? quizStats.items : []).forEach((qz) => {
+    codingRuns.push({
+      app: `Canlı Quiz: ${qz?.quizTitle || "Quiz"}`,
+      range: "-",
+      duration: formatQuizDurationText(qz?.durationMs, qz?.durationMinutes) || "-",
+      xp: Math.max(0, Number(qz?.xpEarned || 0)),
+      percent: Math.max(0, Math.min(100, Number(qz?.successRate || 0)))
+    });
+  });
+  const codingRows = codingRuns.map((run, i) => `
       <tr>
-        <td>${i + 1}. ${run.title || "Blok Kodlama Ödevi"}</td>
-        <td>Seviye ${run.rangeText || "-"}</td>
-        <td>${Math.floor((run.durationSeconds || 0) / 60)} dk ${(run.durationSeconds || 0) % 60} sn</td>
-        <td>${run.xp || 0} XP</td>
-      </tr>
-    `).join("");
-  const computeRows = (computeStats.runs || []).map((run, i) => `
-      <tr>
-        <td>${i + 1}. ${run.title || "Compute It Ödevi"}</td>
-        <td>Seviye ${run.rangeText || "-"}</td>
-        <td>${Math.floor((run.durationSeconds || 0) / 60)} dk ${(run.durationSeconds || 0) % 60} sn</td>
-        <td>${run.xp || 0} XP</td>
+        <td>${i + 1}. ${run.app}</td>
+        <td>${run.range}</td>
+        <td>${run.duration}</td>
+        <td>+${run.xp} XP</td>
+        <td>%${run.percent}</td>
       </tr>
     `).join("");
 
-  const taskOnlyHistory = (Array.isArray(detail.taskHistory) ? detail.taskHistory : [])
-    .filter((t) => !String(t?.title || "").startsWith("Ders:"));
-  const lessonHistoryRows = ((Array.isArray(detail.lessonHistory) && detail.lessonHistory.length)
-    ? detail.lessonHistory
-    : (Array.isArray(detail.taskHistory) ? detail.taskHistory.filter((t) => String(t?.title || "").startsWith("Ders:")) : [])
-  ).map((l, i) => `
+  const lessonHistoryRows = lessonItems.map((l, i) => `
       <tr>
         <td>${i + 1}. ${String(l.title || "Ders").replace(/^Ders:\s*/i, "")}</td>
         <td>${l.date || "-"}</td>
@@ -15890,12 +16537,10 @@ async function buildStudentReportHtml(detail) {
     `;
   }).join("");
 
-  const appRows = contentStats.appList.map((a, i) => `
+    const appCompletionRows = Array.from(appCompletionMap.values()).map((a, i) => `
       <tr>
-        <td>${i + 1}. ${a.title || "Etkinlik"}</td>
-        <td>${Math.floor((a.seconds || 0) / 60)} dk ${(a.seconds || 0) % 60} sn</td>
-        <td>%${a.percent || 0}</td>
-        <td>${a.xp || 0} XP</td>
+        <td>${i + 1}. ${a.title || "Uygulama"}</td>
+        <td>${a.completed || 0}</td>
       </tr>
     `).join("");
 
@@ -15910,18 +16555,48 @@ async function buildStudentReportHtml(detail) {
   const blockTotalCount = Math.max(0, Number(blockAssignmentCounts.totalCount || 0));
   const blockPendingCount = Math.max(0, blockTotalCount - blockCompletedCount);
   const computeAssignmentCounts = getComputeHomeworkAssignmentCounts(computeStats);
-  const computeCompletedCount = Math.max(0, Number(computeAssignmentCounts.completedCount || 0));
-  const computeTotalCount = Math.max(0, Number(computeAssignmentCounts.totalCount || 0));
+  let computeCompletedCount = Math.max(0, Number(computeAssignmentCounts.completedCount || 0));
+  let computeTotalCount = Math.max(0, Number(computeAssignmentCounts.totalCount || 0));
+  if (computeTotalCount === 0 && Math.max(0, Number(computeStats?.totalLevels || 0)) > 0) {
+    computeTotalCount = 1;
+    computeCompletedCount = Math.max(computeCompletedCount, Number(computeStats?.progressPercent || 0) >= 100 ? 1 : 0);
+  }
   const computePendingCount = Math.max(0, computeTotalCount - computeCompletedCount);
-  const combinedTotal = (stats.totalTasks || 0) + totalActivities + blockTotalCount + computeTotalCount + (quizStats.totalQuizzes || 0);
-  const combinedCompleted = (stats.completedCount || 0) + activityCompleted + blockCompletedCount + computeCompletedCount + (quizStats.totalQuizzes || 0);
+  const combinedTotal = (stats.totalTasks || 0) + totalActivities + lessonTotalCount + blockTotalCount + computeTotalCount + (quizStats.totalQuizzes || 0);
+  const combinedCompleted = (stats.completedCount || 0) + activityCompleted + lessonCompletedCount + blockCompletedCount + computeCompletedCount + (quizStats.totalQuizzes || 0);
   const combinedCompletionRate = combinedTotal > 0 ? Math.round((combinedCompleted / combinedTotal) * 100) : 0;
-  const combinedAvgScore = combinedCompletionRate;
+  const workTotalCount = taskTotalCount + lessonTotalCount + (contentStats.totalItems || 0);
+  const workCompletedCount = taskCompletedCount + lessonCompletedCount + (contentStats.completedItems || 0);
+  const workCompletionRate = workTotalCount > 0 ? Math.round((workCompletedCount / workTotalCount) * 100) : 0;
+  const combinedAvgScore = workCompletionRate;
   const totalXPCombined = Math.max(0, Number(stats.totalXP || getStudentXPValue(detail.student) || 0));
-  const taskPie = buildPieSvg(taskCompletedCount, taskTotalCount, "Ödev", "#3b82f6");
-  const activityPie = buildPieSvg(activityCompletedCount, activityTotalCount, "Etkinlik", "#22c55e");
-  const blockPie = buildPieSvg(blockCompletedCount, blockTotalCount, "Blok", "#f59e0b");
-  const computePie = buildPieSvg(computeCompletedCount, computeTotalCount, "Compute", "#8b5cf6");
+  const group1Total = taskTotalCount + activityTotalCount + lessonTotalCount;
+  const group1Completed = taskCompletedCount + activityCompletedCount + lessonCompletedCount;
+  const group1Pending = Math.max(0, group1Total - group1Completed);
+  const group2Total = blockTotalCount + computeTotalCount + (quizStats.totalQuizzes || 0);
+  const group2Completed = blockCompletedCount + computeCompletedCount + (quizStats.totalQuizzes || 0);
+  const group2Pending = Math.max(0, group2Total - group2Completed);
+  const group1Chart = buildCategoryBarChartSvg(
+    ["Ödev", "Etkinlik", "Ders"],
+    [taskCompletedCount, activityCompletedCount, lessonCompletedCount],
+    [taskTotalCount, activityTotalCount, lessonTotalCount],
+    "#3b82f6"
+  );
+  const group2Chart = buildCategoryBarChartSvg(
+    ["Quiz", "Blok", "3D", "Compute", "Python"],
+    [quizCompleted, block2dCompleted, block3dCompleted, computeCompletedCount, pythonCompleted],
+    [quizTotal, block2dTotal, block3dTotal, computeTotalCount, pythonTotal],
+    "#8b5cf6"
+  );
+  const heroRanks = getHeroRankFallbacks();
+  const cacheRanks = getRankFallbacksFromCache(detail);
+  let classRank = detail?.classRank ?? detail?.class_rank ?? heroRanks.classRank ?? cacheRanks.classRank ?? "-";
+  let schoolRank = detail?.schoolRank ?? heroRanks.schoolRank ?? cacheRanks.schoolRank ?? "-";
+  if (isBlankRank(schoolRank) || isBlankRank(classRank)) {
+    const remoteRanks = await getRankFallbacksFromFirestore(detail);
+    if (isBlankRank(classRank) && remoteRanks.classRank) classRank = remoteRanks.classRank;
+    if (isBlankRank(schoolRank) && remoteRanks.schoolRank) schoolRank = remoteRanks.schoolRank;
+  }
 
   return `
     <html lang="tr">
@@ -15929,7 +16604,7 @@ async function buildStudentReportHtml(detail) {
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <title>Öğrenci Raporu</title>
-      <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+      <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
       <style>
         :root {
           --brand: #3b145f;
@@ -15947,10 +16622,17 @@ async function buildStudentReportHtml(detail) {
           .title { font-size: 18px; font-weight: 700; color: var(--brand); text-align: center; letter-spacing: 0.2px; }
           .subtitle { color: var(--muted); font-size: 11px; text-align: center; }
           .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-          .kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
-          .kpi { background: #f8f9ff; border: 1px solid #e4e7ec; border-radius: 8px; padding: 6px; text-align: center; }
-          .kpi .value { font-size: 12.5px; font-weight: 700; color: var(--brand-2); }
-          .kpi .label { font-size: 9.5px; color: var(--muted); }
+        .kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 4px; }
+        .kpi { background: #f8f9ff; border: 1px solid #e4e7ec; border-radius: 8px; padding: 6px; text-align: center; }
+        .kpi .value { font-size: 12.5px; font-weight: 700; color: var(--brand-2); }
+        .kpi .label { font-size: 9.5px; color: var(--muted); }
+        .kpi-alt-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
+        .kpi-alt { border-radius: 12px; padding: 8px; color: #0f172a; font-weight: 700; font-size: 12px; }
+        .kpi-alt small { display: block; font-weight: 600; font-size: 10px; color: #475569; margin-top: 2px; }
+        .kpi-alt.a { background: linear-gradient(135deg, #dbeafe, #eff6ff); }
+        .kpi-alt.b { background: linear-gradient(135deg, #dcfce7, #f0fdf4); }
+        .kpi-alt.c { background: linear-gradient(135deg, #fef3c7, #fffbeb); }
+        .kpi-alt.d { background: linear-gradient(135deg, #ede9fe, #f5f3ff); }
           .badge { background: #f3f0ff; color: var(--brand-2); padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
           .progress { height: 8px; background: #e4e7ec; border-radius: 999px; overflow: hidden; }
           .progress > div { height: 100%; background: linear-gradient(90deg, var(--accent), #22c55e); }
@@ -15972,6 +16654,7 @@ async function buildStudentReportHtml(detail) {
         @media (max-width: 720px) {
           .grid { grid-template-columns: 1fr; }
           .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+          .report-two-col { grid-template-columns: 1fr; }
         }
           @page { size: A4; margin: 10mm; }
         @media print {
@@ -15979,10 +16662,73 @@ async function buildStudentReportHtml(detail) {
           .card { box-shadow: none; border: 1px solid #e4e7ec; }
           .actions { display: none; }
         }
+        :root {
+          --ink: #0f172a;
+          --muted: #475569;
+          --surface: #ffffff;
+          --surface-2: #f8fafc;
+          --brand: #0ea5e9;
+          --brand-2: #f97316;
+          --brand-3: #10b981;
+          --accent: #1d4ed8;
+        }
+        body {
+          font-family: "Manrope", "Segoe UI", Tahoma, Arial, sans-serif;
+          background: radial-gradient(circle at top, #e0f2fe 0%, #f8fafc 48%, #f1f5f9 100%);
+          color: var(--ink);
+          padding: 0;
+          margin: 0;
+        }
+        .page {
+          width: 210mm;
+          min-height: 297mm;
+          margin: 6mm auto;
+          padding: 10mm;
+          background: var(--surface);
+          border-radius: 18px;
+          box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+          page-break-after: always;
+        }
+        .content-page { background: var(--surface); }
+        .card {
+          border-radius: 16px;
+          padding: 14px;
+          margin-bottom: 8px;
+          border: 1px solid #e2e8f0;
+          box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+        }
+        .header { border-top: none; background: linear-gradient(135deg, #ffffff 0%, #eef2ff 100%); }
+        .title { font-family: "Space Grotesk", "Segoe UI", sans-serif; letter-spacing: 0.4px; }
+        .card {
+          background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+          border: 1px solid #e5e7eb;
+        }
+        .header {
+          border-top: 0;
+          background: linear-gradient(135deg, #f0f9ff 0%, #ecfccb 50%, #fff7ed 100%);
+        }
+        .info-pill {
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+        }
+        .kpi {
+          background: linear-gradient(135deg, #eef2ff 0%, #fdf2f8 100%);
+          border: 1px solid #e2e8f0;
+        }
+        th {
+          background: #f1f5f9;
+        }
+        @page { size: A4; margin: 0; }
+        @media print {
+          body { background: #fff; }
+          .page { margin: 0; box-shadow: none; border-radius: 0; }
+          .actions, .actions.actions-fixed, .no-print { display: none !important; }
+          .report-two-col { grid-template-columns: 1fr; }
+        }
       </style>
     </head>
     <body>
-      <div class="page">
+      <div class="page content-page">
         <div class="card header">
           <div style="flex:1;">
             <img src="logo.png" alt="Logo" class="logo" />
@@ -15993,72 +16739,45 @@ async function buildStudentReportHtml(detail) {
           <div class="card grid">
             <div>
               <div class="section-title">Öğrenci Bilgileri</div>
-              <div class="info-grid">
-                <div class="info-pill"><strong>Ad:</strong> ${studentName}</div>
-                <div class="info-pill"><strong>Sınıf/Şube:</strong> ${classInfo}</div>
-                <div class="info-pill"><strong>Sıralama:</strong> #${detail.rank}</div>
-                <div class="info-pill"><strong>Toplam Süre:</strong> ${systemTimeText}</div>
-              </div>
+              <div style="font-size:20px; font-weight:800; color:#0f172a;">${studentName}</div>
+              <div style="font-size:14px; font-weight:700; color:#475569; margin-top:4px;">${classInfo}</div>
               <div style="margin-top:10px;">
                 <div class="section-title">Tamamlama Oranı</div>
               <div class="mini-bar"><div style="width:${Math.min(100, Math.max(0, combinedCompletionRate || 0))}%;"></div></div>
               <div style="font-size:11px;color:var(--muted);margin-top:4px;">%${combinedCompletionRate} tamamlandı</div>
             </div>
           </div>
-          <div>
+          <div class="report-right">
             <div class="section-title">Genel Performans</div>
         <div class="kpi-grid">
-          <div class="kpi"><div class="value">${stats.totalTasks}</div><div class="label">Toplam Ödev</div></div>
-          <div class="kpi"><div class="value">${stats.completedCount}</div><div class="label">Tamamlanan</div></div>
+          <div class="kpi"><div class="value">${workTotalCount}</div><div class="label">Toplam Ödev</div></div>
+          <div class="kpi"><div class="value">${workCompletedCount}</div><div class="label">Tamamlanan</div></div>
           <div class="kpi"><div class="value">%${combinedAvgScore}</div><div class="label">Ortalama Başarı</div></div>
           <div class="kpi"><div class="value">${totalXPCombined}</div><div class="label">Toplam XP</div></div>
         </div>
-          <div class="kpi-grid" style="margin-top:6px;">
-            <div class="kpi"><div class="value">${appCount}</div><div class="label">Etkinlik Sayısı</div></div>
-            <div class="kpi"><div class="value">%${appAvgPercent}</div><div class="label">Etkinlik Ort.</div></div>
-            <div class="kpi"><div class="value">${Math.floor(contentStats.appSeconds / 60)} dk</div><div class="label">Etkinlik Süre</div></div>
-            <div class="kpi"><div class="value">${contentStats.appList.reduce((sum, a) => sum + (a.xp || 0), 0)}</div><div class="label">Etkinlik XP</div></div>
-          </div>
+        <div class="kpi-alt-grid">
+          <div class="kpi-alt a">Sınıf Sırası: ${classRank}<small>Sınıf/Şube içi</small></div>
+          <div class="kpi-alt b">Okul Sırası: ${schoolRank}<small>Genel sıralama</small></div>
+          <div class="kpi-alt c">Toplam Süre<small>${systemTimeText}</small></div>
+          <div class="kpi-alt d">Genel İlerleme<small>%${combinedCompletionRate}</small></div>
+        </div>
           </div>
         </div>
           <div class="card">
-            <div class="section-title">Ödev, Etkinlik, Quiz, Blok Kodlama ve Compute It Tamamlama</div>
-            <div style="display:grid; grid-template-columns: repeat(4, minmax(88px, 1fr)); gap:8px; align-items:center;">
-              <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
-                ${taskPie}
-                <div style="font-size:11px; color:#475569;">${taskCompletedCount} / ${taskTotalCount} tamamlandı</div>
+            <div class="section-title">Kategori Bazlı Tamamlanma</div>
+            <div style="display:grid; grid-template-columns: repeat(2, minmax(200px, 1fr)); gap:14px; align-items:start;">
+              <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
+                ${group1Chart}
+                <div style="font-size:11px; color:#475569; text-align:center;">Ödev • Etkinlik • Ders</div>
+                <div style="font-size:11px; color:#475569;">Toplam: ${group1Total} • Tamamlandı: ${group1Completed}</div>
               </div>
-              <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
-                ${activityPie}
-                <div style="font-size:11px; color:#475569;">${activityCompletedCount} / ${activityTotalCount} tamamlandı</div>
-              </div>
-              <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
-                ${blockPie}
-                <div style="font-size:11px; color:#475569;">${blockCompletedCount} / ${blockTotalCount} tamamlandı</div>
-              </div>
-              <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
-                ${computePie}
-                <div style="font-size:11px; color:#475569;">${computeCompletedCount} / ${computeTotalCount} tamamlandı</div>
+              <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
+                ${group2Chart}
+                <div style="font-size:11px; color:#475569; text-align:center;">Kodlama Uygulamaları</div>
+                <div style="font-size:11px; color:#475569;">Toplam: ${group2Total} • Tamamlandı: ${group2Completed}</div>
               </div>
             </div>
-            <div style="display:grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap:6px; margin-top:10px;">
-              <div class="info-pill"><strong>Ödev:</strong> ${taskCompletedCount} tamamlandı, ${taskPendingCount} bekliyor</div>
-              <div class="info-pill"><strong>Etkinlik:</strong> ${activityCompletedCount} tamamlandı, ${activityPendingCount} bekliyor</div>
-              <div class="info-pill"><strong>Quiz:</strong> ${quizStats.totalQuizzes || 0} tamamlandı, doğruluk %${quizStats.avgSuccess || 0}</div>
-              <div class="info-pill"><strong>Blok Kodlama:</strong> ${blockCompletedCount} tamamlandı, ${blockPendingCount} bekliyor</div>
-              <div class="info-pill"><strong>Compute It:</strong> ${computeCompletedCount} tamamlandı, ${computePendingCount} bekliyor</div>
-            </div>
-            <table style="margin-top:10px;">
-            <thead>
-              <tr>
-                <th>Ödev</th><th>Tarih</th><th>Başarı</th><th>Süre</th><th>XP</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${historyRows || "<tr><td colspan='5'>Veri yok.</td></tr>"}
-            </tbody>
-            </table>
-            <div class="section-title" style="margin-top:10px;">Dersler</div>
+            <div class="section-title" style="margin-top:10px;">Dersler - Ödevler - Etkinlikler</div>
             <table>
               <thead>
                 <tr>
@@ -16069,76 +16788,63 @@ async function buildStudentReportHtml(detail) {
                 ${lessonHistoryRows || "<tr><td colspan='5'>Veri yok.</td></tr>"}
               </tbody>
             </table>
-          </div>
-          <div class="card">
-            <div class="section-title">Etkinlikler</div>
+            <div class="section-title" style="margin-top:10px;">Kodlama ve Uygulamalar</div>
             <table>
               <thead>
                 <tr>
-                  <th>Etkinlik</th><th>Süre</th><th>İlerleme</th><th>XP</th>
+                  <th>Uygulama</th><th>Level Aralığı</th><th>Süre</th><th>XP</th><th>İlerleme</th>
                 </tr>
               </thead>
               <tbody>
-                ${appRows || "<tr><td colspan='4'>Veri yok.</td></tr>"}
+                ${codingRows || "<tr><td colspan='5'>Veri yok.</td></tr>"}
               </tbody>
             </table>
           </div>
-          <div class="card">
-            <div class="section-title">Canlı Quiz Sonuçları</div>
-            <div class="kpi-grid" style="margin-bottom:8px;">
-              <div class="kpi"><div class="value">${quizStats.totalQuizzes || 0}</div><div class="label">Quiz</div></div>
-              <div class="kpi"><div class="value">${quizStats.totalCorrect || 0}</div><div class="label">Doğru</div></div>
-              <div class="kpi"><div class="value">${quizStats.totalWrong || 0}</div><div class="label">Yanlış</div></div>
-              <div class="kpi"><div class="value">${quizStats.totalXP || 0}</div><div class="label">Quiz XP</div></div>
+          <div class="report-two-col">
+            <div class="card">
+              <div class="section-title">Dersler • Etkinlik • Ödevler</div>
+              <div class="kpi-grid" style="margin-bottom:8px; grid-template-columns: repeat(3, minmax(0, 1fr));">
+                <div class="kpi"><div class="value">${taskCompletedCount}/${taskTotalCount}</div><div class="label">Ödevler</div></div>
+                <div class="kpi"><div class="value">${activityCompletedCount}/${activityTotalCount}</div><div class="label">Etkinlikler</div></div>
+                <div class="kpi"><div class="value">${lessonCompletedCount}/${lessonTotalCount}</div><div class="label">Dersler</div></div>
+              </div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Kategori</th><th>Tamamlanan</th><th>Toplam</th><th>İlerleme</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td>Ödevler</td><td>${taskCompletedCount}</td><td>${taskTotalCount}</td><td>%${taskTotalCount > 0 ? Math.round((taskCompletedCount / taskTotalCount) * 100) : 0}</td></tr>
+                  <tr><td>Etkinlikler</td><td>${activityCompletedCount}</td><td>${activityTotalCount}</td><td>%${activityTotalCount > 0 ? Math.round((activityCompletedCount / activityTotalCount) * 100) : 0}</td></tr>
+                  <tr><td>Dersler</td><td>${lessonCompletedCount}</td><td>${lessonTotalCount}</td><td>%${lessonTotalCount > 0 ? Math.round((lessonCompletedCount / lessonTotalCount) * 100) : 0}</td></tr>
+                </tbody>
+              </table>
             </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Quiz</th><th>Doğru</th><th>Yanlış</th><th>Cevap</th><th>Başarı</th><th>XP</th><th>Süre</th><th>Tarih</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${quizRows || "<tr><td colspan='8'>Veri yok.</td></tr>"}
-              </tbody>
-            </table>
-          </div>
-          <div class="card">
-            <div class="section-title">Blok Kodlama</div>
-            <div class="kpi-grid" style="margin-bottom:8px;">
-              <div class="kpi"><div class="value">${blockStats.completedLevels}</div><div class="label">Tamamlanan Seviye</div></div>
-              <div class="kpi"><div class="value">${blockStats.totalLevels}</div><div class="label">Toplam Seviye</div></div>
-              <div class="kpi"><div class="value">%${blockStats.progressPercent}</div><div class="label">İlerleme</div></div>
-              <div class="kpi"><div class="value">${Math.floor((blockStats.totalDurationMs || 0) / 60000)} dk</div><div class="label">Toplam Süre</div></div>
+            <div class="card">
+              <div class="section-title">Kodlama ve Uygulamalar</div>
+              <div class="kpi-grid" style="margin-bottom:8px; grid-template-columns: repeat(5, minmax(0, 1fr));">
+                <div class="kpi"><div class="value">${quizCompleted}/${quizTotal}</div><div class="label">Canlı Quiz</div></div>
+                <div class="kpi"><div class="value">${block2dCompleted}/${block2dTotal}</div><div class="label">Blok Kodlama</div></div>
+                <div class="kpi"><div class="value">${block3dCompleted}/${block3dTotal}</div><div class="label">3D Blok</div></div>
+                <div class="kpi"><div class="value">${computeCompletedCount}/${computeTotalCount}</div><div class="label">Compute It</div></div>
+                <div class="kpi"><div class="value">${pythonCompleted}/${pythonTotal}</div><div class="label">Python Quiz</div></div>
+              </div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Uygulama</th><th>Tamamlanan</th><th>Toplam</th><th>İlerleme</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td>Canlı Quiz</td><td>${quizCompleted}</td><td>${quizTotal}</td><td>%${quizTotal > 0 ? Math.round((quizCompleted / quizTotal) * 100) : 0}</td></tr>
+                  <tr><td>Blok Kodlama</td><td>${block2dCompleted}</td><td>${block2dTotal}</td><td>%${block2dTotal > 0 ? Math.round((block2dCompleted / block2dTotal) * 100) : 0}</td></tr>
+                  <tr><td>3D Blok Kodlama</td><td>${block3dCompleted}</td><td>${block3dTotal}</td><td>%${block3dTotal > 0 ? Math.round((block3dCompleted / block3dTotal) * 100) : 0}</td></tr>
+                  <tr><td>Compute It</td><td>${computeCompletedCount}</td><td>${computeTotalCount}</td><td>%${computeTotalCount > 0 ? Math.round((computeCompletedCount / computeTotalCount) * 100) : 0}</td></tr>
+                  <tr><td>Python Quiz</td><td>${pythonCompleted}</td><td>${pythonTotal}</td><td>%${pythonTotal > 0 ? Math.round((pythonCompleted / pythonTotal) * 100) : 0}</td></tr>
+                </tbody>
+              </table>
             </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Ödev</th><th>Level Aralığı</th><th>Süre</th><th>XP</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${blockRows || "<tr><td colspan='4'>Veri yok.</td></tr>"}
-              </tbody>
-            </table>
-          </div>
-          <div class="card">
-            <div class="section-title">Compute It</div>
-            <div class="kpi-grid" style="margin-bottom:8px;">
-              <div class="kpi"><div class="value">${computeStats.completedLevels}</div><div class="label">Tamamlanan Seviye</div></div>
-              <div class="kpi"><div class="value">${computeStats.totalLevels}</div><div class="label">Toplam Seviye</div></div>
-              <div class="kpi"><div class="value">%${computeStats.progressPercent}</div><div class="label">İlerleme</div></div>
-              <div class="kpi"><div class="value">${Math.floor((computeStats.totalDurationMs || 0) / 60000)} dk</div><div class="label">Toplam Süre</div></div>
-            </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Ödev</th><th>Level Aralığı</th><th>Süre</th><th>XP</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${computeRows || "<tr><td colspan='4'>Veri yok.</td></tr>"}
-              </tbody>
-            </table>
           </div>
       </div>
     </body>
@@ -17531,8 +18237,8 @@ function fillLessonSlideForm() {
   const qType = resolveLessonQuestionType(s, s.questionType || "multiple");
   set("slide-question-type", qType);
   set("slide-question-text", s.question || "");
+  set("slide-question-image-url", s.imageUrl || "");
   set("slide-question-xp", clampLessonQuestionXP(s.questionXP ?? s.xp ?? MAX_QUESTION_XP));
-  set("slide-question-duration", Math.max(5, Number(s.questionDurationSec ?? s.durationSec ?? 30) || 30));
   set("slide-option-0", "");
   set("slide-option-1", "");
   set("slide-option-2", "");
@@ -17546,6 +18252,7 @@ function fillLessonSlideForm() {
     set("slide-option-3", options[3] || "");
     const correctIdx = Math.max(0, getMultipleChoiceIndex(s.correct, options));
     set("slide-correct-choice", String(correctIdx));
+    updateLessonCorrectChoiceUI();
   } else if (qType === "boolean") {
     const boolCorrect = normalizeBooleanToken(s.correct);
     set("slide-correct-boolean", boolCorrect === false ? "yanlis" : "dogru");
@@ -17555,8 +18262,6 @@ function fillLessonSlideForm() {
   lessonCanvasElements = Array.isArray(s.elements) ? JSON.parse(JSON.stringify(s.elements)) : [];
   selectedLessonCanvasElementId = null;
   selectedLessonThemeId = s.themeId || selectedLessonThemeId || LESSON_THEME_TEMPLATES[0].id;
-  const cArea = document.getElementById("slide-content-area");
-  if (cArea) cArea.style.display = normalizeLessonSlideType(s.type || "content") === "question" ? "none" : "block";
   setLessonQuestionEditorVisibility();
   setLessonCodeEditorVisibility();
   renderLessonThemePicker();
@@ -17572,16 +18277,15 @@ function readLessonSlideForm() {
   const codeSnippet = document.getElementById("slide-code-input")?.value || "";
   const questionType = normalizeLessonQuestionType(get("slide-question-type") || "multiple");
   const questionXP = clampLessonQuestionXP(get("slide-question-xp") || MAX_QUESTION_XP);
-  const questionDurationSec = Math.max(5, Number(get("slide-question-duration") || 30) || 30);
   const questionText = get("slide-question-text");
+  const questionImageUrl = get("slide-question-image-url");
   let options = [];
   let correct = "";
   let fillAnswers = [];
   if (type === "question" || type === "mixed") {
     if (questionType === "multiple") {
       options = [get("slide-option-0"), get("slide-option-1"), get("slide-option-2"), get("slide-option-3")]
-        .map((opt) => String(opt || "").trim())
-        .filter((opt) => opt.length > 0);
+        .map((opt) => String(opt || "").trim());
       correct = String(get("slide-correct-choice") || "0");
     } else if (questionType === "boolean") {
       options = ["Doğru", "Yanlış"];
@@ -17597,13 +18301,13 @@ function readLessonSlideForm() {
     type,
     content: (layout === "code" || type === "question") ? "" : (editor ? editor.innerHTML.trim() : ""),
     codeSnippet,
-    imageUrl: get("slide-image-url"),
+    imageUrl: (type === "question" || type === "mixed") ? (questionImageUrl || get("slide-image-url")) : get("slide-image-url"),
     videoUrl: get("slide-video-url"),
     layout,
     questionType: (type === "question" || type === "mixed") ? questionType : "",
     question: (type === "question" || type === "mixed") ? questionText : "",
     questionXP: (type === "question" || type === "mixed") ? questionXP : 0,
-    questionDurationSec: (type === "question" || type === "mixed") ? questionDurationSec : 0,
+    questionDurationSec: 0,
     options: (type === "question" || type === "mixed") ? options : [],
     correct: (type === "question" || type === "mixed") ? correct : "",
     fillAnswers: (type === "question" || type === "mixed") ? fillAnswers : [],
@@ -17709,7 +18413,6 @@ function updateLessonSlidePreview() {
   if ((draft.type || "content") === "question" || (draft.type || "content") === "mixed") {
     const questionXP = clampLessonQuestionXP(draft.questionXP ?? draft.xp ?? MAX_QUESTION_XP);
     const draftQType = resolveLessonQuestionType(draft, draft.questionType || "multiple");
-    const questionDurationSec = Math.max(5, Number(draft.questionDurationSec ?? draft.durationSec ?? 30) || 30);
     const draftOptions = Array.isArray(draft.options) ? draft.options : [];
     let correctLabel = draft.correct || "-";
     if (draftQType === "multiple") {
@@ -17725,7 +18428,7 @@ function updateLessonSlidePreview() {
     box.innerHTML = `
       <div style="font-weight:700;margin-bottom:6px;">Soru Önizleme</div>
       <div style="margin-bottom:6px;padding:8px;border-radius:8px;background:${cardBg};color:${cardText};border:1px solid ${cardBorder};">${draft.question || "-"}</div>
-      <div style="font-size:12px;color:#475569;">Tür: ${draftQType}${draftQType === "fill" || draftQType === "dragdrop" ? ` • Alan: ${(draft.fillAnswers || []).length}` : ` • Doğru: ${correctLabel || "-"}`} • XP: ${questionXP} • Süre: ${questionDurationSec} sn</div>
+      <div style="font-size:12px;color:#475569;">Tür: ${draftQType}${draftQType === "fill" || draftQType === "dragdrop" ? ` • Alan: ${(draft.fillAnswers || []).length}` : ` • Doğru: ${correctLabel || "-"}`} • XP: ${questionXP}</div>
       ${(draft.type || "content") === "mixed" ? `<hr style="border:none;border-top:1px solid #e5e7eb;margin:8px 0;"><div>${draft.content || "<span style='color:#94a3b8;'>İçerik yok</span>"}</div>` : ""}
     `;
     return;
@@ -17798,7 +18501,29 @@ function openLessonBuilderModal(lesson = null) {
     bgImage: lesson?.bgImage || "",
     slides: Array.isArray(lesson?.slides) ? JSON.parse(JSON.stringify(lesson.slides)) : []
   };
-  selectedLessonSlideIndex = lessonDraft.slides.length ? 0 : -1;
+  const createdStarter = !lessonDraft.slides.length;
+  if (createdStarter) {
+    const starter = applyThemeToSlide({
+      id: `s_${Date.now()}`,
+      type: "content",
+      title: "",
+      content: "",
+      imageUrl: "",
+      videoUrl: "",
+      layout: "code",
+      codeSnippet: "",
+      questionType: "",
+      question: "",
+      questionXP: 0,
+      questionDurationSec: 0,
+      options: [],
+      correct: "",
+      fillAnswers: [],
+      elements: []
+    }, LESSON_THEME_TEMPLATES[0].id);
+    lessonDraft.slides = [starter];
+  }
+  selectedLessonSlideIndex = 0;
   lessonCanvasElements = [];
   selectedLessonCanvasElementId = null;
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ""; };
@@ -17819,6 +18544,7 @@ function openLessonBuilderModal(lesson = null) {
   fillLessonSlideForm();
   setLessonCodeEditorVisibility();
   updateLessonSlidePreview();
+  if (createdStarter) setLessonEditorType("content", "code");
   const delLessonBtn = document.getElementById("btn-delete-lesson");
   if (delLessonBtn) delLessonBtn.style.display = editingLessonId ? "inline-block" : "none";
   const modal = document.getElementById("lesson-builder-modal");
@@ -17920,6 +18646,8 @@ function renderLessonPlayer() {
       : `<video controls style="width:100%;max-height:280px;border-radius:10px;"><source src="${cur.videoUrl}"></video>`)
     : "";
   let contentBlock = "";
+  let questionXP = 0;
+  let hasTimer = false;
   if (hasContent) {
     let bodyHtml = "";
     if (cur.layout === "code") {
@@ -17971,16 +18699,21 @@ function renderLessonPlayer() {
   if (hasQuestion) {
     const selected = st.answered[slideAnswerKey];
     const qType = resolveLessonQuestionType(cur, cur.questionType || "multiple");
-    const questionXP = clampLessonQuestionXP(cur.questionXP ?? cur.xp ?? MAX_QUESTION_XP);
-    const questionDurationSec = Math.max(5, Number(cur.questionDurationSec ?? cur.durationSec ?? 30) || 30);
+    questionXP = clampLessonQuestionXP(cur.questionXP ?? cur.xp ?? MAX_QUESTION_XP);
+    const questionDurationSec = Math.max(0, Number(cur.questionDurationSec ?? cur.durationSec ?? 0) || 0);
+    hasTimer = questionDurationSec > 0;
     if (!st.questionTimers) st.questionTimers = {};
     if (!st.questionExpired) st.questionExpired = {};
-    if (!st.questionTimers[slideAnswerKey]) st.questionTimers[slideAnswerKey] = Date.now();
-    const elapsedNow = Math.max(0, Date.now() - Number(st.questionTimers[slideAnswerKey] || Date.now()));
-    const remainingNow = Math.max(0, questionDurationSec - (elapsedNow / 1000));
-    const timeExpired = remainingNow <= 0;
+    if (hasTimer && !st.questionTimers[slideAnswerKey]) st.questionTimers[slideAnswerKey] = Date.now();
+    const elapsedNow = hasTimer
+      ? Math.max(0, Date.now() - Number(st.questionTimers[slideAnswerKey] || Date.now()))
+      : 0;
+    const remainingNow = hasTimer
+      ? Math.max(0, questionDurationSec - (elapsedNow / 1000))
+      : Infinity;
+    const timeExpired = hasTimer ? (remainingNow <= 0) : false;
     if (timeExpired) st.questionExpired[slideAnswerKey] = true;
-    const isLockedByTime = !!st.questionExpired[slideAnswerKey] && !hasLessonAnswerValue(cur, selected);
+    const isLockedByTime = hasTimer && !!st.questionExpired[slideAnswerKey] && !hasLessonAnswerValue(cur, selected);
     const qTypeLabelMap = {
       multiple: "Coktan Secmeli",
       boolean: "Dogru / Yanlis",
@@ -17989,6 +18722,11 @@ function renderLessonPlayer() {
       dragdrop: "Surukle Birak"
     };
     const qTypeLabel = qTypeLabelMap[qType] || "Soru";
+    const questionImageHtml = cur.imageUrl
+      ? `<div style="margin:8px 0 10px;display:flex;justify-content:center;">
+          <img src="${cur.imageUrl}" alt="" class="lesson-question-image-thumb" data-lesson-image="${cur.imageUrl}">
+        </div>`
+      : "";
     const hasAnswered = (qType === "fill")
       ? (Array.isArray(selected) && selected.some((v) => String(v || "").trim().length > 0))
       : (qType === "dragdrop")
@@ -18048,7 +18786,7 @@ function renderLessonPlayer() {
         : `<div class="lesson-q-options">${
             optSource.map((o, idx) => {
               const letter = ["A", "B", "C", "D"][idx] || `${idx + 1}`;
-              const key = qType === "boolean" ? String(o).toLowerCase() : String(idx);
+              const key = qType === "boolean" ? String(o).toLowerCase() : String(letter);
               const selectedIdx = qType === "multiple" ? getMultipleChoiceIndex(selected, optSource) : -1;
               const chosen = qType === "multiple"
                 ? selectedIdx === idx
@@ -18062,7 +18800,7 @@ function renderLessonPlayer() {
               else if (hasAnswered && !answeredCorrect && optionIsCorrect) classes.push("is-reveal-correct");
               const label = qType === "boolean" ? String(o || "") : String(letter);
               return `
-                <button class="btn ${classes.join(" ")}" data-opt="${key}" ${isLockedByTime ? "disabled" : ""}>
+                <button class="btn ${classes.join(" ")}" data-opt="${key}" ${(isLockedByTime || hasAnswered) ? "disabled" : ""}>
                   <span class="opt-key">${escapeHtmlBasic(label)}</span>
                   <span class="opt-text">${escapeHtmlBasic(String(o || ""))}</span>
                 </button>
@@ -18073,7 +18811,7 @@ function renderLessonPlayer() {
       ? `<button id="btn-save-question-answer" class="btn btn-primary" style="margin-top:10px;" ${isLockedByTime ? "disabled" : ""}>Cevabı Kaydet</button>`
       : "";
     const statusHtml = hasAnswered
-      ? `<div class="lesson-answer-status ${answeredCorrect ? "is-correct" : "is-wrong"}">${answeredCorrect ? "? Doğru cevap" : "? Yanlış cevap"}</div>`
+      ? `<div class="lesson-answer-status ${answeredCorrect ? "is-correct" : "is-wrong"}">${answeredCorrect ? "✔ Doğru cevap" : "✖ Yanlış cevap"}</div>`
       : (isLockedByTime ? `<div class="lesson-answer-status is-wrong">Süre doldu.</div>` : "");
     const hasChoiceGrid = qType === "multiple" || qType === "boolean";
     const questionBody = hasChoiceGrid
@@ -18082,6 +18820,7 @@ function renderLessonPlayer() {
           <div class="lesson-question-prompt">
             <p class="lesson-question-text">${escapeHtmlBasic(cur.question || "")}</p>
           </div>
+          ${questionImageHtml}
           <div>
             ${opts}
             ${saveBtn}
@@ -18091,6 +18830,7 @@ function renderLessonPlayer() {
       `
       : `
         <p class="lesson-question-text" style="font-size:20px;font-weight:700;">${escapeHtmlBasic(cur.question || "")}</p>
+        ${questionImageHtml}
         ${opts}
         ${saveBtn}
         ${statusHtml}
@@ -18103,6 +18843,7 @@ function renderLessonPlayer() {
         </div>
         <h3 class="lesson-question-title">${escapeHtmlBasic(hasContent ? "Soru" : (cur.title || "Soru"))}</h3>
         ${questionBody}
+        ${hasTimer ? `
         <div class="lesson-question-timer" data-question-key="${escapeHtmlBasic(String(slideAnswerKey))}">
           <div class="lesson-question-timer-head">
             <span>Süre</span>
@@ -18111,7 +18852,7 @@ function renderLessonPlayer() {
           <div class="lesson-question-timer-track">
             <div class="lesson-question-timer-fill" data-lesson-question-progress style="width:${Math.min(100, Math.max(0, (elapsedNow / (questionDurationSec * 1000)) * 100))}%;"></div>
           </div>
-        </div>
+        </div>` : ""}
       </div>
     `;
   }
@@ -18128,8 +18869,32 @@ function renderLessonPlayer() {
   applyLessonPlayerZoom(lessonPlayerZoom, { keepCenter: false });
   const questionCardEl = stage.querySelector(".lesson-question-card");
   if (questionCardEl) {
+    const imageModal = document.getElementById("lesson-image-modal");
+    const imageModalImg = document.getElementById("lesson-image-modal-img");
+    const imageModalClose = document.getElementById("btn-close-lesson-image-modal");
+    const closeImageModal = () => {
+      if (imageModal) imageModal.style.display = "none";
+      if (imageModalImg) imageModalImg.src = "";
+    };
+    if (imageModalClose) imageModalClose.onclick = closeImageModal;
+    if (imageModal) {
+      imageModal.onclick = (ev) => {
+        if (ev.target === imageModal) closeImageModal();
+      };
+    }
+    stage.querySelectorAll("[data-lesson-image]").forEach((imgEl) => {
+      imgEl.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const src = imgEl.getAttribute("data-lesson-image") || "";
+        if (!src || !imageModal || !imageModalImg) return;
+        imageModalImg.src = src;
+        imageModal.style.display = "flex";
+      });
+    });
     const submitChoice = (choice) => {
       if (choice === null || choice === undefined) return;
+      if (hasLessonAnswerValue(cur, st.answered[slideAnswerKey])) return;
       st.answered[slideAnswerKey] = choice;
       const ok = isLessonAnswerCorrect(cur, choice);
       showNotice(ok ? `Doğru cevap! +${questionXP} XP` : "Cevap kaydedildi.", ok ? "#2ecc71" : "#4a90e2");
@@ -18145,27 +18910,29 @@ function renderLessonPlayer() {
         submitChoice(optBtn.getAttribute("data-opt"));
       });
     });
-    const timerFillEl = stage.querySelector("[data-lesson-question-progress]");
-    const timerLabelEl = stage.querySelector("[data-lesson-question-time]");
-    const qDuration = Math.max(5, Number(cur.questionDurationSec ?? cur.durationSec ?? 30) || 30);
-    const startedAt = Number(st.questionTimers?.[slideAnswerKey] || Date.now());
-    const tickTimer = () => {
-      const elapsed = Math.max(0, Date.now() - startedAt);
-      const ratio = Math.min(1, elapsed / (qDuration * 1000));
-      const remainingSec = Math.max(0, qDuration - (elapsed / 1000));
-      if (timerFillEl) timerFillEl.style.width = `${Math.round(ratio * 100)}%`;
-      if (timerLabelEl) timerLabelEl.textContent = `${Math.ceil(remainingSec)} sn`;
-      if (ratio >= 1) {
-        clearLessonQuestionTimer();
-        const answered = hasLessonAnswerValue(cur, st.answered[slideAnswerKey]);
-        if (!answered) {
-          st.questionExpired[slideAnswerKey] = true;
-          renderLessonPlayer();
+    if (hasTimer) {
+      const timerFillEl = stage.querySelector("[data-lesson-question-progress]");
+      const timerLabelEl = stage.querySelector("[data-lesson-question-time]");
+      const qDuration = Math.max(1, Number(cur.questionDurationSec ?? cur.durationSec ?? 0) || 0);
+      const startedAt = Number(st.questionTimers?.[slideAnswerKey] || Date.now());
+      const tickTimer = () => {
+        const elapsed = Math.max(0, Date.now() - startedAt);
+        const ratio = Math.min(1, elapsed / (qDuration * 1000));
+        const remainingSec = Math.max(0, qDuration - (elapsed / 1000));
+        if (timerFillEl) timerFillEl.style.width = `${Math.round(ratio * 100)}%`;
+        if (timerLabelEl) timerLabelEl.textContent = `${Math.ceil(remainingSec)} sn`;
+        if (ratio >= 1) {
+          clearLessonQuestionTimer();
+          const answered = hasLessonAnswerValue(cur, st.answered[slideAnswerKey]);
+          if (!answered) {
+            st.questionExpired[slideAnswerKey] = true;
+            renderLessonPlayer();
+          }
         }
-      }
-    };
-    tickTimer();
-    lessonQuestionTimerInterval = setInterval(tickTimer, 120);
+      };
+      tickTimer();
+      lessonQuestionTimerInterval = setInterval(tickTimer, 120);
+    }
   }
   stage.querySelectorAll("[data-dd-drag]").forEach((chip) => {
     chip.addEventListener("dragstart", (ev) => {
@@ -18294,7 +19061,7 @@ function applyLessonPlayerZoom(value, options = {}) {
 }
 
 function normalizeChoiceToken(value) {
-  return String(value || "")
+  return String(value ?? "")
     .trim()
     .toLowerCase()
     .normalize("NFD")
@@ -18329,6 +19096,15 @@ function normalizeLessonQuestionType(raw) {
   if (t === "fill") return "fill";
   if (t === "dragdrop" || t === "matching") return "dragdrop";
   return t || "multiple";
+}
+
+function updateLessonCorrectChoiceUI() {
+  const hidden = document.getElementById("slide-correct-choice");
+  const idx = Number(hidden?.value ?? 0);
+  document.querySelectorAll(".lesson-option-row").forEach((row) => {
+    const rowIdx = Number(row.getAttribute("data-opt-row"));
+    row.classList.toggle("is-correct", rowIdx === idx);
+  });
 }
 
 function resolveLessonQuestionType(slide, fallbackRaw = "") {
@@ -18385,6 +19161,9 @@ function getMultipleChoiceCandidateIndices(value, options = []) {
   if (!token) return set;
   const letters = ["a", "b", "c", "d"];
 
+  const isZeroBasedDigit = /^[0-3]$/.test(token);
+  const isOneBasedDigit = /^[1-4]$/.test(token);
+
   const idx = getMultipleChoiceIndex(value, options);
   if (idx >= 0) set.add(idx);
 
@@ -18395,16 +19174,20 @@ function getMultipleChoiceCandidateIndices(value, options = []) {
     const i = letters.indexOf(ch);
     if (i >= 0) set.add(i);
   });
-  const digitMatches = token.match(/(^|[^0-9])([1-4])([^0-9]|$)/g) || [];
-  digitMatches.forEach((m) => {
-    const d = (m.match(/[1-4]/) || [])[0] || "";
-    if (d) set.add(Number(d) - 1);
-  });
-  const zeroBasedDigitMatches = token.match(/(^|[^0-9])([0-3])([^0-9]|$)/g) || [];
-  zeroBasedDigitMatches.forEach((m) => {
-    const d = (m.match(/[0-3]/) || [])[0] || "";
-    if (d !== "") set.add(Number(d));
-  });
+  if (!isZeroBasedDigit) {
+    const digitMatches = token.match(/(^|[^0-9])([1-4])([^0-9]|$)/g) || [];
+    digitMatches.forEach((m) => {
+      const d = (m.match(/[1-4]/) || [])[0] || "";
+      if (d) set.add(Number(d) - 1);
+    });
+  }
+  if (!isOneBasedDigit) {
+    const zeroBasedDigitMatches = token.match(/(^|[^0-9])([0-3])([^0-9]|$)/g) || [];
+    zeroBasedDigitMatches.forEach((m) => {
+      const d = (m.match(/[0-3]/) || [])[0] || "";
+      if (d !== "") set.add(Number(d));
+    });
+  }
 
   // "A) Paris" gibi formatlarda marker sonrası metni option text ile de eşleştir.
   const withoutLead = token.replace(/^([abcd]|[1-4])\s*[\)\].:\-]?\s*/, "").trim();
@@ -18460,10 +19243,27 @@ function isLessonAnswerCorrect(slide, answer) {
   const qType = resolveLessonQuestionType(slide, slide?.questionType || "multiple");
   if (qType === "multiple") {
     const options = Array.isArray(slide?.options) ? slide.options : [];
+    if (String(answer ?? "") !== "" && String(answer) === String(slide?.correct ?? "")) return true;
+    const answerIdxDirect = getMultipleChoiceIndex(answer, options);
+    const correctIdxDirect = getMultipleChoiceIndex(slide?.correct, options);
+    if (answerIdxDirect >= 0 && correctIdxDirect >= 0) {
+      return answerIdxDirect === correctIdxDirect;
+    }
     const answerCandidates = getMultipleChoiceCandidateIndices(answer, options);
     const correctCandidates = getMultipleChoiceCandidateIndices(slide?.correct, options);
     for (const aIdx of answerCandidates) {
       if (correctCandidates.has(aIdx)) return true;
+    }
+    const answerIdx = getMultipleChoiceIndex(answer, options);
+    const correctIdx = getMultipleChoiceIndex(slide?.correct, options);
+    if (answerIdx >= 0 && correctIdx >= 0 && answerIdx === correctIdx) return true;
+    if (correctIdx >= 0) {
+      const correctText = normalizeChoiceToken(options[correctIdx]);
+      if (correctText && correctText === normalizeChoiceToken(answer)) return true;
+    }
+    if (answerIdx >= 0) {
+      const answerText = normalizeChoiceToken(options[answerIdx]);
+      if (answerText && answerText === normalizeChoiceToken(slide?.correct)) return true;
     }
     // fallback: normalize edilmiş metin birebir aynıysa yine doğru kabul et
     const normalizedAnswer = normalizeChoiceToken(answer);
@@ -18928,6 +19728,97 @@ function getStudentCertificateSummary() {
   const total = pending + completed;
   const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
   return { completed, total, completionRate };
+}
+
+async function getStudentBadgeMetrics() {
+  const task = getHomeCacheCounts("tasks");
+  const act = getHomeCacheCounts("activities");
+  const block = getHomeCacheCounts("block");
+  const compute = getHomeCacheCounts("compute");
+  const lesson = getHomeCacheCounts("lessons");
+  const summary = getStudentCertificateSummary();
+  const xp = Math.max(0, parseXPValue(userData?.xp));
+
+  let quizCompleted = 0;
+  try {
+    const now = Date.now();
+    if (!badgeQuizStatsCache || now - badgeQuizStatsAt > 60_000) {
+      badgeQuizStatsCache = await fetchStudentQuizStats(currentUserId);
+      badgeQuizStatsAt = now;
+    }
+    quizCompleted = Math.max(0, Number(badgeQuizStatsCache?.totalQuizzes || 0));
+  } catch (e) {
+    quizCompleted = 0;
+  }
+
+  const totalCompleted =
+    task.completed + act.completed + block.completed + compute.completed + lesson.completed + quizCompleted;
+
+  return {
+    quizCompleted,
+    tasksCompleted: task.completed,
+    activitiesCompleted: act.completed,
+    blockCompleted: block.completed,
+    computeCompleted: compute.completed,
+    lessonsCompleted: lesson.completed,
+    totalCompleted,
+    xp,
+    completionRate: summary.completed > 0 ? Math.max(0, Number(summary.completionRate || 0)) : 0
+  };
+}
+
+function buildBadgeProgresses(metrics) {
+  const safeMetrics = { ...metrics };
+  if ((safeMetrics.totalCompleted || 0) <= 0) {
+    safeMetrics.completionRate = 0;
+  }
+  return BADGE_DEFS.map((b) => {
+    let raw = Number(safeMetrics[b.metric] || 0);
+    // Completion-rate badges should only start after a minimum number of completions.
+    if (b.metric === "completionRate" && (safeMetrics.totalCompleted || 0) < 5) {
+      raw = 0;
+    }
+    const target = Number(b.target || 0);
+    const progress = Math.min(raw, target);
+    const earned = raw >= target && target > 0;
+    return { ...b, progress, earned };
+  });
+}
+
+function renderBadgeGrid(containerId, badges = [], onlyEarned = false) {
+  const grid = document.getElementById(containerId);
+  if (!grid) return;
+  const list = onlyEarned ? badges.filter((b) => b.earned) : badges;
+  if (!list.length) {
+    grid.innerHTML = `<div style="grid-column: 1 / -1; color:#64748b; text-align:center;">Henüz rozet kazanılmadı.</div>`;
+    return;
+  }
+  grid.innerHTML = list
+    .map((b) => {
+      const tip = escapeHtmlBasic(b.desc || "Rozeti kazanma şartları burada gösterilir.");
+      return `
+        <div class="badge-card ${b.earned ? "earned" : ""}" data-tooltip="${tip}" title="${tip}">
+          <div class="badge-icon">${b.icon}</div>
+          <div class="badge-name">${b.name}</div>
+          <div class="badge-desc">${b.desc || ""}</div>
+          <div class="badge-progress-row">
+            <div class="badge-progress-track">
+              <span style="width:${Math.round((b.progress / Math.max(1, b.target)) * 100)}%"></span>
+            </div>
+            <div class="badge-progress-text">${b.progress}/${b.target}</div>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+async function renderStudentBadges() {
+  if (userRole !== "student") return;
+  const metrics = await getStudentBadgeMetrics();
+  const badges = buildBadgeProgresses(metrics);
+  renderBadgeGrid("badges-grid", badges, false);
+  renderBadgeGrid("my-badges-grid", badges, true);
 }
 
 function buildCertificateAwardText(fullName) {
@@ -19514,11 +20405,26 @@ function renderStudentAdventureBoard() {
   );
   const fullName = getUserDisplayName(userData || {});
   const firstName = String(fullName || "Kahraman").trim().split(/\s+/)[0] || "Kahraman";
-  const rankIndex = Array.isArray(leaderboardRowsCache)
-    ? leaderboardRowsCache.findIndex((row) => String(row?.id || "") === String(currentUserId || ""))
-    : -1;
-  const rank = rankIndex >= 0 ? rankIndex + 1 : null;
-  const rankText = rank ? `${rank}. sıradasın` : "Sıralaman hazırlanıyor";
+  const normalizedClass = normalizeClassValue(userData?.className || userData?.class || userData?.class_name || "");
+  const normalizedSection = normalizeSectionValue(userData?.section || userData?.section_name || "");
+  const leaderboardRows = Array.isArray(leaderboardRowsCache) ? leaderboardRowsCache : [];
+  const rankIndex = leaderboardRows.findIndex((row) => String(row?.id || "") === String(currentUserId || ""));
+  let schoolRank = rankIndex >= 0 ? (Number(leaderboardRows[rankIndex]?.rank) || rankIndex + 1) : null;
+  const classRows = normalizedClass
+    ? leaderboardRows.filter((row) => {
+        const rowClass = normalizeClassValue(row?.className || row?.class || row?.class_name || "");
+        const rowSection = normalizeSectionValue(row?.section || row?.section_name || "");
+        if (rowClass !== normalizedClass) return false;
+        if (normalizedSection) return rowSection === normalizedSection;
+        return true;
+      })
+    : [];
+  const classRanked = buildLeaderboardRankedRows(classRows.slice());
+  const classRankRow = classRanked.find((row) => String(row?.id || "") === String(currentUserId || ""));
+  let classRank = classRankRow ? Number(classRankRow.rank || 0) : null;
+  if (myStatsSummaryCache?.schoolRank) schoolRank = myStatsSummaryCache.schoolRank;
+  if (myStatsSummaryCache?.classRank) classRank = myStatsSummaryCache.classRank;
+  const rankText = schoolRank ? `${schoolRank}. sıradasın` : "Sıralaman hazırlanıyor";
   const heroMessage = pending > 0
     ? `${pending} görevin seni bekliyor. Bir sonraki adımı seçip ilerleme çubuğunu hızla doldurabilirsin.`
     : "Tüm görevlerini bitirdin. Şimdi tekrar yapabilir, istatistiklerini inceleyebilir veya liderlikte yerini koruyabilirsin.";
@@ -19535,10 +20441,12 @@ function renderStudentAdventureBoard() {
   setText("student-hero-progress-text", `%${rate}`);
   setText("student-hero-progress-note", progressNote);
   // show compact class rank value in hero stats and avoid long explanatory text
-  setText("student-hero-class-rank", rank ? `${rank}.` : "—");
+  setText("student-hero-class-rank", classRank ? `${classRank}.` : "—");
+  setText("student-hero-school-rank", schoolRank ? `${schoolRank}.` : "—");
   setText("student-hero-rank-note", "");
   const progressFill = document.getElementById("student-hero-progress-fill");
   if (progressFill) progressFill.style.width = `${rate}%`;
+  renderStudentBadges();
 }
 
 function renderTeacherWorkspaceHero() {
@@ -19624,40 +20532,103 @@ function renderTeacherWorkspaceHero() {
       ? `${weakest && weakest.value >= 0 ? `${weakest.key} yavaş kalıyor.` : "Dağılım dengeleniyor."}`
       : "İlk veriyle hareketlenecek."
   );
-  setText("teacher-info-attendance-title", `${activeStudentsNum}/${totalStudentsNum} öğrenci aktif`);
-  setWidth("teacher-info-attendance-bar", attendancePercent);
-  setText(
-    "teacher-info-attendance-text",
-    totalStudentsNum > 0
-      ? `${Math.max(0, totalStudentsNum - activeStudentsNum)} öğrenci bekliyor.`
-      : "Aktiflik özeti gelecek."
+  const formatClassLabel = (row) => {
+    if (!row) return "";
+    if (row.label) return row.label;
+    const cls = String(row.className || "").trim();
+    const sec = String(row.section || "").trim();
+    return cls && sec ? `${cls}/${sec}` : (cls || sec || "");
+  };
+  const classTop = teacherClassSignals?.topActive;
+  const classCompletion = teacherClassSignals?.topCompletion;
+  const classXP = teacherClassSignals?.topXP;
+  const classLow = teacherClassSignals?.leastActive;
+  const classTotal = Number(teacherClassSignals?.totalClasses || 0);
+  const maxAvgXP = Number(teacherClassSignals?.maxAvgXP || 0);
+
+  if (classLow) {
+    setText("teacher-info-support-title", `Destek: ${formatClassLabel(classLow) || "Sınıf"}`);
+    setWidth("teacher-info-support-bar", classLow.activeRate);
+    setText(
+      "teacher-info-support-text",
+      `%${classLow.activeRate} aktiflik • ${classLow.total} öğrenci`
+    );
+  } else {
+    setText(
+      "teacher-info-support-title",
+      activeStudentsNum < totalStudentsNum ? "Destek grubu var" : "Destek dengeli"
+    );
+    setWidth("teacher-info-support-bar", supportPercent);
+    setText(
+      "teacher-info-support-text",
+      activeStudentsNum < totalStudentsNum
+        ? "Pasif öğrencilere kısa görev verin."
+        : "Akış şu an dengeli görünüyor."
+    );
+  }
+
+  if (classXP) {
+    setText("teacher-info-motivation-title", `${formatClassLabel(classXP) || "Sınıf"} XP önde`);
+    const xpPct = maxAvgXP > 0 ? Math.round((classXP.avgXP / maxAvgXP) * 100) : motivationPercent;
+    setWidth("teacher-info-motivation-bar", xpPct);
+    setText("teacher-info-motivation-text", `Ort. ${classXP.avgXP} XP/öğrenci`);
+  } else {
+    setText("teacher-info-motivation-title", `${totalXPNum} toplam XP üretildi`);
+    setWidth("teacher-info-motivation-bar", motivationPercent);
+    setText(
+      "teacher-info-motivation-text",
+      topRows > 0
+        ? `${topRows} öğrenci öne çıkıyor.`
+        : "Başarı listesi bekleniyor."
+    );
+  }
+
+  if (classCompletion) {
+    setText("teacher-info-focus-title", `${formatClassLabel(classCompletion) || "Sınıf"} önde`);
+    setWidth("teacher-info-focus-bar", classCompletion.avgCompletion);
+    setText(
+      "teacher-info-focus-text",
+      `Ort. %${classCompletion.avgCompletion} tamamlanma`
+    );
+  } else {
+    setWidth("teacher-info-focus-bar", Math.max(0, avgCompletionNum));
+    setText("teacher-info-focus-title", "Kısa plan önerisi");
+    setText("teacher-info-focus-text", "3 kısa görev + 1 derin çalışma önerisi.");
+  }
+
+  if (classTop && classTotal > 0) {
+    setWidth("teacher-info-status-bar", classTop.activeRate);
+    setText(
+      "teacher-hero-status-note",
+      `${classTotal} sınıf/şube izleniyor. En aktif ${formatClassLabel(classTop)} (%${classTop.activeRate}).`
+    );
+  } else {
+    setWidth("teacher-info-status-bar", attendancePercent);
+  }
+
+  const setMini = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.innerText = String(val);
+  };
+  setMini("teacher-mini-top-active", classTop ? formatClassLabel(classTop) : "-");
+  setMini(
+    "teacher-mini-top-active-sub",
+    classTop ? `%${classTop.activeRate} aktif` : "Aktiflik oranı"
   );
-  setText("teacher-info-progress-title", `Ortalama tamamlama ${avgCompletion}`);
-  setWidth("teacher-info-progress-bar", avgCompletionNum);
-  setText(
-    "teacher-info-progress-text",
-    totalCompletionsNum > 0
-      ? `${totalCompletionsNum} kayıt oluştu.`
-      : "İlk ilerleme bekleniyor."
+  setMini("teacher-mini-top-completion", classCompletion ? formatClassLabel(classCompletion) : "-");
+  setMini(
+    "teacher-mini-top-completion-sub",
+    classCompletion ? `%${classCompletion.avgCompletion} ort.` : "Ortalama tamamlama"
   );
-  setText(
-    "teacher-info-support-title",
-    activeStudentsNum < totalStudentsNum ? "Destek grubu var" : "Destek dengeli"
+  setMini("teacher-mini-top-xp", classXP ? formatClassLabel(classXP) : "-");
+  setMini(
+    "teacher-mini-top-xp-sub",
+    classXP ? `${classXP.avgXP} XP/öğrenci` : "Ort. XP/öğrenci"
   );
-  setWidth("teacher-info-support-bar", supportPercent);
-  setText(
-    "teacher-info-support-text",
-    activeStudentsNum < totalStudentsNum
-      ? "Pasif öğrencilere kısa görev verin."
-      : "Akış şu an dengeli görünüyor."
-  );
-  setText("teacher-info-motivation-title", `${totalXPNum} toplam XP üretildi`);
-  setWidth("teacher-info-motivation-bar", motivationPercent);
-  setText(
-    "teacher-info-motivation-text",
-    topRows > 0
-      ? `${topRows} öğrenci öne çıkıyor.`
-      : "Başarı listesi bekleniyor."
+  setMini("teacher-mini-low-active", classLow ? formatClassLabel(classLow) : "-");
+  setMini(
+    "teacher-mini-low-active-sub",
+    classLow ? `%${classLow.activeRate} aktif` : "Öncelik önerisi"
   );
 }
 
@@ -19686,7 +20657,7 @@ function syncMobileOpenMenuPlacement() {
   const appHeader = document.querySelector("#app-screen[style*='display: grid'] .app-header") || document.querySelector("#app-screen .app-header");
   if (!openMenuBtn || !appHeader) return;
   const isMobile = window.matchMedia("(max-width: 768px)").matches;
-  const forceInHeader = userRole === "teacher";
+  const forceInHeader = userRole === "teacher" || userRole === "student";
   if (isMobile || forceInHeader) {
     if (openMenuBtn.parentElement !== appHeader) {
       appHeader.insertBefore(openMenuBtn, appHeader.firstChild);
@@ -22109,14 +23080,38 @@ async function loadReportsModal() {
     for (const [key, group] of classGroups.entries()) {
       const [className, section] = key.split("|");
       const totalStudents = group.length;
-      const totalTasks = allTasks.length || 1;
+      const classTasks = allTasks.filter((t) => !t?.isDeleted && taskMatchesStudentFor(t, { className, section }));
+      const classTaskIds = new Set(classTasks.map((t) => String(t.id)));
+      const totalTasksForClass = classTasks.length;
       let completedTotal = 0;
+      const studentReportMap = new Map();
+      try {
+        await Promise.all(group.map(async (student) => {
+          const uid = String(student?.id || "");
+          if (!uid) return;
+          const snap = await getDoc(doc(db, "studentReports", uid));
+          if (!snap.exists()) return;
+          const data = snap.data() || {};
+          const percent = Number(data.completionPercent ?? data.completion_percent ?? 0);
+          if (Number.isFinite(percent)) {
+            studentReportMap.set(uid, Math.max(0, Math.min(100, percent)));
+          }
+        }));
+      } catch (e) {
+        console.warn("studentReports load failed:", e);
+      }
       
       const userIds = group.map(g => g.id);
       const chunks = chunkArray(userIds, 10);
       for (const ch of chunks) {
         const compSnap = await getDocs(query(collection(db, "completions"), where("userId", "in", ch)));
-        completedTotal += compSnap.size;
+        compSnap.forEach((docSnap) => {
+          const data = docSnap.data() || {};
+          const taskId = String(data.taskId || "");
+          if (!classTaskIds.size || (taskId && classTaskIds.has(taskId))) {
+            completedTotal += 1;
+          }
+        });
       }
       
       const classAssignments = contentAssignments.filter(a => assignmentMatchesClass(a, className, section));
@@ -22140,11 +23135,15 @@ async function loadReportsModal() {
           });
         }
       }
-      const totalPossibleClass = (totalTasks + totalActivitiesForClass) * totalStudents;
+      const totalPossibleClass = (totalTasksForClass + totalActivitiesForClass) * totalStudents;
       const completedAll = completedTotal + completedActivitiesTotal;
-      const completionRate = totalPossibleClass > 0
+      let completionRate = totalPossibleClass > 0
         ? Math.round((completedAll / totalPossibleClass) * 100)
         : 0;
+      const reportPercents = Array.from(studentReportMap.values()).filter((v) => Number.isFinite(v));
+      if (reportPercents.length) {
+        completionRate = Math.round(reportPercents.reduce((a, b) => a + b, 0) / reportPercents.length);
+      }
       const cappedRate = Math.min(100, Math.max(0, completionRate));
       
       const row = document.createElement("div");
@@ -22175,7 +23174,7 @@ async function loadReportsModal() {
       };
       
       row.onclick = async () => {
-        openClassStudentsModal(className, section, group, totalTasks);
+        openClassStudentsModal(className, section, group, totalTasksForClass, classTaskIds, studentReportMap);
       };
       
       list.appendChild(row);
@@ -22187,7 +23186,7 @@ async function loadReportsModal() {
   syncRunnerSaveButtons();
 }
 
-async function openClassStudentsModal(className, section, group, totalTasks) {
+async function openClassStudentsModal(className, section, group, totalTasks, classTaskIds = null, studentReportMap = null) {
   if (!taskStudentsModal) return;
   const title = document.getElementById("task-students-title");
   const list = document.getElementById("task-students-list");
@@ -22209,22 +23208,31 @@ async function openClassStudentsModal(className, section, group, totalTasks) {
     const completionsQuery = query(collection(db, "completions"), where("userId", "==", student.id));
     const completionsSnap = await getDocs(completionsQuery);
     
-    let completedCount = completionsSnap.size;
+    let completedCount = 0;
     let totalScore = 0;
     let scoreSampleCount = 0;
     let totalXP = getStudentXPValue(student);
     const completions = [];
+    const classCompletions = [];
     
     completionsSnap.forEach(docSnap => {
       const data = docSnap.data();
+      const taskId = String(data.taskId || "");
+      const matchesClassTask = !classTaskIds || !classTaskIds.size || (taskId && classTaskIds.has(taskId));
       const totalQ = Math.max(0, Number(data.totalQuestions || 0));
       const correctQ = Math.max(0, Number(data.correctAnswers || 0));
       if (totalQ > 0) {
-        totalScore += Math.round((correctQ / totalQ) * 100);
-        scoreSampleCount++;
+        if (matchesClassTask) {
+          totalScore += Math.round((correctQ / totalQ) * 100);
+          scoreSampleCount++;
+        }
       }
       completions.push(data);
+      if (matchesClassTask) {
+        classCompletions.push(data);
+      }
     });
+    completedCount = classCompletions.length;
 
     let completedActivities = 0;
     const totalActivities = classAssignments.filter(a => assignmentMatchesStudentFor(a, student)).length;
@@ -22257,7 +23265,11 @@ async function openClassStudentsModal(className, section, group, totalTasks) {
 
     const totalPossible = totalTasks + totalActivities;
     const completedTotal = completedCount + completedActivities;
-    const completionRateStudent = totalPossible > 0 ? Math.round((completedTotal / totalPossible) * 100) : 0;
+    let completionRateStudent = totalPossible > 0 ? Math.round((completedTotal / totalPossible) * 100) : 0;
+    const reportPercent = studentReportMap?.get?.(String(student?.id || "")) ?? null;
+    if (reportPercent !== null && reportPercent !== undefined && Number.isFinite(Number(reportPercent))) {
+      completionRateStudent = Math.round(Math.max(0, Math.min(100, Number(reportPercent))));
+    }
     const cappedRateStudent = Math.min(100, Math.max(0, completionRateStudent));
     const avgScore = scoreSampleCount > 0 ? Math.round(totalScore / scoreSampleCount) : cappedRateStudent;
     const displayName = getUserDisplayName(student);
@@ -22268,7 +23280,7 @@ async function openClassStudentsModal(className, section, group, totalTasks) {
       <div>
         <strong>${displayName}</strong>
         <small style="display: block; color: #666;">
-          ${completedTotal}/${totalPossible} toplam | Ort: %${avgScore} | ? ${totalXP} XP
+          ${completedTotal}/${totalPossible} toplam | Ort: %${avgScore} | XP: ${totalXP}
         </small>
       </div>
       <div style="display:flex; gap:6px; align-items:center;">
@@ -22949,6 +23961,7 @@ async function loadStatsPage() {
     let lessonPossibleTotal = 0;
 
     const topCandidates = [];
+    const classStatsMap = new Map();
     for (let i = 0; i < displayStudents.length; i++) {
       const student = displayStudents[i];
       const quizTaskCompletedCount = Number(completionsByUser.get(student.id) || 0);
@@ -22991,6 +24004,27 @@ async function loadStatsPage() {
       totalPossibleAll += totalPossible;
       const studentXP = getStudentXPValue(student);
       totalXPAll += studentXP;
+      const className = normalizeClassSectionText(student?.className || student?.class || "");
+      const section = normalizeClassSectionText(student?.section || "");
+      const classLabel = className && section ? `${className}/${section}` : (className || section || "");
+      if (classLabel) {
+        if (!classStatsMap.has(classLabel)) {
+          classStatsMap.set(classLabel, {
+            className,
+            section,
+            label: classLabel,
+            total: 0,
+            active: 0,
+            completionSum: 0,
+            xpSum: 0
+          });
+        }
+        const row = classStatsMap.get(classLabel);
+        row.total += 1;
+        row.completionSum += cappedRate;
+        row.xpSum += studentXP;
+        if (cappedRate > 0 || studentXP > 0) row.active += 1;
+      }
       taskCompletionsTotal += completedCount;
       activityCompletionsTotal += completedActivities;
       blockCompletionsTotal += completedBlocks;
@@ -23013,6 +24047,35 @@ async function loadStatsPage() {
       });
     }
     
+    const classStats = Array.from(classStatsMap.values()).map((row) => {
+      const total = Math.max(0, Number(row.total || 0));
+      const active = Math.max(0, Number(row.active || 0));
+      const completionAvg = total > 0 ? Math.round(Number(row.completionSum || 0) / total) : 0;
+      const avgXP = total > 0 ? Math.round(Number(row.xpSum || 0) / total) : 0;
+      const activeRate = total > 0 ? Math.round((active / total) * 100) : 0;
+      return {
+        ...row,
+        total,
+        active,
+        avgCompletion: completionAvg,
+        avgXP,
+        activeRate
+      };
+    });
+    const byActive = classStats.slice().sort((a, b) => b.activeRate - a.activeRate);
+    const byCompletion = classStats.slice().sort((a, b) => b.avgCompletion - a.avgCompletion);
+    const byXP = classStats.slice().sort((a, b) => b.avgXP - a.avgXP);
+    const byLowActive = classStats.slice().sort((a, b) => a.activeRate - b.activeRate);
+    const maxAvgXP = byXP.length ? Math.max(0, Number(byXP[0]?.avgXP || 0)) : 0;
+    teacherClassSignals = {
+      topActive: byActive[0] || null,
+      topCompletion: byCompletion[0] || null,
+      topXP: byXP[0] || null,
+      leastActive: byLowActive[0] || null,
+      maxAvgXP,
+      totalClasses: classStats.length
+    };
+
     const topList = document.getElementById("top-students-list");
     const topCard = document.getElementById("top-students-card");
     if (topCard && userRole === "teacher") topCard.style.display = "block";
@@ -23345,6 +24408,7 @@ async function showStudentDetail(student, completions, rank) {
   }
   const quizStats = await fetchStudentQuizStats(student.id);
   const computeStats = await fetchComputeRunStats(student.id);
+  const blockStats = await fetchBlockRunStats(student.id);
   const computeHistory = (Array.isArray(computeStats?.runs) ? computeStats.runs : []).map((run) => {
     const durationSec = Math.max(0, Number(run.durationSeconds || 0));
     const percent = Math.max(0, Math.min(100, Number(run.percent || 0)));
@@ -23382,7 +24446,30 @@ async function showStudentDetail(student, completions, rank) {
   document.getElementById("detail-success-rate").innerText = avgScore + "%";
   document.getElementById("detail-avg-time").innerText = systemTimeText;
   document.getElementById("detail-total-xp").innerText = totalXP;
-  document.getElementById("detail-rank").innerText = "#" + rank;
+  let classRank = null;
+  let schoolRank = null;
+  try {
+    const ranked = await ensureLeaderboardRowsLoaded();
+    const uid = String(student?.id || "");
+    const schoolIndex = ranked.findIndex((row) => String(row?.id || "") === uid);
+    schoolRank = schoolIndex >= 0 ? (Number(ranked[schoolIndex]?.rank) || schoolIndex + 1) : null;
+    const className = normalizeClassValue(student?.className || student?.class || student?.class_name || "");
+    const section = normalizeSectionValue(student?.section || student?.section_name || "");
+    const classRows = ranked.filter((row) => {
+      const rowClass = normalizeClassValue(row?.className || row?.class || row?.class_name || "");
+      const rowSection = normalizeSectionValue(row?.section || row?.section_name || "");
+      if (className && rowClass !== className) return false;
+      if (section && rowSection !== section) return false;
+      return true;
+    });
+    const classSorted = classRows.slice().sort((a, b) => Number(b?.xp || 0) - Number(a?.xp || 0));
+    const classIndex = classSorted.findIndex((row) => String(row?.id || "") === uid);
+    classRank = classIndex >= 0 ? classIndex + 1 : null;
+  } catch (e) {
+    console.warn("rank calc failed", e);
+  }
+  const rankText = classRank ? `#${classRank}` : (rank ? `#${rank}` : "-");
+  document.getElementById("detail-rank").innerText = rankText;
   
   renderStudentChart(taskHistory);
   
@@ -23413,7 +24500,7 @@ async function showStudentDetail(student, completions, rank) {
           </span>
         </div>
         <small style="color: #666; display: block; margin-top: 5px;">
-          ?? ${task.date} | ? ${mins}dk ${secs}sn | ? +${task.xp} XP
+          Tarih: ${task.date} | Süre: ${mins}dk ${secs}sn | XP: +${task.xp}
         </small>
       `;
       historyContainer.appendChild(div);
@@ -23468,7 +24555,7 @@ async function showStudentDetail(student, completions, rank) {
             <span class="badge ${cls}">%${act.percent}</span>
           </div>
           <small style="color: #666; display: block; margin-top: 5px;">
-            ?? ${act.updatedAt} | ? ${mins}dk ${secs}sn
+            Tarih: ${act.updatedAt} | Süre: ${mins}dk ${secs}sn
           </small>
         `;
         contentHistoryContainer.appendChild(div);
@@ -23489,7 +24576,7 @@ async function showStudentDetail(student, completions, rank) {
             <span class="badge ${qz.successRate >= 80 ? 'badge-success' : qz.successRate >= 60 ? 'badge-info' : 'badge-pending'}">%${qz.successRate}</span>
           </div>
           <small style="color: #666; display: block; margin-top: 5px;">
-            ?? ${qz.date} | ? ${qz.durationText} | ? ${qz.correct} • ? ${qz.wrong} | ? +${qz.xp} XP
+            Tarih: ${qz.date} | Süre: ${qz.durationText} | Doğru: ${qz.correct} • Yanlış: ${qz.wrong} | XP: +${qz.xp}
           </small>
         `;
         quizHistoryContainer.appendChild(div);
@@ -23497,6 +24584,47 @@ async function showStudentDetail(student, completions, rank) {
     }
   }
   renderStudentQuizChart(quizHistory, quizStats);
+
+  // Rozetler
+  try {
+    let completionRate = null;
+    try {
+      const rptSnap = await getDoc(doc(db, "studentReports", String(student?.id || "")));
+      if (rptSnap.exists()) {
+        const rpt = rptSnap.data() || {};
+        const pct = Number(rpt.completionPercent ?? rpt.completion_percent ?? 0);
+        if (Number.isFinite(pct)) completionRate = Math.max(0, Math.min(100, pct));
+      }
+    } catch {}
+    const manualApproved = taskHistory.filter((t) => String(t.title || "").includes("Kitap") || String(t.title || "").includes("Test")).length;
+    const tasksCompleted = Math.max(0, completedCount + manualApproved);
+    const activitiesCompleted = activityHistory.filter((a) => Number(a?.percent || 0) > 0).length;
+    const lessonsCompleted = lessonHistory.filter((l) => Number(l?.score || 0) > 0).length;
+    const blockCompleted = Array.isArray(blockStats?.runs)
+      ? blockStats.runs.filter((r) => Number(r?.percent || 0) > 0 || r?.completed).length
+      : 0;
+    const computeCompleted = Array.isArray(computeStats?.runs)
+      ? computeStats.runs.filter((r) => Number(r?.percent || 0) > 0 || r?.completed).length
+      : 0;
+    const quizCompleted = Math.max(0, Number(quizStats?.totalQuizzes || quizStats?.items?.length || 0));
+    const totalCompleted =
+      tasksCompleted + activitiesCompleted + blockCompleted + computeCompleted + lessonsCompleted + quizCompleted;
+    const metrics = {
+      quizCompleted,
+      tasksCompleted,
+      activitiesCompleted,
+      blockCompleted,
+      computeCompleted,
+      lessonsCompleted,
+      totalCompleted,
+      xp: Math.max(0, Number(getStudentXPValue(student) || 0)),
+      completionRate: completionRate ?? 0
+    };
+    const badges = buildBadgeProgresses(metrics);
+    renderBadgeGrid("student-detail-badges", badges, true);
+  } catch (e) {
+    console.warn("student badges render failed", e);
+  }
 
   currentStudentDetail = {
     student,
@@ -23510,8 +24638,12 @@ async function showStudentDetail(student, completions, rank) {
     activityHistory,
     lessonHistory,
     quizHistory,
-    quizStats
+    quizStats,
+    blockStats,
+    computeStats
   };
+  if (classRank) currentStudentDetail.classRank = classRank;
+  if (schoolRank) currentStudentDetail.schoolRank = schoolRank;
   
   if (!suppressStudentDetailModal) {
     document.getElementById("student-detail-modal").style.display = "flex";
@@ -24049,7 +25181,6 @@ async function renderStudentBlockRunReport(studentId) {
   container.innerHTML = '<div id="blockrun-summary">Yükleniyor...</div>';
   try {
     const stats = await fetchBlockRunStats(studentId);
-    const minutes = Math.floor((stats.totalDurationMs || 0) / 60000);
     const rows = (stats.runs || []).map((run, i) => `
       <tr>
         <td>${i + 1}. ${run.title || "Blok Kodlama Ödevi"}</td>
@@ -24059,22 +25190,6 @@ async function renderStudentBlockRunReport(studentId) {
       </tr>
     `).join("");
     const listHtml = `
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-        <div><strong>Bölümler Tamamlandı</strong></div>
-        <div>${stats.completedLevels} / ${stats.totalLevels}</div>
-      </div>
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-        <div><strong>Toplam XP</strong></div>
-        <div>${stats.totalXP} XP</div>
-      </div>
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-        <div><strong>İlerleme</strong></div>
-        <div>%${stats.progressPercent}</div>
-      </div>
-      <div style="display:flex; justify-content:space-between; align-items:center;">
-        <div><strong>Toplam Süre</strong></div>
-        <div>${minutes} dk</div>
-      </div>
       <div style="margin-top:10px; border-top:1px solid #e5e7eb; padding-top:8px;">
         <table style="width:100%; border-collapse:collapse; font-size:12px;">
           <thead>
@@ -24184,14 +25299,132 @@ function renderStudentQuizChart(quizHistory = [], quizStats = {}) {
   });
 }
 
+async function fetchMyStatsSummary() {
+  try {
+    const res = await getMyStatsSummary({});
+    return res?.data || null;
+  } catch {
+    return null;
+  }
+}
+
 async function loadMyStatsModal() {
   if (!currentUserId) return;
   try {
-    const completionsQuery = query(collection(db, "completions"), where("userId", "==", currentUserId));
-    const completionsSnap = await getDocs(completionsQuery);
+    ensureLeaderboardRowsLoaded();
+    const setText = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.innerText = String(val);
+    };
+    const renderChartsFromSummary = (summary) => {
+      if (!summary || summary.ok === false) return;
+      const taskCompleted = Math.max(0, Number(summary.completedCount || 0));
+      const taskTotal = Math.max(0, Number(summary.totalTasks || 0));
+      const activityCompleted = Math.max(0, Number(summary.activityCompleted || 0));
+      const activityTotal = Math.max(0, Number(summary.totalActivities || 0));
+      const lessonCompleted = Math.max(0, Number(summary.lessonCompleted || 0));
+      const lessonTotalRaw = Math.max(0, Number(summary.lessonTotal || 0));
+      const lessonTotal = Math.max(lessonTotalRaw, lessonCompleted);
+      const block2dCompleted = Math.max(0, Number(summary.block2DCompleted || 0));
+      const block2dTotal = Math.max(0, Number(summary.block2DTotal || 0));
+      const block3dCompleted = Math.max(0, Number(summary.block3DCompleted || 0));
+      const block3dTotal = Math.max(0, Number(summary.block3DTotal || 0));
+      const computeCompleted = Math.max(0, Number(summary.computeCompleted || 0));
+      const computeTotal = Math.max(0, Number(summary.computeTotal || 0));
+      const pythonCompleted = Math.max(0, Number(summary.pythonQuizCompleted || 0));
+      const pythonTotal = Math.max(0, Number(summary.pythonQuizTotal || 0));
 
-    const completions = [];
-    completionsSnap.forEach(docSnap => completions.push(docSnap.data()));
+      const safeChart = (destroyRef, canvasId, config, assign) => {
+        try {
+          const canvas = document.getElementById(canvasId);
+          if (!canvas || typeof Chart === "undefined") return;
+          if (destroyRef && typeof destroyRef.destroy === "function") destroyRef.destroy();
+          assign(new Chart(canvas, config));
+        } catch (chartErr) {
+          console.warn(`chart render failed: ${canvasId}`, chartErr);
+        }
+      };
+
+      safeChart(myStatsChart, "myTaskChart", {
+        type: "bar",
+        data: { labels: ["Yapılan", "Bekleyen"], datasets: [{ label: "Ödev", data: [taskCompleted, Math.max(0, taskTotal - taskCompleted)], backgroundColor: ["#22c55e", "#e5e7eb"], borderRadius: 8 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+      }, (c) => { myStatsChart = c; });
+
+      safeChart(myActivityChart, "myActivityChart", {
+        type: "bar",
+        data: { labels: ["Yapılan", "Bekleyen"], datasets: [{ label: "Etkinlik", data: [activityCompleted, Math.max(0, activityTotal - activityCompleted)], backgroundColor: ["#3b82f6", "#e5e7eb"], borderRadius: 8 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+      }, (c) => { myActivityChart = c; });
+
+      safeChart(myLessonChart, "myLessonChart", {
+        type: "bar",
+        data: { labels: ["Yapılan", "Bekleyen"], datasets: [{ label: "Dersler", data: [lessonCompleted, Math.max(0, lessonTotal - lessonCompleted)], backgroundColor: ["#14b8a6", "#e5e7eb"], borderRadius: 8 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+      }, (c) => { myLessonChart = c; });
+
+      safeChart(myBlockChart, "myBlockChart", {
+        type: "bar",
+        data: { labels: ["Yapılan", "Bekleyen"], datasets: [{ label: "Blok Kodlama (2D)", data: [block2dCompleted, Math.max(0, block2dTotal - block2dCompleted)], backgroundColor: ["#f59e0b", "#e5e7eb"], borderRadius: 8 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+      }, (c) => { myBlockChart = c; });
+
+      safeChart(myBlock3DChart, "myBlock3DChart", {
+        type: "bar",
+        data: { labels: ["Yapılan", "Bekleyen"], datasets: [{ label: "3D Blok Kodlama", data: [block3dCompleted, Math.max(0, block3dTotal - block3dCompleted)], backgroundColor: ["#f97316", "#e5e7eb"], borderRadius: 8 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+      }, (c) => { myBlock3DChart = c; });
+
+      safeChart(myComputeChart, "myComputeChart", {
+        type: "bar",
+        data: { labels: ["Yapılan", "Bekleyen"], datasets: [{ label: "Compute It", data: [computeCompleted, Math.max(0, computeTotal - computeCompleted)], backgroundColor: ["#8b5cf6", "#e5e7eb"], borderRadius: 8 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+      }, (c) => { myComputeChart = c; });
+
+      safeChart(myPythonQuizChart, "myPythonQuizChart", {
+        type: "bar",
+        data: { labels: ["Yapılan", "Bekleyen"], datasets: [{ label: "Python Quiz", data: [pythonCompleted, Math.max(0, pythonTotal - pythonCompleted)], backgroundColor: ["#6366f1", "#e5e7eb"], borderRadius: 8 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+      }, (c) => { myPythonQuizChart = c; });
+    };
+    let statsSummaryCache = null;
+    const applySummary = (summary) => {
+      if (!summary || summary.ok === false) return;
+      statsSummaryCache = summary;
+      myStatsSummaryCache = summary;
+      const classRankText = summary.classRank ? `${summary.classRank}.` : "—";
+      const schoolRankText = summary.schoolRank ? `${summary.schoolRank}.` : "—";
+      setText("student-hero-class-rank", classRankText);
+      setText("student-hero-school-rank", schoolRankText);
+      if (currentStudentDetail && currentStudentDetail.student && currentStudentDetail.student.id === currentUserId) {
+        currentStudentDetail.classRank = summary.classRank ?? null;
+        currentStudentDetail.schoolRank = summary.schoolRank ?? null;
+      }
+      setText("my-task-summary", `${summary.completedCount || 0}/${summary.totalTasks || 0} • %${summary.taskRate || 0}`);
+      setText("my-activity-summary", `${summary.activityCompleted || 0}/${summary.totalActivities || 0} • %${summary.activityRate || 0}`);
+      const lessonCompleted = Math.max(0, Number(summary.lessonCompleted || 0));
+      const lessonTotalRaw = Math.max(0, Number(summary.lessonTotal || 0));
+      const lessonTotal = Math.max(lessonTotalRaw, lessonCompleted);
+      const lessonRate = lessonTotal > 0 ? Math.round((lessonCompleted / lessonTotal) * 100) : Math.max(0, Number(summary.lessonRate || 0));
+      setText("my-lesson-summary", `${lessonCompleted}/${lessonTotal} • %${lessonRate}`);
+      setText("my-block2d-summary", `${summary.block2DCompleted || 0}/${summary.block2DTotal || 0} • %${summary.block2DRate || 0}`);
+      setText("my-block3d-summary", `${summary.block3DCompleted || 0}/${summary.block3DTotal || 0} • %${summary.block3DRate || 0}`);
+      setText("my-compute-summary", `${summary.computeCompleted || 0}/${summary.computeTotal || 0} • %${summary.computeRate || 0}`);
+      setText("my-python-quiz-summary", `${summary.pythonQuizCompleted || 0}/${summary.pythonQuizTotal || 0} • %${summary.pythonQuizRate || 0}`);
+      setText("my-total-xp", summary.totalXP || 0);
+      renderChartsFromSummary(summary);
+    };
+    fetchMyStatsSummary().then(applySummary).catch(() => {});
+
+    const completionsPromise = (isCompletionsLoaded)
+      ? Promise.resolve(Array.from(completedTasks.entries()).map(([taskId, c]) => ({ taskId, ...c })))
+      : getDocs(query(collection(db, "completions"), where("userId", "==", currentUserId)))
+          .then((snap) => {
+            const rows = [];
+            snap.forEach((docSnap) => rows.push(docSnap.data()));
+            return rows;
+          })
+          .catch(() => []);
 
     const tasks = Array.isArray(allTasks) ? allTasks : [];
     const assignmentsAll = Array.isArray(contentAssignments) ? contentAssignments : [];
@@ -24204,10 +25437,15 @@ async function loadMyStatsModal() {
     const studentTasks = tasks.filter(t => taskMatchesStudent(t));
     const totalTasks = studentTasks.length || 0;
     const approvedManualCount = studentTasks.filter(t => requiresTeacherApprovalTask(t) && bookTaskProgressMap.get(t.id)?.approved).length;
+    const [completions, quizStats, blockStats, computeStats] = await Promise.all([
+      completionsPromise,
+      fetchStudentQuizStats(currentUserId),
+      fetchBlockRunStats(currentUserId),
+      fetchComputeRunStats(currentUserId)
+    ]);
     const completedCount = completions.length + approvedManualCount;
     let totalScore = 0;
     const completionsXP = completions.reduce((sum, c) => sum + Math.max(0, Number(c.xpEarned || 0)), 0);
-    const quizStats = await fetchStudentQuizStats(currentUserId);
     const computedXP = completionsXP
       + getActivityXPFromProgressMap()
       + getBlockXPFromProgressMap()
@@ -24225,11 +25463,6 @@ async function loadMyStatsModal() {
     const avgScore = completedCount > 0 ? Math.round(totalScore / completedCount) : 0;
     const taskRate = totalTasks > 0 ? Math.round((completedCount / totalTasks) * 100) : 0;
 
-    const setText = (id, val) => {
-      const el = document.getElementById(id);
-      if (el) el.innerText = String(val);
-    };
-
     const assignments = assignmentsAll.filter(a => assignmentMatchesStudent(a));
     const totalActivities = assignments.length;
     let activityCompleted = 0;
@@ -24239,14 +25472,22 @@ async function loadMyStatsModal() {
     });
     const activityRate = totalActivities > 0 ? Math.round((activityCompleted / totalActivities) * 100) : 0;
 
-    const blockStats = await fetchBlockRunStats(currentUserId);
-    const computeStats = await fetchComputeRunStats(currentUserId);
     const lessonsForStudent = lessonsAll.filter((l) => lessonMatchesStudent(l));
-    const lessonCompleted = lessonsForStudent.filter((lesson) => {
+    const isLessonCompleted = (p = {}) => {
+      if (!p || typeof p !== "object") return false;
+      return Object.keys(p).length > 0;
+    };
+    let lessonCompleted = lessonsForStudent.filter((lesson) => {
       const p = lessonProgressMap.get(String(lesson.id)) || {};
-      return Number(p.percent || 0) >= 100;
+      return isLessonCompleted(p);
     }).length;
-    const lessonRate = lessonsForStudent.length > 0 ? Math.round((lessonCompleted / lessonsForStudent.length) * 100) : 0;
+    if ((!lessonProgressMap || lessonProgressMap.size === 0) && statsSummaryCache) {
+      lessonCompleted = Math.max(lessonCompleted, Number(statsSummaryCache.lessonCompleted || 0));
+    }
+    const lessonTotal = Math.max(lessonsForStudent.length, lessonCompleted);
+    const lessonRate = lessonTotal > 0
+      ? Math.round((lessonCompleted / lessonTotal) * 100)
+      : Math.round(Number(statsSummaryCache?.lessonRate || 0));
 
     const blockAssignmentsForStudent = (Array.isArray(blockAssignments) ? blockAssignments : [])
       .filter((a) => !a?.isDeleted && blockAssignmentMatchesStudent(a));
@@ -24285,7 +25526,7 @@ async function loadMyStatsModal() {
 
     setText("my-task-summary", `${completedCount}/${totalTasks} • %${taskRate}`);
     setText("my-activity-summary", `${activityCompleted}/${totalActivities} • %${activityRate}`);
-    setText("my-lesson-summary", `${lessonCompleted}/${lessonsForStudent.length} • %${lessonRate}`);
+    setText("my-lesson-summary", `${lessonCompleted}/${lessonTotal} • %${lessonRate}`);
     setText("my-block2d-summary", `${block2DCompleted}/${block2DAssignments.length} • %${block2DRate}`);
     setText("my-block3d-summary", `${block3DCompleted}/${block3DAssignments.length} • %${block3DRate}`);
     setText("my-compute-summary", `${computeCompleted}/${computeAssignmentsForStudent.length} • %${computeRate}`);
@@ -24368,7 +25609,7 @@ async function loadMyStatsModal() {
 
     safeChart(myLessonChart, "myLessonChart", {
       type: "bar",
-      data: { labels: ["Yapılan", "Bekleyen"], datasets: [{ label: "Dersler", data: [lessonCompleted, Math.max(0, lessonsForStudent.length - lessonCompleted)], backgroundColor: ["#14b8a6", "#e5e7eb"], borderRadius: 8 }] },
+      data: { labels: ["Yapılan", "Bekleyen"], datasets: [{ label: "Dersler", data: [lessonCompleted, Math.max(0, lessonTotal - lessonCompleted)], backgroundColor: ["#14b8a6", "#e5e7eb"], borderRadius: 8 }] },
       options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
     }, (c) => { myLessonChart = c; });
 
@@ -24412,6 +25653,8 @@ async function loadMyStatsModal() {
     currentStudentDetail = {
       student,
       rank: "-",
+      classRank: statsSummaryCache?.classRank ?? null,
+      schoolRank: statsSummaryCache?.schoolRank ?? null,
       totalTasks,
       completedCount,
       avgScore,
