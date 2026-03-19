@@ -1,0 +1,43 @@
+﻿# OS
+.DS_Store
+Thumbs.db
+
+# IDE / Editor
+.vscode/
+.idea/
+
+# Env / Secrets
+.env
+.env.*
+!.env.example
+
+# Laravel runtime
+/storage/*.key
+/storage/logs/*
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+/storage/app/public/*
+/bootstrap/cache/*
+!/bootstrap/cache/.gitignore
+
+# Dependencies
+/vendor/
+/node_modules/
+
+# Build / cache / temp
+/public/build/
+/public/hot
+/public/mix-manifest.json
+/public/*.map
+coverage/
+dist/
+build/
+tmp/
+temp/
+*.log
+
+# Test / local db artifacts
+.phpunit.result.cache
+*.sqlite
+*.sqlite3
