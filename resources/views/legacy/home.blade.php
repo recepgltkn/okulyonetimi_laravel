@@ -285,6 +285,25 @@
             color: rgba(15, 23, 42, 0.82);
             margin: 0;
         }
+        .student-hero-alert {
+            margin-top: 12px;
+            padding: 12px 14px;
+            border-radius: 14px;
+            border: 2px solid #dc2626;
+            background: linear-gradient(135deg, #fee2e2, #fecaca);
+            color: #7f1d1d;
+            box-shadow: 0 10px 24px rgba(220, 38, 38, 0.22);
+            display: none;
+        }
+        .student-hero-alert-title {
+            font-size: 0.92rem;
+            font-weight: 800;
+            margin-bottom: 4px;
+        }
+        .student-hero-alert-text {
+            font-size: 0.88rem;
+            font-weight: 700;
+        }
         .student-hero-stats {
             margin-top: 18px;
             display: grid;
@@ -1535,6 +1554,12 @@
         body.dark-mode .student-rank-pill {
             color: #f8fafc !important;
         }
+        body.dark-mode .student-hero-alert {
+            border-color: #ef4444 !important;
+            background: linear-gradient(135deg, rgba(127, 29, 29, 0.9), rgba(153, 27, 27, 0.8)) !important;
+            color: #fee2e2 !important;
+            box-shadow: 0 12px 28px rgba(239, 68, 68, 0.28) !important;
+        }
         body.dark-mode .student-rank-pill {
             background: linear-gradient(135deg, #1e3a8a, #1d4ed8) !important;
         }
@@ -2752,6 +2777,8 @@
         #side-menu.student-minimal #btn-open-compute-it-menu,
         #side-menu.student-minimal #btn-open-flowchart-app,
         #side-menu.student-minimal #btn-open-live-quiz,
+        #side-menu.student-minimal #btn-open-live-quiz-start,
+        #side-menu.student-minimal #btn-open-live-quiz-results,
         #side-menu.student-minimal #submenu-tasks,
         #side-menu.student-minimal #submenu-add,
         #side-menu.student-minimal #submenu-apps,
@@ -8713,6 +8740,10 @@
                     <div class="student-hero-kicker">Seviye haritan hazır</div>
                     <h2 id="student-hero-greeting" class="student-hero-title">Bugün neyi tamamlamak istersin?</h2>
                     <p id="student-hero-message" class="student-hero-message">Bekleyen görevlerini seç, ilerlemeni artır ve yeni puanlar kazan.</p>
+                    <div id="student-hero-pending-alert" class="student-hero-alert">
+                        <div class="student-hero-alert-title">Bekleyen çalışmaların var</div>
+                        <div id="student-hero-pending-alert-text" class="student-hero-alert-text">Ödev, etkinlik ve ders bekleyenlerin bitene kadar bu uyarı kalır.</div>
+                    </div>
                     <div class="student-hero-stats">
                         <div class="student-hero-stat">
                             <div class="student-hero-stat-label">Toplam XP</div>
@@ -10926,7 +10957,8 @@ Ayşe, Yılmaz, ayse, 123456, 9, B"></textarea>
             <div class="certificate-modal-head">
                 <h2 style="margin:0;">Sertifikalarım</h2>
                 <div style="display:flex;gap:8px;">
-                    <button id="btn-download-certificate" class="btn btn-primary">Önizle / Yazdır</button>
+                    <button id="btn-download-certificate" class="btn btn-primary">Önizle</button>
+                    <button id="btn-download-certificate-pdf" class="btn btn-primary">PDF İndir</button>
                     <button id="btn-close-certificates" class="btn" style="background:#eee;">Kapat</button>
                 </div>
             </div>

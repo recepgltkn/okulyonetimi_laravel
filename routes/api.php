@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ClientDataController;
+use App\Http\Controllers\ClientLiveQuizController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('client')->group(function () {
@@ -25,5 +26,22 @@ Route::prefix('client')->group(function () {
         Route::post('/docs/batch', [ClientDataController::class, 'batch']);
 
         Route::post('/callable/{name}', [ClientDataController::class, 'callable']);
+        Route::prefix('/live-quiz')->group(function () {
+            Route::post('/quizzes', [ClientLiveQuizController::class, 'createQuiz']);
+            Route::get('/quizzes', [ClientLiveQuizController::class, 'listMyQuizzes']);
+            Route::put('/quizzes/{quizId}', [ClientLiveQuizController::class, 'updateQuiz']);
+            Route::delete('/quizzes/{quizId}', [ClientLiveQuizController::class, 'deleteQuiz']);
+            Route::post('/sessions', [ClientLiveQuizController::class, 'startSession']);
+            Route::get('/sessions/active/teacher', [ClientLiveQuizController::class, 'getActiveTeacherSession']);
+            Route::get('/sessions/active/student', [ClientLiveQuizController::class, 'getActiveStudentSession']);
+            Route::get('/sessions/{sessionId}', [ClientLiveQuizController::class, 'getSession']);
+            Route::post('/sessions/{sessionId}/answer', [ClientLiveQuizController::class, 'submitAnswer']);
+            Route::post('/sessions/{sessionId}/lock', [ClientLiveQuizController::class, 'lockQuestion']);
+            Route::post('/sessions/{sessionId}/unlock', [ClientLiveQuizController::class, 'unlockQuestion']);
+            Route::post('/sessions/{sessionId}/next', [ClientLiveQuizController::class, 'nextQuestion']);
+            Route::post('/sessions/{sessionId}/finish', [ClientLiveQuizController::class, 'finishSession']);
+            Route::get('/sessions/{sessionId}/leaderboard', [ClientLiveQuizController::class, 'leaderboard']);
+        });
     });
 });
+

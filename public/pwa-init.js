@@ -45,7 +45,11 @@
   function registerServiceWorker() {
     if (!("serviceWorker" in navigator)) return;
     window.addEventListener("load", () => {
-      navigator.serviceWorker.register("/service-worker.js").catch(() => {});
+      const metaBaseUrl = String(
+        document.querySelector('meta[name="app-base-url"]')?.content || ""
+      ).trim().replace(/\/+$/, "");
+      const swUrl = `${metaBaseUrl || window.location.origin}/service-worker.js`;
+      navigator.serviceWorker.register(swUrl).catch(() => {});
     });
   }
 

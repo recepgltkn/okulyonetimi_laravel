@@ -1,6 +1,17 @@
-const APP_BASE_URL = String(
-  document.querySelector('meta[name="app-base-url"]')?.content || window.location.origin
-).replace(/\/+$/, "");
+const META_BASE_URL = String(
+  document.querySelector('meta[name="app-base-url"]')?.content || ""
+).trim().replace(/\/+$/, "");
+const currentDirBase = `${window.location.origin}${String(window.location.pathname || "").replace(/\/+$/, "")}`;
+const inferredPublicBase = (() => {
+  const path = String(window.location.pathname || "");
+  const idx = path.toLowerCase().indexOf("/public/");
+  if (idx >= 0) return `${window.location.origin}${path.slice(0, idx + "/public".length)}`;
+  if (path.toLowerCase().endsWith("/public")) return `${window.location.origin}${path}`;
+  return "";
+})();
+const metaHasPublic = /\/public$/i.test(META_BASE_URL);
+const fallbackPublicBase = /\/public$/i.test(currentDirBase) ? currentDirBase : `${currentDirBase}/public`;
+const APP_BASE_URL = (inferredPublicBase || (metaHasPublic ? META_BASE_URL : "") || fallbackPublicBase || window.location.origin).replace(/\/+$/, "");
 const API_BASE = `${APP_BASE_URL}/api/client`;
 
 async function api(path, method = "GET", body = null) {

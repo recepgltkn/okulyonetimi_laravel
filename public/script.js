@@ -9,6 +9,7 @@ import {
   onAuthStateChanged,
   signOut
 } from "./mysql-client-adapter.js";
+import { liveQuizClient } from "./live-quiz-client.js";
 import {
   getStore,
   doc,
@@ -38,6 +39,7 @@ const appConfig = {};
 
 const app = initializeApp(appConfig);
 const auth = getAuth(app);
+window.liveQuizClient = liveQuizClient;
 const secondaryApp = initializeApp(appConfig, "Secondary");
 const secondaryAuth = getAuth(secondaryApp);
 const db = getStore(app);
@@ -585,6 +587,7 @@ const LESSON_THEME_TEMPLATES = [
 ];
 
 function ensureLoggedOutView() {
+  stopTeacherLiveSessionPolling({ resetState: true });
   const loginScreen = document.getElementById("login-screen");
   const loginBtn = document.getElementById("btn-login");
   const appScreen = document.getElementById("app-screen");
@@ -2022,6 +2025,11 @@ function showLoadingNotice(msg = "Rapor hazırlanıyor...", color = "#1d4ed8") {
   };
 }
 
+function setLoadingNoticeText(msg) {
+  if (!loadingNoticeEl) return;
+  loadingNoticeEl.innerText = String(msg || "");
+}
+
 let reportLoadingOverlayEl = null;
 function showReportLoadingOverlay(msg = "Rapor hazırlanıyor, lütfen bekleyin") {
   if (reportLoadingOverlayEl) return;
@@ -2872,18 +2880,14 @@ async function loadTeacherLiveQuizList() {
   if (!list || userRole !== "teacher" || !currentUserId) return;
   list.innerHTML = `<div class="loading">Yükleniyor...</div>`;
   try {
-    const qx = query(collection(db, "liveQuizzes"), where("teacherId", "==", currentUserId));
-    const snap = await getDocs(qx);
-    const rows = [];
-    snap.forEach((d) => rows.push({ id: d.id, ...d.data() }));
-    rows.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-    const visibleRows = rows.filter((qz) => !qz?.isDeleted);
-    if (!visibleRows.length) {
+    const res = await liveQuizClient.listMyQuizzes();
+    const rows = Array.isArray(res?.quizzes) ? res.quizzes : [];
+    if (!rows.length) {
       list.innerHTML = `<div class="empty-state">Kayıtlı quiz yok.</div>`;
       return;
     }
     list.innerHTML = "";
-    visibleRows.forEach((qz) => {
+    rows.forEach((qz) => {
       const div = document.createElement("div");
       div.className = "list-item";
       div.innerHTML = `
@@ -3271,24 +3275,16 @@ async function saveLiveQuiz() {
     title,
     targetClass,
     targetSection,
-    teacherId: currentUserId,
     questions: liveQuizItems.map((q) => cloneLiveQuizQuestion(q)),
-    isDeleted: false,
-    updatedAt: serverTimestamp()
   };
   try {
-    if (liveQuizEditingId) await setDoc(doc(db, "liveQuizzes", liveQuizEditingId), payload, { merge: true });
-    else await addDoc(collection(db, "liveQuizzes"), { ...payload, createdAt: serverTimestamp() });
+    if (liveQuizEditingId) await liveQuizClient.updateQuiz(String(liveQuizEditingId), payload);
+    else await liveQuizClient.createQuiz(payload);
     showNotice("Quiz kaydedildi.", "#2ecc71");
     resetLiveQuizEditor();
     loadTeacherLiveQuizList();
   } catch (e) {
-    const msg = String(e?.message || "");
-    if (msg.toLowerCase().includes("packet bigger than")) {
-      showNotice("Quiz kaydedilemedi: Görsel boyutu çok büyük. Daha küçük görsel seçin.", "#e74c3c");
-    } else {
-      showNotice("Quiz kaydedilemedi.", "#e74c3c");
-    }
+    showNotice(`Quiz kaydedilemedi: ${String(e?.message || "")}`, "#e74c3c");
   }
 }
 
@@ -3325,19 +3321,8 @@ async function deleteLiveQuizById(quizId, quizTitle = "Quiz") {
 
 async function deleteOrArchiveLiveQuiz(quizId) {
   if (!quizId) throw new Error("missing-quiz-id");
-  const ref = doc(db, "liveQuizzes", String(quizId));
-  try {
-    await deleteDoc(ref);
-    return "deleted";
-  } catch (e) {
-    // Fallback for stricter rules: hide from UI via soft-delete.
-    await setDoc(ref, {
-      isDeleted: true,
-      deletedAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    }, { merge: true });
-    return "archived";
-  }
+  await liveQuizClient.deleteQuiz(String(quizId));
+  return "deleted";
 }
 
 async function startLiveSession(quiz) {
@@ -3346,34 +3331,14 @@ async function startLiveSession(quiz) {
     return;
   }
   try {
-    const fallbackDuration = 30;
-    const firstQuestionDuration = Math.max(
-      5,
-      Number(quiz?.questions?.[0]?.durationSec ?? quiz?.questions?.[0]?.duration ?? 0) || fallbackDuration
-    );
-    const now = Date.now();
-    const endsAtMs = now + (firstQuestionDuration * 1000);
-    const ref = await addDoc(collection(db, "liveQuizSessions"), {
-      teacherId: currentUserId,
-      quizId: quiz.id || null,
-      quizTitle: quiz.title || "Quiz",
-      questions: (quiz.questions || []).map((q) => cloneLiveQuizQuestion(q)),
-      questionDurationSec: fallbackDuration,
-      currentIndex: 0,
-      startedAtMs: now,
-      endsAtMs,
-      status: "live",
-      isLocked: false,
-      targetClass: quiz.targetClass || "",
-      targetSection: quiz.targetSection || "",
-      createdAt: serverTimestamp()
-    });
-    activeLiveSession = { id: ref.id, ...quiz, currentIndex: 0, endsAtMs, status: "live", questionDurationSec: fallbackDuration };
+    const res = await liveQuizClient.startSession({ quizId: String(quiz?.id || "") });
+    const s = res?.session || null;
+    activeLiveSession = s ? { ...s, id: String(s.id || ""), questions: Array.isArray(s.questions) ? s.questions : [] } : null;
     showNotice("Canlı quiz başlatıldı.", "#f97316");
     listenTeacherLiveSession();
     openTeacherLiveMonitor();
   } catch (e) {
-    showNotice("Canlı quiz başlatılamadı.", "#e74c3c");
+    showNotice(`Canlı quiz başlatılamadı: ${String(e?.message || "")}`, "#e74c3c");
   }
 }
 
@@ -3796,6 +3761,17 @@ function stopTeacherLiveTicker() {
   liveTeacherTick = null;
 }
 
+function stopTeacherLiveSessionPolling({ resetState = false } = {}) {
+  if (window.__teacherLivePollTimer) clearInterval(window.__teacherLivePollTimer);
+  window.__teacherLivePollTimer = null;
+  stopTeacherLiveTicker();
+  if (resetState) {
+    activeLiveSession = null;
+    teacherLiveMonitorScores = [];
+    teacherLiveMonitorAnswers = [];
+  }
+}
+
 function startTeacherLiveTicker() {
   stopTeacherLiveTicker();
   liveTeacherTick = setInterval(async () => {
@@ -4099,89 +4075,53 @@ function listenTeacherLiveSession() {
   liveSessionScoresUnsub = null;
   if (liveSessionAnswersUnsub) liveSessionAnswersUnsub();
   liveSessionAnswersUnsub = null;
-  stopTeacherLiveTicker();
+  stopTeacherLiveSessionPolling();
   if (userRole !== "teacher" || !currentUserId) return;
   startTeacherLiveTicker();
-  const qx = query(collection(db, "liveQuizSessions"), where("teacherId", "==", currentUserId));
-  liveSessionUnsub = onSnapshot(qx, (snap) => {
-    const sessions = [];
-    snap.forEach((d) => sessions.push({ id: d.id, ...d.data() }));
-    sessions.sort((a, b) => (b.startedAtMs || 0) - (a.startedAtMs || 0));
-    const live = sessions.find((s) => s.status === "live") || null;
-    activeLiveSession = live;
-    updateTeacherLiveMetaText(live);
-    if (!live) {
-      teacherLiveMonitorScores = [];
-      teacherLiveMonitorAnswers = [];
-      teacherLiveMonitorStudents = [];
-      teacherLiveMonitorStudentKey = "";
-      scheduleTeacherLiveMonitorRender(null);
-    } else {
-      ensureTeacherLiveMonitorStudents(live)
-        .then(() => scheduleTeacherLiveMonitorRender(live))
-        .catch(() => scheduleTeacherLiveMonitorRender(live));
-    }
-    if (live && Date.now() >= Number(live.endsAtMs || 0) && !liveAutoProgressing) {
-      liveAutoProgressing = true;
-      (async () => {
-        try {
-          const idx = Number(live.currentIndex || 0);
-          const total = Array.isArray(live.questions) ? live.questions.length : 0;
-          if (idx + 1 >= total) await teacherEndLiveSession("time");
-          else await teacherNextLiveQuestion();
-        } finally {
-          setTimeout(() => { liveAutoProgressing = false; }, 500);
-        }
-      })();
-    }
-
-    if (liveSessionScoresUnsub) liveSessionScoresUnsub();
-    liveSessionScoresUnsub = null;
-    if (liveSessionAnswersUnsub) liveSessionAnswersUnsub();
-    liveSessionAnswersUnsub = null;
-    if (!live) {
-      renderLiveTeacherRank([]);
-      renderTeacherAnswerStats(null, []);
-      return;
-    }
-    liveSessionScoresUnsub = onSnapshot(collection(db, "liveQuizSessions", live.id, "scores"), (sc) => {
-      const rows = [];
-      sc.forEach((d) => rows.push(d.data()));
-      rows.sort((a, b) => Number(b.xp || 0) - Number(a.xp || 0));
+  const poll = async () => {
+    try {
+      const activeRes = await liveQuizClient.getActiveTeacherSession();
+      const liveRaw = activeRes?.session || null;
+      const live = liveRaw ? { ...liveRaw, id: String(liveRaw.id || ""), questions: Array.isArray(liveRaw.questions) ? liveRaw.questions : [] } : null;
+      activeLiveSession = live;
+      updateTeacherLiveMetaText(live);
+      if (!live) {
+        teacherLiveMonitorScores = [];
+        teacherLiveMonitorAnswers = [];
+        renderLiveTeacherRank([]);
+        renderTeacherAnswerStats(null, []);
+        scheduleTeacherLiveMonitorRender(null);
+        return;
+      }
+      const lb = await liveQuizClient.leaderboard(String(live.id));
+      const rows = Array.isArray(lb?.rows) ? lb.rows : [];
       teacherLiveMonitorScores = rows;
+      teacherLiveMonitorAnswers = [];
       renderLiveTeacherRank(rows);
+      renderTeacherAnswerStats(live, []);
       scheduleTeacherLiveMonitorRender(live);
-    });
-    const answerQuery = query(
-      collection(db, "liveQuizSessions", live.id, "answers"),
-      where("qIndex", "==", Number(live.currentIndex || 0))
-    );
-    liveSessionAnswersUnsub = onSnapshot(answerQuery, (ansSnap) => {
-      const answers = [];
-      ansSnap.forEach((d) => answers.push(d.data()));
-      teacherLiveMonitorAnswers = answers;
-      renderTeacherAnswerStats(live, answers);
-      scheduleTeacherLiveMonitorRender(live);
-    });
-  });
+    } catch (e) {
+      if (Number(e?.status || 0) === 401) {
+        stopTeacherLiveSessionPolling({ resetState: true });
+      }
+    }
+  };
+  poll();
+  window.__teacherLivePollTimer = setInterval(poll, 2000);
 }
 
 async function teacherNextLiveQuestion() {
   if (!activeLiveSession?.id) return;
-  const ref = doc(db, "liveQuizSessions", activeLiveSession.id);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) return;
-  const s = snap.data();
-  const idx = Number(s.currentIndex || 0);
-  const total = Array.isArray(s.questions) ? s.questions.length : 0;
-  if (idx + 1 >= total) return teacherEndLiveSession("questions-completed");
-  const nextQuestion = s.questions?.[idx + 1] || null;
-  const duration = Math.max(5, Number(nextQuestion?.durationSec ?? nextQuestion?.duration ?? 0) || Math.max(10, Number(s.questionDurationSec || 30)));
-  await updateDoc(ref, {
-    currentIndex: idx + 1,
-    endsAtMs: Date.now() + duration * 1000,
-    isLocked: false
-  });
+  try {
+    const res = await liveQuizClient.next(String(activeLiveSession.id));
+    if (res?.finished) {
+      await teacherEndLiveSession("questions-completed");
+      return;
+    }
+    await listenTeacherLiveSession();
+  } catch (e) {
+    showNotice(`Soru geçişi başarısız: ${String(e?.message || "")}`, "#e74c3c");
+  }
 }
 
 async function persistLiveQuizResultsAndAwardXP(sessionId, sessionData = {}) {
@@ -4369,54 +4309,19 @@ async function repairLiveQuizResultRowsFromAnswers(rows = []) {
 
 async function teacherEndLiveSession(reason = "manual") {
   if (!activeLiveSession?.id) return;
-  const ref = doc(db, "liveQuizSessions", activeLiveSession.id);
-  const sessionSnap = await getDoc(ref);
-  if (!sessionSnap.exists()) return;
-  const sessionData = sessionSnap.data() || {};
-  const startedAtMs = Math.max(0, Number(sessionData.startedAtMs || 0));
-  if (sessionData.status === "finished") return;
-  const scoreSnap = await getDocs(collection(db, "liveQuizSessions", activeLiveSession.id, "scores"));
-  const scores = [];
-  scoreSnap.forEach((d) => scores.push(d.data()));
-  scores.sort((a, b) => Number(b.xp || 0) - Number(a.xp || 0));
-  const rankingRows = scores.map((s) => {
-    const answered = Math.max(0, Number(s.answered || 0));
-    const correct = Math.max(0, Number(s.correct || 0));
-    const wrong = Math.max(0, answered - correct);
-    const successRate = answered > 0 ? Math.round((correct / answered) * 100) : 0;
-    return {
-      userId: s.userId || "",
-      studentName: s.name || s.userId || "-",
-      correct,
-      wrong,
-      answered,
-      xpEarned: Math.max(0, Number(s.xp || 0)),
-      successRate,
-      durationMs: startedAtMs > 0 ? Math.max(0, Date.now() - startedAtMs) : 0,
-      durationMinutes: startedAtMs > 0 ? Math.round(((Date.now() - startedAtMs) / 60000) * 10) / 10 : 0,
-      finishedAtMs: Date.now()
-    };
-  });
-  if (rankingRows.length) {
-    const meta = `${sessionData.quizTitle || "Quiz"} • ${rankingRows.length} öğrenci tamamladı • Sonuç listesi`;
-    setTeacherHomeResultsView(getSortedQuizRanking(rankingRows), meta, activeLiveSession.id);
+  try {
+    await liveQuizClient.finish(String(activeLiveSession.id));
+    const lb = await liveQuizClient.leaderboard(String(activeLiveSession.id));
+    const rankingRows = getSortedQuizRanking(Array.isArray(lb?.rows) ? lb.rows : []);
+    if (rankingRows.length) {
+      const meta = `${activeLiveSession.quizTitle || "Quiz"} • ${rankingRows.length} öğrenci tamamladı • Sonuç listesi`;
+      setTeacherHomeResultsView(rankingRows, meta, String(activeLiveSession.id));
+    }
+    showNotice("Quiz bitti.", "#2ecc71");
+    await listenTeacherLiveSession();
+  } catch (e) {
+    showNotice(`Quiz bitirilemedi: ${String(e?.message || "")}`, "#e74c3c");
   }
-  const winner = scores[0] || null;
-  const finishedAtMs = Date.now();
-  await updateDoc(ref, {
-    status: "finished",
-    finishedAtMs,
-    finishReason: reason,
-    winnerId: winner?.userId || "",
-    winnerName: winner?.name || "",
-    winnerXP: winner?.xp || 0
-  });
-  await persistLiveQuizResultsAndAwardXP(activeLiveSession.id, {
-    ...sessionData,
-    finishReason: reason,
-    finishedAtMs
-  });
-  showNotice(winner ? `Quiz bitti. Kazanan: ${winner.name} (${winner.xp} XP)` : "Quiz bitti.", "#2ecc71");
 }
 
 async function teacherToggleLiveLock() {
@@ -4425,71 +4330,68 @@ async function teacherToggleLiveLock() {
     return;
   }
   try {
-    const ref = doc(db, "liveQuizSessions", activeLiveSession.id);
-    await updateDoc(ref, { isLocked: !activeLiveSession?.isLocked });
+    if (activeLiveSession?.isLocked) await liveQuizClient.unlock(String(activeLiveSession.id));
+    else await liveQuizClient.lock(String(activeLiveSession.id));
+    await listenTeacherLiveSession();
   } catch (e) {
-    showNotice("Kilit durumu güncellenemedi.", "#e74c3c");
+    showNotice(`Kilit durumu güncellenemedi: ${String(e?.message || "")}`, "#e74c3c");
   }
 }
 
 function startStudentLiveQuizListener() {
   if (studentLiveSessionUnsub) studentLiveSessionUnsub();
+  studentLiveSessionUnsub = null;
+  stopStudentLiveSessionPolling({ clearInvite: false, closePlayer: false });
   if (userRole !== "student" || !currentUserId) return;
-  const liveSessionsQuery = query(collection(db, "liveQuizSessions"), where("status", "==", "live"));
-  studentLiveSessionUnsub = onSnapshot(liveSessionsQuery, (snap) => {
-    const all = [];
-    snap.forEach((d) => all.push({ id: d.id, ...d.data() }));
-    all.sort((a, b) => Number(b.startedAtMs || 0) - Number(a.startedAtMs || 0));
-    const live = all.find((s) => {
-      if (s.status !== "live") return false;
-      if (!userData) return true;
-      if (!s.targetClass) return true;
-      if (s.targetClass !== (userData.className || "")) return false;
-      if (s.targetSection && s.targetSection !== (userData.section || "")) return false;
-      return true;
-    }) || null;
-    const previousSessionId = activeStudentLiveSession?.id || "";
-    activeStudentLiveSession = live;
-    if (previousSessionId && previousSessionId !== (live?.id || "")) {
-      syncStudentLiveQuizProgress(previousSessionId, true);
-    }
-    if (live?.id && live.id !== previousSessionId && lastStudentLiveSessionId !== live.id) {
-      lastStudentLiveSessionId = live.id;
-      syncStudentLiveQuizProgress(live.id, false);
-    }
-    if (previousSessionId !== (live?.id || "")) {
-      studentLiveAnswerCache = new Map();
-      studentLiveSubmittingAnswerKeys = new Set();
-      studentLivePendingAnswers = new Map();
-      studentLiveDoubleXpIntroShown = new Set();
-      studentLiveLocalQuestionTimer = { key: "", endsAtMs: 0 };
-    }
-    const invite = document.getElementById("live-quiz-invite");
-    const inviteText = document.getElementById("live-quiz-invite-text");
-    if (!invite || !inviteText) return;
-    if (live) {
-      inviteText.innerText = `“${live.quizTitle || "Canlı Quiz"}” başladı. Katılmak için tıklayın.`;
-      const playerOpen = document.getElementById("live-quiz-player")?.style.display === "flex";
-      if (!playerOpen) {
-        invite.style.display = "flex";
-        if (lastLiveInviteSessionId !== live.id) {
-          showNotice("?? Canlı quize katıl bildirimi", "#f97316");
-        }
+  const poll = async () => {
+    try {
+      const res = await liveQuizClient.getActiveStudentSession();
+      const liveRaw = res?.session || null;
+      const live = liveRaw ? { ...liveRaw, id: String(liveRaw.id || ""), questions: Array.isArray(liveRaw.questions) ? liveRaw.questions : [] } : null;
+      const previousSessionId = activeStudentLiveSession?.id || "";
+      activeStudentLiveSession = live;
+      if (previousSessionId !== (live?.id || "")) {
+        studentLiveAnswerCache = new Map();
+        studentLiveSubmittingAnswerKeys = new Set();
+        studentLivePendingAnswers = new Map();
+        studentLiveDoubleXpIntroShown = new Set();
+        studentLiveLocalQuestionTimer = { key: "", endsAtMs: 0 };
       }
-      lastLiveInviteSessionId = live.id;
-      if (playerOpen) renderStudentLiveQuestion();
-    } else {
-      lastLiveInviteSessionId = null;
-      lastStudentLiveSessionId = "";
-      studentLiveAnswerCache = new Map();
-      studentLiveSubmittingAnswerKeys = new Set();
-      studentLivePendingAnswers = new Map();
-      studentLiveDoubleXpIntroShown = new Set();
-      studentLiveLocalQuestionTimer = { key: "", endsAtMs: 0 };
-      invite.style.display = "none";
-      closeLivePlayer(true);
-    }
-  });
+      const invite = document.getElementById("live-quiz-invite");
+      const inviteText = document.getElementById("live-quiz-invite-text");
+      if (!invite || !inviteText) return;
+      if (live) {
+        inviteText.innerText = `“${live.quizTitle || "Canlı Quiz"}” başladı. Katılmak için tıklayın.`;
+        const playerOpen = document.getElementById("live-quiz-player")?.style.display === "flex";
+        invite.style.display = playerOpen ? "none" : "flex";
+        if (playerOpen) renderStudentLiveQuestion();
+        startStudentLiveScoresListener(live.id);
+      } else {
+        invite.style.display = "none";
+        stopStudentLiveScoresListener();
+        closeLivePlayer(true);
+      }
+    } catch (e) {}
+  };
+  poll();
+  window.__studentLivePollTimer = setInterval(poll, 2000);
+}
+
+function stopStudentLiveSessionPolling({ clearInvite = true, closePlayer = true } = {}) {
+  if (window.__studentLivePollTimer) clearInterval(window.__studentLivePollTimer);
+  window.__studentLivePollTimer = null;
+  stopStudentLiveScoresListener();
+  if (closePlayer) closeLivePlayer(true);
+  activeStudentLiveSession = null;
+  studentLiveAnswerCache = new Map();
+  studentLiveSubmittingAnswerKeys = new Set();
+  studentLivePendingAnswers = new Map();
+  studentLiveDoubleXpIntroShown = new Set();
+  studentLiveLocalQuestionTimer = { key: "", endsAtMs: 0 };
+  if (clearInvite) {
+    const invite = document.getElementById("live-quiz-invite");
+    if (invite) invite.style.display = "none";
+  }
 }
 
 async function resolveStudentLiveAnswer(sessionId, qIndex) {
@@ -4865,8 +4767,6 @@ async function submitStudentLiveAnswer(opt, idx) {
   };
   studentLivePendingAnswers.set(submitKey, pendingPayload);
   renderStudentLiveQuestion();
-  const answerId = `${currentUserId}_${qIndex}`;
-  const ansRef = doc(db, "liveQuizSessions", session.id, "answers", answerId);
   try {
     const cachedExisting = studentLiveAnswerCache.get(submitKey) || studentLivePendingAnswers.get(submitKey);
     if (cachedExisting?.answeredAtMs) {
@@ -4875,9 +4775,12 @@ async function submitStudentLiveAnswer(opt, idx) {
       renderStudentLiveQuestion();
       return;
     }
-    const isCorrect = isLiveAnswerCorrect(q, selectedKey);
-    const questionXP = Math.max(0, Number(q?.xp ?? MAX_QUESTION_XP)) * (q?.doubleXp ? 2 : 1);
-    const xp = isCorrect ? questionXP : 0;
+    const res = await liveQuizClient.submitAnswer(String(session.id), {
+      questionIndex: qIndex,
+      choice: selectedKey,
+    });
+    const isCorrect = !!res?.isCorrect;
+    const xp = Math.max(0, Number(res?.xp || 0));
     const answerPayload = {
       userId: currentUserId,
       name: getUserDisplayName(userData || {}),
@@ -4885,36 +4788,20 @@ async function submitStudentLiveAnswer(opt, idx) {
       selectedKey,
       selected: opt,
       isCorrect,
-      xp,
       answeredAtMs: Date.now()
     };
-
-    // Öğretmen paneline düşen asıl veri answers koleksiyonudur; önce bunu yazıp UI'ı anında güncelle.
-    await setDoc(ansRef, answerPayload);
     studentLivePendingAnswers.delete(submitKey);
     studentLiveAnswerCache.set(submitKey, answerPayload);
-    showNotice(isCorrect ? `Doğru! +${questionXP} XP` : "Yanlış cevap.", isCorrect ? "#2ecc71" : "#e74c3c");
+    showNotice(isCorrect ? `Doğru! +${xp} XP` : "Yanlış cevap.", isCorrect ? "#2ecc71" : "#e74c3c");
     renderStudentLiveQuestion();
-
-    const writes = [
-      upsertLiveScoreAndAwardXP(session.id, {
-        isCorrect,
-        xp,
-        name: getUserDisplayName(userData || {})
-      })
-    ];
-    const [xpGranted] = await Promise.all(writes);
-    if (xp > 0 && xpGranted) {
+    if (xp > 0) {
       if (userData) userData.xp = Math.max(0, Number(userData.xp || 0)) + xp;
       updateUserXPDisplay();
       addStudentQuizPoints(xp);
-    } else if (xp > 0 && !xpGranted) {
-      showNotice("XP şu an kaydedilemedi, quiz sonunda tekrar denenecek.", "#f39c12");
     }
-    await syncStudentLiveQuizProgress(session.id, false);
   } catch (e) {
     studentLivePendingAnswers.delete(submitKey);
-    showNotice("Cevap/XP kaydedilemedi, tekrar deneyin.", "#e74c3c");
+    showNotice(`Cevap kaydedilemedi: ${String(e?.message || "")}`, "#e74c3c");
     renderStudentLiveQuestion();
   } finally {
     studentLiveSubmittingAnswerKeys.delete(submitKey);
@@ -4951,8 +4838,6 @@ async function submitStudentLiveMatchingAnswer(selectedMap = {}) {
   };
   studentLivePendingAnswers.set(submitKey, pendingPayload);
   renderStudentLiveQuestion();
-  const answerId = `${currentUserId}_${qIndex}`;
-  const ansRef = doc(db, "liveQuizSessions", session.id, "answers", answerId);
   try {
     const cachedExisting = studentLiveAnswerCache.get(submitKey) || studentLivePendingAnswers.get(submitKey);
     if (cachedExisting?.answeredAtMs) {
@@ -4961,9 +4846,12 @@ async function submitStudentLiveMatchingAnswer(selectedMap = {}) {
       renderStudentLiveQuestion();
       return;
     }
-    const isCorrect = isLiveAnswerCorrect(q, normalizedMap);
-    const questionXP = Math.max(0, Number(q?.xp ?? MAX_QUESTION_XP)) * (q?.doubleXp ? 2 : 1);
-    const xp = isCorrect ? questionXP : 0;
+    const res = await liveQuizClient.submitAnswer(String(session.id), {
+      questionIndex: qIndex,
+      choice: normalizedMap,
+    });
+    const isCorrect = !!res?.isCorrect;
+    const xp = Math.max(0, Number(res?.xp || 0));
     const answerPayload = {
       userId: currentUserId,
       name: getUserDisplayName(userData || {}),
@@ -4972,35 +4860,20 @@ async function submitStudentLiveMatchingAnswer(selectedMap = {}) {
       selectedMap: normalizedMap,
       selected: "Eşleştirme",
       isCorrect,
-      xp,
       answeredAtMs: Date.now()
     };
-
-    await setDoc(ansRef, answerPayload);
     studentLivePendingAnswers.delete(submitKey);
     studentLiveAnswerCache.set(submitKey, answerPayload);
-    showNotice(isCorrect ? `Eşleştirme doğru! +${questionXP} XP` : "Eşleştirme yanlış.", isCorrect ? "#2ecc71" : "#e74c3c");
+    showNotice(isCorrect ? `Eşleştirme doğru! +${xp} XP` : "Eşleştirme yanlış.", isCorrect ? "#2ecc71" : "#e74c3c");
     renderStudentLiveQuestion();
-
-    const writes = [
-      upsertLiveScoreAndAwardXP(session.id, {
-        isCorrect,
-        xp,
-        name: getUserDisplayName(userData || {})
-      })
-    ];
-    const [xpGranted] = await Promise.all(writes);
-    if (xp > 0 && xpGranted) {
+    if (xp > 0) {
       if (userData) userData.xp = Math.max(0, Number(userData.xp || 0)) + xp;
       updateUserXPDisplay();
       addStudentQuizPoints(xp);
-    } else if (xp > 0 && !xpGranted) {
-      showNotice("XP şu an kaydedilemedi, quiz sonunda tekrar denenecek.", "#f39c12");
     }
-    await syncStudentLiveQuizProgress(session.id, false);
   } catch (e) {
     studentLivePendingAnswers.delete(submitKey);
-    showNotice("Cevap/XP kaydedilemedi, tekrar deneyin.", "#e74c3c");
+    showNotice(`Cevap kaydedilemedi: ${String(e?.message || "")}`, "#e74c3c");
     renderStudentLiveQuestion();
   } finally {
     studentLiveSubmittingAnswerKeys.delete(submitKey);
@@ -5026,19 +4899,22 @@ function renderStudentLiveRank(rows = []) {
 }
 
 function stopStudentLiveScoresListener() {
-  if (livePlayerScoresUnsub) livePlayerScoresUnsub();
-  livePlayerScoresUnsub = null;
+  if (window.__studentLiveScorePollTimer) clearInterval(window.__studentLiveScorePollTimer);
+  window.__studentLiveScorePollTimer = null;
 }
 
 function startStudentLiveScoresListener(sessionId) {
   stopStudentLiveScoresListener();
   if (!sessionId) return;
-  livePlayerScoresUnsub = onSnapshot(collection(db, "liveQuizSessions", sessionId, "scores"), (snap) => {
-    const rows = [];
-    snap.forEach((d) => rows.push(d.data()));
-    rows.sort((a, b) => Number(b.xp || 0) - Number(a.xp || 0));
-    renderStudentLiveRank(rows);
-  });
+  const poll = async () => {
+    try {
+      const lb = await liveQuizClient.leaderboard(String(sessionId));
+      const rows = Array.isArray(lb?.rows) ? lb.rows : [];
+      renderStudentLiveRank(rows);
+    } catch (e) {}
+  };
+  poll();
+  window.__studentLiveScorePollTimer = setInterval(poll, 2000);
 }
 
 function updateLivePlayerTimer(leftSeconds) {
@@ -5158,6 +5034,8 @@ async function handleUserLogout({ closeSideMenu = true, closeDropdown = true } =
   if (logoutInProgress) return;
   logoutInProgress = true;
   stopProfileChangeApprovalsListener();
+  stopStudentLiveSessionPolling();
+  stopTeacherLiveSessionPolling({ resetState: true });
   if (userProfileUnsub) {
     try { userProfileUnsub(); } catch (e) {}
     userProfileUnsub = null;
@@ -6651,11 +6529,7 @@ function normalizeUserRole(rawRole) {
 function isSystemAdminUser(profile = null) {
   const role = String(profile?.role || "").trim().toLowerCase();
   if (role === "admin" || role === "administrator") return true;
-  const username = String(profile?.username || profile?.name || "").trim().toLowerCase();
-  const email = String(profile?.email || "").trim().toLowerCase();
-  if (username === "dogu") return true;
-  if (email === "dogu" || email.startsWith("dogu@")) return true;
-  return false;
+  return profile?.isAdmin === true;
 }
 
 function getStrictUserRole(rawRole) {
@@ -6698,15 +6572,17 @@ async function resolveExistingUserProfileByAuth(authUser) {
     const candidates = [email, usernameGuess].filter(Boolean);
     for (const candidate of candidates) {
       const [usernameSnap, emailSnap] = await Promise.all([
-        getDocs(query(collection(db, "users"), where("username", "==", candidate), limit(1))),
-        getDocs(query(collection(db, "users"), where("email", "==", candidate), limit(1)))
+        getDocs(query(collection(db, "users"), where("username", "==", candidate))),
+        getDocs(query(collection(db, "users"), where("email", "==", candidate)))
       ]);
-      if (!usernameSnap.empty) {
-        const d = usernameSnap.docs[0];
+      if (!emailSnap.empty) {
+        if (emailSnap.docs.length !== 1) return null;
+        const d = emailSnap.docs[0];
         return { id: d.id, data: d.data() || {} };
       }
-      if (!emailSnap.empty) {
-        const d = emailSnap.docs[0];
+      if (!usernameSnap.empty) {
+        if (usernameSnap.docs.length !== 1) return null;
+        const d = usernameSnap.docs[0];
         return { id: d.id, data: d.data() || {} };
       }
     }
@@ -9771,6 +9647,26 @@ if (openLiveQuizMenuBtn) {
   openLiveQuizMenuBtn.onclick = function() {
     if (userRole !== "teacher") return;
     openLiveQuizModal();
+    setLiveQuizTab("create");
+    prepareNewLiveQuizQuestionForm();
+    document.getElementById("side-menu").style.width = "0";
+  };
+}
+const openLiveQuizStartMenuBtn = document.getElementById("btn-open-live-quiz-start");
+if (openLiveQuizStartMenuBtn) {
+  openLiveQuizStartMenuBtn.onclick = function() {
+    if (userRole !== "teacher") return;
+    openLiveQuizModal();
+    setLiveQuizTab("start");
+    document.getElementById("side-menu").style.width = "0";
+  };
+}
+const openLiveQuizResultsMenuBtn = document.getElementById("btn-open-live-quiz-results");
+if (openLiveQuizResultsMenuBtn) {
+  openLiveQuizResultsMenuBtn.onclick = function() {
+    if (userRole !== "teacher") return;
+    openLiveQuizModal();
+    setLiveQuizTab("results");
     document.getElementById("side-menu").style.width = "0";
   };
 }
@@ -10926,6 +10822,14 @@ if (downloadCertificateBtn) {
     if (userRole !== "student") return;
     renderStudentCertificateCard();
     downloadStudentCertificatePdf();
+  };
+}
+const downloadCertificatePdfBtn = document.getElementById("btn-download-certificate-pdf");
+if (downloadCertificatePdfBtn) {
+  downloadCertificatePdfBtn.onclick = function() {
+    if (userRole !== "student") return;
+    renderStudentCertificateCard();
+    downloadStudentCertificatePdf({ autoPrint: true });
   };
 }
 
@@ -12483,6 +12387,7 @@ document.getElementById("btn-preview-content").onclick = function () {
 onAuthStateChanged(auth, (user) => {
   const loginScreen = document.getElementById("login-screen");
   const appScreen = document.getElementById("app-screen");
+  myStatsSummaryCache = null;
 
   if (!user) {
     flushAuthReadyWaiters(false);
@@ -12537,11 +12442,8 @@ onAuthStateChanged(auth, (user) => {
     stopTeacherLiveTicker();
     if (studentLiveSessionUnsub) studentLiveSessionUnsub();
     studentLiveSessionUnsub = null;
-    stopStudentLiveScoresListener();
+    stopStudentLiveSessionPolling();
     lastLiveInviteSessionId = null;
-    closeLivePlayer(true);
-    const invite = document.getElementById("live-quiz-invite");
-    if (invite) invite.style.display = "none";
     if (activityProgressUnsub) activityProgressUnsub();
     activityProgressUnsub = null;
     activityProgressMap.clear();
@@ -12646,6 +12548,7 @@ onAuthStateChanged(auth, (user) => {
     logoutInProgress = false;
   }
   currentUserId = user.uid;
+  myStatsSummaryCache = null;
   lastTaskXP = 0;
   contentProgressMap.clear();
   blockAssignmentProgressMap.clear();
@@ -12701,7 +12604,7 @@ onAuthStateChanged(auth, (user) => {
       if (!userData.ownedAvatarIds.includes(userData.selectedAvatarId)) {
         userData.ownedAvatarIds = normalizeOwnedAvatarIds([...userData.ownedAvatarIds, userData.selectedAvatarId]);
       }
-      if (isForcedTeacherAlias(user, userData) || await shouldPromoteToTeacherByAlias(user, userData.role)) {
+      if (isSystemAdminUser(userData)) {
         userData.role = "teacher";
       }
       userData.id = user.uid;
@@ -12726,7 +12629,7 @@ onAuthStateChanged(auth, (user) => {
       if (!userData.ownedAvatarIds.includes(userData.selectedAvatarId)) {
         userData.ownedAvatarIds = normalizeOwnedAvatarIds([...userData.ownedAvatarIds, userData.selectedAvatarId]);
       }
-      if (isForcedTeacherAlias(user, userData) || await shouldPromoteToTeacherByAlias(user, userData.role)) {
+      if (isSystemAdminUser(userData)) {
         userData.role = "teacher";
       }
       userRole = userData.role;
@@ -12759,7 +12662,7 @@ onAuthStateChanged(auth, (user) => {
     renderStudentAdventureBoard();
     syncMobileOpenMenuPlacement();
 
-    const isTeacher = userRole === "teacher";
+    const isTeacher = getStrictUserRole(userRole) === "teacher" || isSystemAdminUser(userData);
     const sideMenu = document.getElementById("side-menu");
     if (sideMenu) sideMenu.classList.toggle("student-minimal", !isTeacher);
     if (appScreen) {
@@ -12895,6 +12798,10 @@ onAuthStateChanged(auth, (user) => {
     if (lessonsListMenuBtn) lessonsListMenuBtn.style.display = isTeacher ? "block" : "none";
     const liveQuizMenuBtn = document.getElementById("btn-open-live-quiz");
     if (liveQuizMenuBtn) liveQuizMenuBtn.style.display = isTeacher ? "block" : "none";
+    const liveQuizStartMenuBtn = document.getElementById("btn-open-live-quiz-start");
+    if (liveQuizStartMenuBtn) liveQuizStartMenuBtn.style.display = isTeacher ? "block" : "none";
+    const liveQuizResultsMenuBtn = document.getElementById("btn-open-live-quiz-results");
+    if (liveQuizResultsMenuBtn) liveQuizResultsMenuBtn.style.display = isTeacher ? "block" : "none";
     const homeBtn = document.getElementById("btn-open-home");
     if (homeBtn) homeBtn.style.display = "block";
     if (!isTeacher) {
@@ -12973,7 +12880,7 @@ onAuthStateChanged(auth, (user) => {
       liveSessionScoresUnsub = null;
       if (liveSessionAnswersUnsub) liveSessionAnswersUnsub();
       liveSessionAnswersUnsub = null;
-      stopTeacherLiveTicker();
+      stopTeacherLiveSessionPolling({ resetState: true });
       loadStudentCompletions(user.uid);
       startContentProgressListener();
       startBookTaskProgressListener();
@@ -14433,6 +14340,35 @@ function buildLeaderboardRankedRows(users = []) {
   });
 }
 
+function getLeaderboardPreviewRows(rows = [], maxRows = 7) {
+  const list = Array.isArray(rows) ? rows.slice() : [];
+  const topRows = list.slice(0, maxRows);
+  const meIndex = list.findIndex((u) => String(u?.id || "") === String(currentUserId || ""));
+  if (meIndex < 0) return topRows;
+  const meRow = list[meIndex];
+  const alreadyVisible = topRows.some((u) => String(u?.id || "") === String(meRow?.id || ""));
+  if (alreadyVisible) return topRows;
+  if (topRows.length < maxRows) {
+    topRows.push(meRow);
+    return prioritizeCurrentUserInTieGroup(topRows);
+  }
+  topRows[topRows.length - 1] = meRow;
+  return prioritizeCurrentUserInTieGroup(topRows);
+}
+
+function prioritizeCurrentUserInTieGroup(rows = []) {
+  const list = Array.isArray(rows) ? rows.slice() : [];
+  const meIndex = list.findIndex((u) => String(u?.id || "") === String(currentUserId || ""));
+  if (meIndex < 0) return list;
+  const myRank = Number(list[meIndex]?.rank || 0);
+  if (!myRank) return list;
+  const firstSameRankIndex = list.findIndex((u) => Number(u?.rank || 0) === myRank);
+  if (firstSameRankIndex < 0 || firstSameRankIndex === meIndex) return list;
+  const [meRow] = list.splice(meIndex, 1);
+  list.splice(firstSameRankIndex, 0, meRow);
+  return list;
+}
+
 async function ensureLeaderboardRowsLoaded() {
   if (leaderboardRowsCache.length) return leaderboardRowsCache;
   if (leaderboardRowsLoadPromise) return leaderboardRowsLoadPromise;
@@ -14473,7 +14409,7 @@ function renderLeaderboardPreview(rows = []) {
     renderStudentAdventureBoard();
     return;
   }
-  const topRows = rows.slice(0, 7);
+  const topRows = getLeaderboardPreviewRows(rows, 7);
   topRows.forEach((u) => {
     const li = document.createElement("li");
     li.className = `top-student-row rank-${Math.min(3, Number(u.rank || 99))}`;
@@ -14514,7 +14450,7 @@ function renderStudentTopStudentsList(rows = []) {
     list.innerHTML = `<div class="empty-state">Sıralama verisi bulunamadı.</div>`;
     return;
   }
-  const topRows = rows.slice(0, 7);
+  const topRows = getLeaderboardPreviewRows(rows, 7);
   topRows.forEach((u, idx) => {
     const row = document.createElement("div");
     row.className = `top-student-row rank-${Math.min(3, Number(u.rank || idx + 1))}`;
@@ -16256,6 +16192,32 @@ async function openStudentReportWindow(detail) {
     if (isBlankRank(classRank) && remoteRanks.classRank) classRank = remoteRanks.classRank;
     if (isBlankRank(schoolRank) && remoteRanks.schoolRank) schoolRank = remoteRanks.schoolRank;
   }
+  const overallPercent = Math.max(0, Math.min(100, Number(combinedCompletionRate || 0)));
+  const pendingTotal = Math.max(0, Number(combinedTotal || 0) - Number(combinedCompleted || 0));
+  const analysisItems = [
+    overallPercent >= 70
+      ? "Genel tamamlama oranı güçlü seviyede. Bu tempoyu koruyup haftalık tekrar planı ile kalıcılığı artırabilirsin."
+      : "Genel tamamlama oranı geliştirilebilir düzeyde. Önce kısa sürede bitirilebilen görevlerle ivme kazanman önerilir.",
+    pendingTotal > 0
+      ? `Bekleyen toplam ${pendingTotal} çalışma var. Önceliği ödev ve derslerdeki yakın hedeflere vermen performansı hızla yükseltir.`
+      : "Bekleyen çalışma görünmüyor. Yeni görevler açıldığında ilk 24 saat içinde başlamak ilerleme ritmini korur.",
+    Number(taskPendingCount || 0) > 0 || Math.max(0, Number(lessonTotalCount || 0) - Number(lessonCompletedCount || 0)) > 0
+      ? "Her gün en az 1 ödev veya 1 ders tamamlayarak düzenli ilerleme alışkanlığı oluşturabilirsin."
+      : "Ödev ve ders tarafı düzenli görünüyor. Bu dengeyi korumak için haftalık mini-hedef listesi kullanabilirsin.",
+    Number(computePendingCount || 0) > 0 || Number(blockPendingCount || 0) > 0
+      ? "Kodlama uygulamalarında günlük 20-25 dakikalık kısa seanslar, bekleyen seviyeleri daha sürdürülebilir şekilde bitirmeni sağlar."
+      : "Kodlama uygulamalarında istikrar yüksek. Öğrendiklerini yeni seviyelerde farklı çözüm yolları deneyerek pekiştirebilirsin."
+  ];
+  const strengths = [
+    { label: "Genel İlerleme", score: overallPercent, text: `Genel ilerleme oranı %${overallPercent} ile düzenli çalışma alışkanlığı gösteriyor.` },
+    { label: "Görev Tamamlama", score: Number(taskTotalCount || 0) > 0 ? Math.round((Number(taskCompletedCount || 0) / Number(taskTotalCount || 1)) * 100) : 0, text: `Ödev tamamlama oranı güçlü; tamamlanan görevler düzenli takip edildiğini gösteriyor.` },
+    { label: "Ders Katılımı", score: Number(lessonTotalCount || 0) > 0 ? Math.round((Number(lessonCompletedCount || 0) / Number(lessonTotalCount || 1)) * 100) : 0, text: `Ders ilerleme performansı istikrarlı; içerikleri tamamlama konusunda sürdürülebilir bir ritim var.` },
+    { label: "Uygulama Performansı", score: Number(group2Total || 0) > 0 ? Math.round((Number(group2Completed || 0) / Number(group2Total || 1)) * 100) : 0, text: `Kodlama ve uygulama alanında gelişim açıkça görülüyor; pratik istikrarı yüksek.` },
+    { label: "Sorumluluk Yönetimi", score: pendingTotal === 0 ? 100 : Math.max(0, 100 - Math.min(100, pendingTotal * 8)), text: `Bekleyen işlerini yönetme becerisi gelişmiş; görevlerini planlı biçimde ilerletiyorsun.` }
+  ]
+    .sort((a, b) => Number(b.score || 0) - Number(a.score || 0))
+    .slice(0, 3)
+    .map((item) => item.text);
   
   reportWindow.document.write(`
     <html lang="tr">
@@ -16450,6 +16412,7 @@ async function openStudentReportWindow(detail) {
     </head>
     <body>
       <div class="actions actions-fixed no-print">
+        <button id="downloadFileBtn" class="btn btn-secondary">Raporu İndir</button>
         <button id="downloadBtn" class="btn btn-primary">Yazdır</button>
         <button id="closeBtn" class="btn btn-secondary">Kapat</button>
       </div>
@@ -16502,6 +16465,12 @@ async function openStudentReportWindow(detail) {
                 <div style="font-size:11px; color:#475569;">Toplam: ${group2Total} • Tamamlandı: ${group2Completed}</div>
               </div>
             </div>
+          </div>
+          <div class="card">
+            <div class="section-title">Analiz ve Gelişim Planı</div>
+            <ul style="margin:8px 0 0 16px; padding:0; line-height:1.65; color:#334155;">
+              ${analysisItems.map((x) => `<li style="margin-bottom:6px;">${x}</li>`).join("")}
+            </ul>
           </div>
           <div class="card">
             <div class="section-title">Kazanılan Rozetler</div>
@@ -16580,6 +16549,29 @@ async function openStudentReportWindow(detail) {
             </div>
           </div>
       </div>
+      <div class="page content-page">
+        <div class="card header">
+          <div style="flex:1;">
+            <img src="logo.png" alt="Logo" class="logo" />
+            <div class="title">Öğrenci Gelişim Raporu • Sayfa 2</div>
+            <div class="subtitle">Güçlü Yönler ve Odak Alanları</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="section-title">Nelerde İyi? (3 Madde)</div>
+          <ol style="margin:8px 0 0 18px; padding:0; line-height:1.75; color:#1e293b; font-weight:600;">
+            ${strengths.map((x) => `<li style="margin-bottom:8px;">${x}</li>`).join("")}
+          </ol>
+        </div>
+        <div class="card">
+          <div class="section-title">Kısa Eylem Planı</div>
+          <ul style="margin:8px 0 0 16px; padding:0; line-height:1.65; color:#334155;">
+            <li>Her gün en az 1 bekleyen görev tamamla.</li>
+            <li>Kodlama uygulamaları için günlük kısa tekrar oturumu planla.</li>
+            <li>Haftalık ilerleme yüzdesini kontrol edip bir sonraki hedefini yazılı belirle.</li>
+          </ul>
+        </div>
+      </div>
       <script>
         window.reportData = ${JSON.stringify({ studentName, classInfo, stats, contentStats, history: detail.taskHistory.slice(0, 10) })};
       </script>
@@ -16589,8 +16581,26 @@ async function openStudentReportWindow(detail) {
   reportWindow.document.close();
   
   reportWindow.onload = () => {
+    const downloadFileBtn = reportWindow.document.getElementById("downloadFileBtn");
     const btn = reportWindow.document.getElementById("downloadBtn");
     const closeBtn = reportWindow.document.getElementById("closeBtn");
+    if (downloadFileBtn) {
+      downloadFileBtn.onclick = () => {
+        const safeName = String(studentName || "ogrenci").replace(/[^a-z0-9_-]+/gi, "_");
+        const datePart = new Date().toISOString().slice(0, 10);
+        const html = "<!doctype html>\\n" + reportWindow.document.documentElement.outerHTML;
+        const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+        const a = reportWindow.document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `${safeName}_gelisim_raporu_${datePart}.html`;
+        reportWindow.document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          URL.revokeObjectURL(a.href);
+          try { a.remove(); } catch (e) {}
+        }, 1500);
+      };
+    }
     if (btn) {
       btn.onclick = () => {
         reportWindow.focus();
@@ -20111,8 +20121,9 @@ function renderStudentCertificateCard() {
   }
 }
 
-async function downloadStudentCertificatePdf() {
+async function downloadStudentCertificatePdf(options = {}) {
   try {
+    const autoPrint = !!options.autoPrint;
     const student = userData || {};
     const summary = getStudentCertificateSummary();
     const fullName = getUserDisplayName(student);
@@ -20128,7 +20139,8 @@ async function downloadStudentCertificatePdf() {
     }];
     openCertificatePreviewWindow({
       title: `${fullName} Sertifikası`,
-      pages
+      pages,
+      autoPrint
     });
   } catch (e) {
     console.error("certificate pdf", e);
@@ -20276,7 +20288,7 @@ function getCertificatePreviewStyles() {
   `;
 }
 
-function openCertificatePreviewWindow({ title, pages }) {
+function openCertificatePreviewWindow({ title, pages, autoPrint = false }) {
   const reportWindow = window.open("", "_blank");
   if (!reportWindow) {
     showNotice("Yeni sekme açılamadı.", "#e74c3c");
@@ -20295,7 +20307,8 @@ function openCertificatePreviewWindow({ title, pages }) {
       </head>
       <body>
         <div class="toolbar">
-          <button id="certPrintBtn" class="btn btn-primary">PDF / Yazdır</button>
+          <button id="certDownloadBtn" class="btn btn-primary">PDF İndir</button>
+          <button id="certPrintBtn" class="btn btn-primary">Yazdır</button>
           <button id="certCloseBtn" class="btn btn-danger">Kapat</button>
         </div>
         ${bodyHtml || "<div style='padding:20px;background:#fff;border-radius:12px;border:1px solid #e5e7eb;'>Sertifika verisi bulunamadı.</div>"}
@@ -20304,6 +20317,13 @@ function openCertificatePreviewWindow({ title, pages }) {
   `);
   reportWindow.document.close();
   reportWindow.onload = () => {
+    const downloadBtn = reportWindow.document.getElementById("certDownloadBtn");
+    if (downloadBtn) {
+      downloadBtn.onclick = () => {
+        reportWindow.focus();
+        reportWindow.print();
+      };
+    }
     const printBtn = reportWindow.document.getElementById("certPrintBtn");
     if (printBtn) {
       printBtn.onclick = () => {
@@ -20313,6 +20333,12 @@ function openCertificatePreviewWindow({ title, pages }) {
     }
     const closeBtn = reportWindow.document.getElementById("certCloseBtn");
     if (closeBtn) closeBtn.onclick = () => reportWindow.close();
+    if (autoPrint) {
+      setTimeout(() => {
+        reportWindow.focus();
+        reportWindow.print();
+      }, 120);
+    }
   };
 }
 
@@ -20547,15 +20573,17 @@ async function downloadSelectedTeacherCertificatePdf() {
 }
 
 async function downloadFilteredTeacherCertificatesPdf() {
+  let closeLoading = null;
   try {
     const students = getTeacherCertificateFilteredStudents();
     if (!students.length) {
       showNotice("Seçili filtrede öğrenci yok.", "#e74c3c");
       return;
     }
-    showNotice(`Sertifikalar hazırlanıyor (${students.length} öğrenci)...`, "#4a90e2");
+    const totalStudents = students.length;
+    closeLoading = showLoadingNotice(`Sertifikalar hazırlanıyor... %0 (0/${totalStudents})`, "#1d4ed8");
     const pages = [];
-    for (let i = 0; i < students.length; i++) {
+    for (let i = 0; i < totalStudents; i++) {
       const student = students[i];
       const summary = await getTeacherStudentCertificateSummary(student, true);
       setTeacherCertificateCard(student, summary);
@@ -20569,6 +20597,9 @@ async function downloadFilteredTeacherCertificatesPdf() {
         total: Number(summary.total || 0),
         issuedAt: getTeacherCertificateIssuedDate()
       });
+      const completed = i + 1;
+      const percent = Math.round((completed / totalStudents) * 100);
+      setLoadingNoticeText(`Sertifikalar hazırlanıyor... %${percent} (${completed}/${totalStudents})`);
     }
 
     const classVal = document.getElementById("teacher-cert-class")?.value || "tum_siniflar";
@@ -20577,10 +20608,24 @@ async function downloadFilteredTeacherCertificatesPdf() {
       title: `Sınıf Sertifikaları ${classVal}/${sectionVal}`,
       pages
     });
+    setLoadingNoticeText(`Sertifikalar hazırlandı... %100 (${totalStudents}/${totalStudents})`);
+    setTimeout(() => {
+      if (typeof closeLoading === "function") closeLoading();
+      closeLoading = null;
+    }, 500);
     showNotice("Sertifika önizleme sekmesi açıldı.", "#2ecc71");
   } catch (e) {
     console.error("teacher certificate bulk", e);
     showNotice("Toplu sertifika önizlemesi açılamadı.", "#e74c3c");
+    if (typeof closeLoading === "function") {
+      closeLoading();
+      closeLoading = null;
+    }
+  } finally {
+    if (typeof closeLoading === "function") {
+      closeLoading();
+      closeLoading = null;
+    }
   }
 }
 
@@ -20644,6 +20689,46 @@ function renderHomeOverviewStrip() {
   renderStudentAdventureBoard();
 }
 
+function getStudentPendingBreakdown() {
+  const tasks = getHomeCacheCounts("tasks");
+  const activities = getHomeCacheCounts("activities");
+  const block = getHomeCacheCounts("block");
+  const compute = getHomeCacheCounts("compute");
+  const lessons = getHomeCacheCounts("lessons");
+  const pendingByType = {
+    tasks: Math.max(0, Number(tasks?.pending || 0)),
+    activities: Math.max(0, Number(activities?.pending || 0)),
+    block: Math.max(0, Number(block?.pending || 0)),
+    compute: Math.max(0, Number(compute?.pending || 0)),
+    lessons: Math.max(0, Number(lessons?.pending || 0)),
+  };
+  const totalPending = Object.values(pendingByType).reduce((sum, n) => sum + Number(n || 0), 0);
+  return { pendingByType, totalPending };
+}
+
+function updateStudentHeroPendingAlert() {
+  const box = document.getElementById("student-hero-pending-alert");
+  const textEl = document.getElementById("student-hero-pending-alert-text");
+  const heroMessageEl = document.getElementById("student-hero-message");
+  if (!box || !textEl) return;
+  const { pendingByType, totalPending } = getStudentPendingBreakdown();
+  if (totalPending <= 0) {
+    box.style.display = "none";
+    if (heroMessageEl) heroMessageEl.style.display = "";
+    return;
+  }
+  const labels = [
+    ["Ödev", pendingByType.tasks],
+    ["Etkinlik", pendingByType.activities],
+    ["Blok", pendingByType.block],
+    ["Compute", pendingByType.compute],
+    ["Ders", pendingByType.lessons],
+  ].filter(([, count]) => Number(count) > 0).map(([label, count]) => `${label}: ${count}`);
+  box.style.display = "block";
+  if (heroMessageEl) heroMessageEl.style.display = "none";
+  textEl.innerText = `${totalPending} bekleyen var. ${labels.join(" • ")}. Tamamlanmadan bu uyarı kaybolmaz.`;
+}
+
 function renderStudentAdventureBoard() {
   if (userRole !== "student") return;
   const setText = (id, val) => {
@@ -20679,8 +20764,10 @@ function renderStudentAdventureBoard() {
   const classRanked = buildLeaderboardRankedRows(classRows.slice());
   const classRankRow = classRanked.find((row) => String(row?.id || "") === String(currentUserId || ""));
   let classRank = classRankRow ? Number(classRankRow.rank || 0) : null;
-  if (myStatsSummaryCache?.schoolRank) schoolRank = myStatsSummaryCache.schoolRank;
-  if (myStatsSummaryCache?.classRank) classRank = myStatsSummaryCache.classRank;
+  const cacheBelongsToCurrentUser =
+    String(myStatsSummaryCache?.uid || "") === String(currentUserId || "");
+  if (cacheBelongsToCurrentUser && myStatsSummaryCache?.schoolRank) schoolRank = myStatsSummaryCache.schoolRank;
+  if (cacheBelongsToCurrentUser && myStatsSummaryCache?.classRank) classRank = myStatsSummaryCache.classRank;
   const rankText = schoolRank ? `${schoolRank}. sıradasın` : "Sıralaman hazırlanıyor";
   const heroMessage = pending > 0
     ? `${pending} görevin seni bekliyor. Bir sonraki adımı seçip ilerleme çubuğunu hızla doldurabilirsin.`
@@ -20701,6 +20788,7 @@ function renderStudentAdventureBoard() {
   setText("student-hero-class-rank", classRank ? `${classRank}.` : "—");
   setText("student-hero-school-rank", schoolRank ? `${schoolRank}.` : "—");
   setText("student-hero-rank-note", "");
+  updateStudentHeroPendingAlert();
   const progressFill = document.getElementById("student-hero-progress-fill");
   if (progressFill) progressFill.style.width = `${rate}%`;
   renderStudentBadges();

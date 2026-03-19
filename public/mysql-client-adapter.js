@@ -1,7 +1,19 @@
-const APP_BASE_URL = String(
-  document.querySelector('meta[name="app-base-url"]')?.content || window.location.origin
-).replace(/\/+$/, "");
+const META_BASE_URL = String(
+  document.querySelector('meta[name="app-base-url"]')?.content || ""
+).trim().replace(/\/+$/, "");
+const currentDirBase = `${window.location.origin}${String(window.location.pathname || "").replace(/\/+$/, "")}`;
+const inferredPublicBase = (() => {
+  const path = String(window.location.pathname || "");
+  const idx = path.toLowerCase().indexOf("/public/");
+  if (idx >= 0) return `${window.location.origin}${path.slice(0, idx + "/public".length)}`;
+  if (path.toLowerCase().endsWith("/public")) return `${window.location.origin}${path}`;
+  return "";
+})();
+const metaHasPublic = /\/public$/i.test(META_BASE_URL);
+const fallbackPublicBase = /\/public$/i.test(currentDirBase) ? currentDirBase : `${currentDirBase}/public`;
+const APP_BASE_URL = (inferredPublicBase || (metaHasPublic ? META_BASE_URL : "") || fallbackPublicBase || window.location.origin).replace(/\/+$/, "");
 const API_BASE = `${APP_BASE_URL}/api/client`;
+window.__MYSQL_CLIENT_API_BASE__ = API_BASE;
 const AUTH_KEY = "mysql_auth_user";
 const WATCH_INTERVAL_MS = 1000;
 const WATCH_INTERVAL_HIDDEN_MS = 5000;
@@ -313,3 +325,4 @@ export function httpsCallable(_functions, name) {
     return { data: res?.data };
   };
 }
+

@@ -1,0 +1,15 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # API is physically served by /public; force API traffic there to avoid 405 on subfolder installs.
+    RewriteCond %{REQUEST_URI} ^(.*/)?api/ [NC]
+    RewriteCond %{REQUEST_URI} !^/public/ [NC]
+    RewriteRule ^api/(.*)$ public/api/$1 [L,QSA]
+
+    # Shared hosting compatibility:
+    # serve the Laravel app from the project root without hardcoded absolute paths.
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>

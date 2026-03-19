@@ -15,6 +15,9 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->append(SecureHeaders::class);
+        $middleware->validateCsrfTokens(except: [
+            'login',
+        ]);
         $middleware->alias([
             'client.auth' => AuthenticateClientApi::class,
         ]);

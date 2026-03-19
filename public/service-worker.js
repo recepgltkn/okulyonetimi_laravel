@@ -1,18 +1,20 @@
 const SW_VERSION = "v1.1.0";
 const RUNTIME_CACHE = `runtime-${SW_VERSION}`;
 const SHELL_CACHE = `shell-${SW_VERSION}`;
-const OFFLINE_URL = "/offline.html";
+const SCOPE_PATH = new URL(self.registration.scope).pathname.replace(/\/+$/, "");
+const withScope = (path) => `${SCOPE_PATH}/${String(path || "").replace(/^\/+/, "")}`;
+const OFFLINE_URL = withScope("offline.html");
 
 const SHELL_ASSETS = [
-  "/",
+  `${SCOPE_PATH}/`,
   OFFLINE_URL,
-  "/manifest.json",
-  "/pwa-init.js",
-  "/logo192.png",
-  "/logo512.png",
-  "/logo.png",
-  "/script.js",
-  "/style.css"
+  withScope("manifest.json"),
+  withScope("pwa-init.js"),
+  withScope("logo192.png"),
+  withScope("logo512.png"),
+  withScope("logo.png"),
+  withScope("script.js"),
+  withScope("style.css")
 ];
 
 self.addEventListener("install", (event) => {
