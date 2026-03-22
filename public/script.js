@@ -615,9 +615,152 @@ function ensureLoggedOutView() {
   if (externalOverlay) externalOverlay.style.display = "none";
   if (liveInvite) liveInvite.style.display = "none";
   if (livePlayer) livePlayer.style.display = "none";
+  ensureLoginSceneRuntime();
   document.querySelectorAll(".modal").forEach((el) => {
     el.style.display = "none";
   });
+}
+
+function ensureLoginSceneRuntime() {
+  const left = document.querySelector("#login-screen .login-left");
+  if (!left) return;
+  left.style.alignItems = "center";
+  const existing = left.querySelector(".login-scene-runtime");
+  const scene = existing || document.createElement("div");
+  if (!existing) {
+    scene.className = "login-scene-runtime";
+    left.prepend(scene);
+  }
+  scene.style.position = "absolute";
+  scene.style.inset = "0";
+  scene.style.pointerEvents = "none";
+  scene.style.overflow = "hidden";
+  scene.style.zIndex = "6";
+  scene.style.display = "block";
+  if (scene.dataset.built) return;
+  scene.dataset.built = "1";
+
+  const make = (tag, styles = {}) => {
+    const el = document.createElement(tag);
+    Object.assign(el.style, styles);
+    scene.appendChild(el);
+    return el;
+  };
+
+  const floaters = [];
+
+  // soft big circles
+  [
+    { x: -6, y: 8, d: 34, o: 0.22 },
+    { x: 78, y: -8, d: 26, o: 0.22 },
+    { x: 70, y: 70, d: 28, o: 0.2 },
+    { x: -10, y: 78, d: 36, o: 0.2 }
+  ].forEach((c, i) => {
+    const el = make("div", {
+      position: "absolute",
+      left: `${c.x}%`,
+      top: `${c.y}%`,
+      width: `${c.d}%`,
+      aspectRatio: "1 / 1",
+      borderRadius: "999px",
+      border: "1px solid rgba(255,255,255,0.22)",
+      background: `rgba(255,255,255,${c.o})`
+    });
+    floaters.push({ el, bx: c.x, by: c.y, ax: 0.4 + i * 0.12, ay: 0.5 + i * 0.1, mx: 0.8, my: 0.8 });
+  });
+
+  // code labels
+  [
+    { t: "class FutureEngineer {}", x: 42, y: 6 },
+    { t: "</> while(code){learn();}", x: 82, y: 12 },
+    { t: 'if(future) return you;', x: 14, y: 22 },
+    { t: 'deploy("dreams")', x: 90, y: 43 },
+    { t: "for(;;){ build(); }", x: 10, y: 83 },
+    { t: "const xp = progress + effort;", x: 88, y: 95 }
+  ].forEach((m, i) => {
+    const el = make("div", {
+      position: "absolute",
+      left: `${m.x}%`,
+      top: `${m.y}%`,
+      transform: "translate(-50%, -50%)",
+      color: "rgba(30,58,138,0.62)",
+      fontSize: "14px",
+      fontWeight: "700",
+      letterSpacing: "0.3px",
+      fontFamily: "'JetBrains Mono','Consolas','Menlo',monospace",
+      whiteSpace: "nowrap"
+    });
+    el.textContent = m.t;
+    floaters.push({ el, bx: m.x, by: m.y, ax: 0.7 + i * 0.08, ay: 0.65 + i * 0.07, mx: 0.9, my: 0.7 });
+  });
+
+  // thin white lines
+  [
+    { x: 15, y: 25, w: 12 }, { x: 48, y: 14, w: 14 }, { x: 82, y: 14, w: 10 },
+    { x: 60, y: 33, w: 9 }, { x: 74, y: 48, w: 11 }, { x: 90, y: 52, w: 13 },
+    { x: 16, y: 65, w: 13 }, { x: 30, y: 81, w: 11 }, { x: 82, y: 73, w: 14 }
+  ].forEach((l, i) => {
+    const el = make("div", {
+      position: "absolute",
+      left: `${l.x}%`,
+      top: `${l.y}%`,
+      width: `${l.w}%`,
+      height: "2px",
+      borderRadius: "4px",
+      background: "rgba(255,255,255,0.68)"
+    });
+    floaters.push({ el, bx: l.x, by: l.y, ax: 0.55 + i * 0.03, ay: 0.5 + i * 0.02, mx: 0.8, my: 0.55 });
+  });
+
+  // little robots / icons
+  [
+    { t: "🤖", x: 12, y: 28 }, { t: "🤖", x: 83, y: 78 }, { t: "🤖", x: 45, y: 86 },
+    { t: "◇", x: 78, y: 18 }, { t: "◇", x: 56, y: 39 }, { t: "◻", x: 12, y: 60 }, { t: "◻", x: 91, y: 78 }
+  ].forEach((k, i) => {
+    const el = make("div", {
+      position: "absolute",
+      left: `${k.x}%`,
+      top: `${k.y}%`,
+      transform: "translate(-50%, -50%)",
+      color: "rgba(255,255,255,0.7)",
+      fontSize: k.t === "🤖" ? "26px" : "24px",
+      lineHeight: "1"
+    });
+    el.textContent = k.t;
+    floaters.push({ el, bx: k.x, by: k.y, ax: 0.9 + i * 0.06, ay: 0.85 + i * 0.05, mx: 1.2, my: 1.1 });
+  });
+
+  // small dots
+  [
+    { x: 5, y: 9 }, { x: 17, y: 18 }, { x: 34, y: 12 }, { x: 57, y: 25 },
+    { x: 86, y: 11 }, { x: 75, y: 41 }, { x: 29, y: 52 }, { x: 64, y: 70 },
+    { x: 92, y: 91 }, { x: 6, y: 93 }
+  ].forEach((d, i) => {
+    const el = make("div", {
+      position: "absolute",
+      left: `${d.x}%`,
+      top: `${d.y}%`,
+      width: "6px",
+      height: "6px",
+      borderRadius: "50%",
+      background: "rgba(255,255,255,0.72)"
+    });
+    floaters.push({ el, bx: d.x, by: d.y, ax: 0.6 + i * 0.03, ay: 0.55 + i * 0.02, mx: 0.4, my: 0.4 });
+  });
+
+  const start = performance.now();
+  const animate = (t) => {
+    if (!scene.isConnected) return;
+    const dt = (t - start) / 1000;
+    floaters.forEach((n) => {
+      const dx = Math.sin(dt * n.ax) * n.mx;
+      const dy = Math.cos(dt * n.ay) * n.my;
+      n.el.style.left = `${n.bx + dx}%`;
+      n.el.style.top = `${n.by + dy}%`;
+    });
+    requestAnimationFrame(animate);
+  };
+  requestAnimationFrame(animate);
 }
 
 function installImageFallbacks() {
@@ -631,6 +774,10 @@ function installImageFallbacks() {
     }
   }, true);
 }
+
+setTimeout(() => {
+  try { ensureLoginSceneRuntime(); } catch {}
+}, 200);
 
 function installZoomLock() {
   // Sayfa icinde klavye/mouse/pinch ile zoom'u engelle.
@@ -3043,7 +3190,7 @@ function openTeacherQuizResultsReport() {
       <div class="card">
         <div class="report-head">
           <div class="report-head-left">
-            <img src="logo.png" alt="Logo" class="report-logo">
+            <img src="${appUrl("logo.png")}" alt="Logo" class="report-logo">
             <h2>Quiz Sonuç Raporu</h2>
           </div>
         </div>
@@ -8978,6 +9125,13 @@ document.getElementById("btn-open-classes")?.addEventListener("click", async fun
   document.getElementById("side-menu").style.width = "0";
 });
 
+document.getElementById("btn-open-class-sections")?.addEventListener("click", async function() {
+  if (userRole !== "teacher") return;
+  if (classesModal) classesModal.style.display = "flex";
+  await loadClassesModal();
+  document.getElementById("side-menu").style.width = "0";
+});
+
 document.getElementById("btn-close-classes")?.addEventListener("click", function() {
   if (classesModal) classesModal.style.display = "none";
 });
@@ -9110,10 +9264,6 @@ if (deleteAllStudentsBtn) {
 
 document.getElementById("btn-open-add-student").onclick = async function() {
   if (userRole !== "teacher") return;
-  if (isSystemAdminUser(userData)) {
-    showNotice("Bu hesap sadece öğretmen ekleyebilir.", "#f39c12");
-    return;
-  }
   await refreshAndApplyClassSectionDropdowns();
   if (addStudentModal) addStudentModal.style.display = "flex";
   document.getElementById("side-menu").style.width = "0";
@@ -11478,10 +11628,6 @@ async function createTeacherAccount({ firstName, lastName, username, password, b
 
 document.getElementById("btn-add-student-save").onclick = async function () {
   if (userRole !== "teacher") return;
-  if (isSystemAdminUser(userData)) {
-    showNotice("Bu hesap sadece öğretmen ekleyebilir.", "#f39c12");
-    return;
-  }
   const firstName = document.getElementById("add-student-firstname").value.trim();
   const lastName = document.getElementById("add-student-lastname").value.trim();
   const username = document.getElementById("add-student-username").value.trim();
@@ -11522,16 +11668,43 @@ document.getElementById("btn-bulk-student-save").onclick = async function () {
   const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   let okCount = 0;
   let failCount = 0;
+  const existing = document.getElementById("bulk-student-progress-overlay");
+  if (existing) existing.remove();
+  const overlay = document.createElement("div");
+  overlay.id = "bulk-student-progress-overlay";
+  overlay.style.cssText = "position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,0.42);backdrop-filter:blur(4px);z-index:26010;";
+  overlay.innerHTML = `
+    <div style="background:#fff;color:#111827;border:1px solid #e5e7eb;border-radius:12px;padding:16px 20px;box-shadow:0 12px 28px rgba(0,0,0,0.2);min-width:320px;">
+      <div id="bulk-student-progress-text" style="font-weight:700;">Toplu öğrenci kaydı hazırlanıyor... %0</div>
+      <div style="margin-top:10px;height:10px;background:#e5e7eb;border-radius:999px;overflow:hidden;">
+        <div id="bulk-student-progress-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#2563eb,#0ea5e9);"></div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  const total = Math.max(1, lines.length);
+  let done = 0;
+  const updateProgress = () => {
+    const pct = Math.round((done / total) * 100);
+    const txt = document.getElementById("bulk-student-progress-text");
+    const bar = document.getElementById("bulk-student-progress-bar");
+    if (txt) txt.textContent = `İşleniyor... %${pct} (${done}/${total})`;
+    if (bar) bar.style.width = `${pct}%`;
+  };
   for (const line of lines) {
     const parts = line.split(",").map(p => p.trim()).filter(Boolean);
     if (parts.length < 6) {
       failCount++;
+      done++;
+      updateProgress();
       continue;
     }
     const [firstName, lastName, username, pass, className, section] = parts;
     const password = pass || defaultPass;
     if (!password || password.length < 6) {
       failCount++;
+      done++;
+      updateProgress();
       continue;
     }
     try {
@@ -11540,7 +11713,17 @@ document.getElementById("btn-bulk-student-save").onclick = async function () {
     } catch (e) {
       failCount++;
     }
+    done++;
+    updateProgress();
   }
+  const finalTxt = document.getElementById("bulk-student-progress-text");
+  const finalBar = document.getElementById("bulk-student-progress-bar");
+  if (finalTxt) finalTxt.textContent = `Tamamlandı %100 (${total}/${total})`;
+  if (finalBar) finalBar.style.width = "100%";
+  setTimeout(() => {
+    const el = document.getElementById("bulk-student-progress-overlay");
+    if (el) el.remove();
+  }, 500);
   showNotice(`Toplu kayıt tamamlandı. Başarılı: ${okCount}, Hatalı: ${failCount}`, "#4a90e2");
 };
 
@@ -12472,6 +12655,8 @@ onAuthStateChanged(auth, (user) => {
     if (classesBtn) classesBtn.style.display = "none";
     const addStudentBtn = document.getElementById("btn-open-add-student");
     if (addStudentBtn) addStudentBtn.style.display = "none";
+    const classSectionsBtn = document.getElementById("btn-open-class-sections");
+    if (classSectionsBtn) classSectionsBtn.style.display = "none";
     const booksBtn = document.getElementById("btn-open-books");
     if (booksBtn) booksBtn.style.display = "none";
     const approvalsBtn = document.getElementById("btn-open-approvals");
@@ -12753,6 +12938,8 @@ onAuthStateChanged(auth, (user) => {
     if (classesBtn) classesBtn.style.display = teacherUiEnabled ? "block" : "none";
     const addStudentBtn = document.getElementById("btn-open-add-student");
     if (addStudentBtn) addStudentBtn.style.display = teacherUiEnabled ? "block" : "none";
+    const classSectionsBtn = document.getElementById("btn-open-class-sections");
+    if (classSectionsBtn) classSectionsBtn.style.display = teacherUiEnabled ? "block" : "none";
     const booksBtn = document.getElementById("btn-open-books");
     if (booksBtn) booksBtn.style.display = teacherUiEnabled ? "block" : "none";
     const approvalsBtn = document.getElementById("btn-open-approvals");
@@ -12775,7 +12962,12 @@ onAuthStateChanged(auth, (user) => {
     }
     const addMenuToggleBtn = document.getElementById("btn-toggle-add-menu");
     if (addMenuToggleBtn) {
-      const hasAddItems = isTeacher && !!((contentBtn && contentBtn.style.display !== "none") || (booksBtn && booksBtn.style.display !== "none") || (addStudentBtn && addStudentBtn.style.display !== "none"));
+      const hasAddItems = isTeacher && !!(
+        (contentBtn && contentBtn.style.display !== "none")
+        || (booksBtn && booksBtn.style.display !== "none")
+        || (addStudentBtn && addStudentBtn.style.display !== "none")
+        || (classSectionsBtn && classSectionsBtn.style.display !== "none")
+      );
       addMenuToggleBtn.style.display = hasAddItems ? "block" : "none";
     }
     const blockMenuBtn = document.getElementById("btn-open-block-runner-menu");
@@ -13392,6 +13584,92 @@ function updateModalStats(taskId) {
 }
 
 /* ================= GİRİŞ / KAYIT ================= */
+async function loginWithResolvedCredentials(identifier, pass) {
+  const emailCandidates = await resolveLoginEmails(String(identifier || "").trim());
+  const attempts = Array.from(new Set([
+    String(identifier || "").trim().toLowerCase(),
+    ...emailCandidates
+  ])).filter(Boolean);
+  let lastErr = null;
+  for (const candidate of attempts) {
+    try {
+      await signInWithEmailAndPassword(auth, candidate, pass);
+      return true;
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  if (lastErr) throw lastErr;
+  throw new Error("Giriş bilgileri çözümlenemedi.");
+}
+
+async function resolvePasswordlessLoginSecret(identifier) {
+  const raw = String(identifier || "").trim();
+  if (!raw) return null;
+  const norm = String(raw || "").trim().toLowerCase();
+  const normAlias = norm.includes("@") ? norm.split("@")[0] : norm;
+  const candidates = Array.from(new Set([
+    raw,
+    raw.toLowerCase(),
+    ...(await resolveLoginEmails(raw))
+  ])).filter(Boolean);
+  const extractSecret = (data = {}) => {
+    const meta = (data && typeof data.meta === "object" && data.meta) ? data.meta : {};
+    const hints = Array.isArray(data.currentPasswordHints) ? data.currentPasswordHints : [];
+    const metaHints = Array.isArray(meta.currentPasswordHints) ? meta.currentPasswordHints : [];
+    const pool = [
+      data.loginCardPassword,
+      data.cardPassword,
+      data.passwordPlain,
+      data.password,
+      meta.loginCardPassword,
+      meta.cardPassword,
+      meta.passwordPlain,
+      ...hints,
+      ...metaHints
+    ];
+    return String(pool.find((x) => String(x || "").trim()) || "").trim();
+  };
+  const matchesIdentifier = (data = {}, candidate = "") => {
+    const uname = String(data.username || "").trim().toLowerCase();
+    const mail = String(data.email || "").trim().toLowerCase();
+    const c = String(candidate || "").trim().toLowerCase();
+    const cAlias = c.includes("@") ? c.split("@")[0] : c;
+    const uAlias = uname.includes("@") ? uname.split("@")[0] : uname;
+    const mAlias = mail.includes("@") ? mail.split("@")[0] : mail;
+    return uname === c || mail === c || uAlias === cAlias || mAlias === cAlias || uAlias === normAlias || mAlias === normAlias || uname === norm || mail === norm;
+  };
+  try {
+    for (const candidate of candidates) {
+      const [byUsername, byEmail] = await Promise.all([
+        getDocs(query(collection(db, "users"), where("username", "==", candidate))),
+        getDocs(query(collection(db, "users"), where("email", "==", candidate)))
+      ]);
+      const docs = [...byUsername.docs, ...byEmail.docs];
+      for (const d of docs) {
+        const data = d.data() || {};
+        const secret = extractSecret(data);
+        if (!secret) continue;
+        const loginIdentifier = String(data.email || data.username || candidate || raw).trim();
+        if (loginIdentifier) return { loginIdentifier, password: secret };
+      }
+    }
+    // Fallback: tum users dokumanlarini tarayip kullanıcı adı/e-posta aliasına göre kart sifresi bul.
+    const allSnap = await getDocs(collection(db, "users"));
+    for (const d of allSnap.docs) {
+      const data = d.data() || {};
+      if (!matchesIdentifier(data, raw)) continue;
+      const secret = extractSecret(data);
+      if (!secret) continue;
+      const loginIdentifier = String(data.email || data.username || raw).trim();
+      if (loginIdentifier) return { loginIdentifier, password: secret };
+    }
+  } catch (e) {
+    console.warn("passwordless secret resolve error", e);
+  }
+  return null;
+}
+
 const loginButtonEl = document.getElementById("btn-login");
 if (loginButtonEl) loginButtonEl.onclick = async function () {
   const emailInput = document.getElementById("email");
@@ -13418,7 +13696,7 @@ if (loginButtonEl) loginButtonEl.onclick = async function () {
   // Bazi oturum cikis race senaryolarinda bu bayrak acik kalabiliyor ve profil yuklemesini bloke ediyor.
   logoutInProgress = false;
   try {
-    await signInWithEmailAndPassword(auth, String(email || "").trim(), pass);
+    await loginWithResolvedCredentials(String(email || "").trim(), pass);
     showNotice("Giriş başarılı, profil yükleniyor...", "#2ecc71");
     if (loginBtn) loginBtn.innerText = "Profil yükleniyor...";
     const ready = await waitForAuthReady(12000);
@@ -13437,6 +13715,314 @@ if (loginButtonEl) loginButtonEl.onclick = async function () {
     }
   }
 };
+
+const miniGameBtn = document.getElementById("btn-login-mini-game");
+const miniGameWrap = document.getElementById("login-mini-game-wrap");
+const miniGameModal = document.getElementById("login-mini-game-modal");
+const miniGameCloseBtn = document.getElementById("btn-close-login-mini-game");
+const miniGameCanvas = document.getElementById("login-mini-game-canvas");
+const miniGameStatus = document.getElementById("login-mini-game-status");
+let miniGameLoop = null;
+let miniGameWon = false;
+let miniGameRunning = false;
+let miniGameKeyDownHandler = null;
+let miniGameKeyUpHandler = null;
+
+function stopMiniGameLoop() {
+  if (miniGameLoop) {
+    cancelAnimationFrame(miniGameLoop);
+    miniGameLoop = null;
+  }
+  if (miniGameKeyDownHandler) {
+    window.removeEventListener("keydown", miniGameKeyDownHandler);
+    miniGameKeyDownHandler = null;
+  }
+  if (miniGameKeyUpHandler) {
+    window.removeEventListener("keyup", miniGameKeyUpHandler);
+    miniGameKeyUpHandler = null;
+  }
+  miniGameRunning = false;
+}
+
+async function doPasswordlessLoginAfterWin() {
+  const emailInput = document.getElementById("email");
+  const identifier = String(emailInput?.value || "").trim();
+  if (!identifier) {
+    showNotice("Mini oyun girişinde kullanıcı adı zorunlu.", "#e74c3c");
+    return;
+  }
+  const loginBtn = document.getElementById("btn-login");
+  const loginScreen = document.getElementById("login-screen");
+  try {
+    const old = document.getElementById("mini-game-login-overlay");
+    if (old) old.remove();
+    const overlay = document.createElement("div");
+    overlay.id = "mini-game-login-overlay";
+    overlay.style.cssText = "position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,0.45);backdrop-filter:blur(2px);z-index:32000;";
+    overlay.innerHTML = '<div style="background:#fff;border:1px solid #dbe5f4;border-radius:14px;padding:16px 20px;font-weight:700;color:#0f172a;box-shadow:0 12px 26px rgba(0,0,0,0.2);">✅ Oyun tamamlandı. Giriş yapılıyor...</div>';
+    document.body.appendChild(overlay);
+    await new Promise((r) => setTimeout(r, 2000));
+    overlay.remove();
+
+    if (loginBtn) {
+      loginBtn.disabled = true;
+      loginBtn.innerText = "Oyun ödülü ile giriş yapılıyor...";
+    }
+    const secret = await resolvePasswordlessLoginSecret(identifier);
+    if (secret) {
+      await loginWithResolvedCredentials(secret.loginIdentifier, secret.password);
+    } else {
+      const fallbackPasswords = ["123456", "12345", "000000", identifier];
+      let ok = false;
+      let lastErr = null;
+      for (const p of fallbackPasswords) {
+        try {
+          await loginWithResolvedCredentials(identifier, String(p || "").trim());
+          ok = true;
+          break;
+        } catch (e) {
+          lastErr = e;
+        }
+      }
+      if (!ok) throw lastErr || new Error("Kullanıcı kartı bulunamadı.");
+    }
+    showNotice("Mini oyun başarıyla tamamlandı, giriş yapıldı.", "#2ecc71");
+    const ready = await waitForAuthReady(12000);
+    if (!ready) restoreLoginButtonState();
+  } catch (err) {
+    showNotice("Şifresiz giriş başarısız: " + (err?.message || "Giriş hatası"), "#e74c3c");
+  } finally {
+    const stillOnLogin = !!loginScreen && !loginScreen.classList.contains("hidden");
+    if (loginBtn && stillOnLogin) {
+      loginBtn.disabled = false;
+      loginBtn.innerText = "Giriş Yap";
+    }
+  }
+}
+
+function initLoginMiniGame() {
+  if (!miniGameCanvas || miniGameRunning) return;
+  const ctx = miniGameCanvas.getContext("2d");
+  if (!ctx) return;
+  miniGameRunning = true;
+  miniGameWon = false;
+  const W = miniGameCanvas.width;
+  const H = miniGameCanvas.height;
+  const hero = { x: 28, y: H - 58, w: 18, h: 18, vx: 0, vy: 0, onGround: true };
+  const gravity = 0.64;
+  const jump = -11.6;
+  const speed = 6.6;
+  const groundY = H - 26;
+  const platforms = [
+    // alt hat (giriste yayik)
+    { x: Math.round(W * 0.08), y: Math.round(H * 0.82), w: Math.round(W * 0.13), h: 9 },
+    { x: Math.round(W * 0.24), y: Math.round(H * 0.77), w: Math.round(W * 0.12), h: 9 },
+    { x: Math.round(W * 0.40), y: Math.round(H * 0.81), w: Math.round(W * 0.11), h: 9 },
+    { x: Math.round(W * 0.55), y: Math.round(H * 0.75), w: Math.round(W * 0.10), h: 9 },
+    { x: Math.round(W * 0.69), y: Math.round(H * 0.79), w: Math.round(W * 0.10), h: 9 },
+    // ust hat (hedefe dogru kademeli cikis, ziplanabilir farklar)
+    { x: Math.round(W * 0.47), y: Math.round(H * 0.67), w: Math.round(W * 0.12), h: 9 },
+    { x: Math.round(W * 0.61), y: Math.round(H * 0.62), w: Math.round(W * 0.11), h: 9 },
+    { x: Math.round(W * 0.74), y: Math.round(H * 0.58), w: Math.round(W * 0.10), h: 9 },
+    { x: Math.round(W * 0.86), y: Math.round(H * 0.54), w: Math.round(W * 0.10), h: 9 }
+  ];
+  const goal = {
+    x: Math.round(W * 0.93),
+    y: Math.round(H * 0.46),
+    w: Math.round(W * 0.07),
+    h: Math.round(H * 0.10)
+  };
+  const monsters = [
+    { x: Math.round(W * 0.24), y: groundY - 18, w: 22, h: 18, vx: 4.3, minX: Math.round(W * 0.14), maxX: Math.round(W * 0.44) },
+    { x: Math.round(W * 0.52), y: groundY - 18, w: 22, h: 18, vx: -4.6, minX: Math.round(W * 0.38), maxX: Math.round(W * 0.69) },
+    { x: Math.round(W * 0.76), y: groundY - 18, w: 22, h: 18, vx: 4.1, minX: Math.round(W * 0.63), maxX: Math.round(W * 0.92) }
+  ];
+  const stars = [
+    { x: Math.round(W * 0.30), y: Math.round(H * 0.72), w: 16, h: 16, taken: false }, // alt hat
+    { x: Math.round(W * 0.60), y: Math.round(H * 0.69), w: 16, h: 16, taken: false }, // gecis
+    { x: Math.round(W * 0.84), y: Math.round(H * 0.53), w: 16, h: 16, taken: false }  // ust hat
+  ];
+  let starCount = 0;
+  const keys = { left: false, right: false, up: false };
+  const keyDown = (e) => {
+    if (e.code === "ArrowLeft") keys.left = true;
+    if (e.code === "ArrowRight") keys.right = true;
+    if (e.code === "ArrowUp") keys.up = true;
+    if ((e.code === "ArrowUp" || e.code === "Space") && hero.onGround) {
+      hero.vy = jump;
+      hero.onGround = false;
+    }
+  };
+  const keyUp = (e) => {
+    if (e.code === "ArrowLeft") keys.left = false;
+    if (e.code === "ArrowRight") keys.right = false;
+    if (e.code === "ArrowUp") keys.up = false;
+  };
+  miniGameKeyDownHandler = keyDown;
+  miniGameKeyUpHandler = keyUp;
+  window.addEventListener("keydown", miniGameKeyDownHandler);
+  window.addEventListener("keyup", miniGameKeyUpHandler);
+
+  const collides = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+
+  const resetHero = () => {
+    hero.x = 36;
+    hero.y = H - 66;
+    hero.vx = 0;
+    hero.vy = 0;
+    hero.onGround = true;
+  };
+
+  const drawRobot = (x, y, w, h) => {
+    ctx.fillStyle = "#f8fafc";
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = "#0ea5e9";
+    ctx.fillRect(x + 5, y + 6, 5, 5);
+    ctx.fillRect(x + w - 10, y + 6, 5, 5);
+    ctx.fillStyle = "#475569";
+    ctx.fillRect(x + 6, y + h - 7, w - 12, 3);
+  };
+  const drawBird = (x, y, w, h) => {
+    ctx.fillStyle = "#a78bfa";
+    ctx.beginPath();
+    ctx.ellipse(x + w * 0.5, y + h * 0.55, w * 0.55, h * 0.45, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#0f172a";
+    ctx.beginPath();
+    ctx.arc(x + w * 0.62, y + h * 0.52, h * 0.24, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#fde68a";
+    ctx.beginPath();
+    ctx.moveTo(x + w * 0.86, y + h * 0.56);
+    ctx.lineTo(x + w * 1.03, y + h * 0.5);
+    ctx.lineTo(x + w * 0.86, y + h * 0.44);
+    ctx.closePath();
+    ctx.fill();
+  };
+
+  const tick = () => {
+    ctx.clearRect(0, 0, W, H);
+    const grd = ctx.createLinearGradient(0, 0, 0, H);
+    grd.addColorStop(0, "#111827");
+    grd.addColorStop(1, "#1e3a8a");
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.fillStyle = "#38bdf8";
+    platforms.forEach((p) => ctx.fillRect(p.x, p.y, p.w, p.h));
+    ctx.fillStyle = "#334155";
+    ctx.fillRect(0, groundY, W, H - groundY);
+    // damali bayrak hedefi
+    const poleX = goal.x + Math.round(goal.w * 0.14);
+    const poleY = goal.y + 2;
+    const poleH = Math.round(goal.h * 0.9);
+    ctx.fillStyle = "#e2e8f0";
+    ctx.fillRect(poleX, poleY, 4, poleH);
+    const flagX = poleX + 6;
+    const flagY = poleY + 2;
+    const flagW = Math.round(goal.w * 0.7);
+    const flagH = Math.round(goal.h * 0.52);
+    const cols = 4;
+    const rows = 3;
+    const cellW = Math.max(4, Math.floor(flagW / cols));
+    const cellH = Math.max(4, Math.floor(flagH / rows));
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        ctx.fillStyle = (r + c) % 2 === 0 ? "#ffffff" : "#111827";
+        ctx.fillRect(flagX + c * cellW, flagY + r * cellH, cellW, cellH);
+      }
+    }
+    ctx.strokeStyle = "rgba(255,255,255,0.5)";
+    ctx.strokeRect(flagX, flagY, cols * cellW, rows * cellH);
+
+    hero.vx = 0;
+    if (keys.left) hero.vx = -speed;
+    if (keys.right) hero.vx = speed;
+    hero.x += hero.vx;
+    if (hero.x < 0) hero.x = 0;
+    if (hero.x + hero.w > W) hero.x = W - hero.w;
+
+    hero.vy += gravity;
+    hero.y += hero.vy;
+    hero.onGround = false;
+    if (hero.y + hero.h >= groundY) {
+      hero.y = groundY - hero.h;
+      hero.vy = 0;
+      hero.onGround = true;
+    }
+    platforms.forEach((p) => {
+      if (hero.vy >= 0 && hero.x + hero.w > p.x && hero.x < p.x + p.w && hero.y + hero.h >= p.y && hero.y + hero.h <= p.y + 10) {
+        hero.y = p.y - hero.h;
+        hero.vy = 0;
+        hero.onGround = true;
+      }
+    });
+
+    monsters.forEach((m) => {
+      m.x += m.vx;
+      if (m.x <= m.minX || m.x + m.w >= m.maxX) m.vx *= -1;
+      drawRobot(m.x, m.y, m.w, m.h);
+    });
+
+    stars.forEach((s) => {
+      if (s.taken) return;
+      ctx.fillStyle = "#f59e0b";
+      ctx.font = "bold 22px Arial";
+      ctx.fillText("★", s.x, s.y + 16);
+      const hit = collides(hero, { x: s.x - 2, y: s.y - 2, w: s.w + 4, h: s.h + 4 });
+      if (hit) {
+        s.taken = true;
+        starCount += 1;
+      }
+    });
+    if (miniGameStatus) miniGameStatus.textContent = `Yıldız: ${starCount}/3`;
+
+    if (monsters.some((m) => collides(hero, m))) {
+      if (miniGameStatus) miniGameStatus.textContent = "Canavara yakalandın, tekrar dene";
+      resetHero();
+    }
+    const goalHitbox = {
+      x: goal.x + Math.round(goal.w * 0.2),
+      y: goal.y + Math.round(goal.h * 0.2),
+      w: Math.round(goal.w * 0.6),
+      h: Math.round(goal.h * 0.6)
+    };
+    if (collides(hero, goalHitbox) && !miniGameWon) {
+      if (starCount < 3) {
+        if (miniGameStatus) miniGameStatus.textContent = `Yıldız: ${starCount}/3 • Önce tüm yıldızları topla`;
+      } else {
+        miniGameWon = true;
+        if (miniGameStatus) miniGameStatus.textContent = "Başarılı! Şifresiz giriş yapılıyor...";
+        stopMiniGameLoop();
+        if (miniGameModal) miniGameModal.style.display = "none";
+        doPasswordlessLoginAfterWin();
+        return;
+      }
+    }
+
+    drawBird(hero.x, hero.y, hero.w, hero.h);
+    miniGameLoop = requestAnimationFrame(tick);
+  };
+  miniGameLoop = requestAnimationFrame(tick);
+}
+
+if (miniGameBtn) miniGameBtn.addEventListener("click", () => {
+  if (!miniGameModal) return;
+  miniGameModal.style.display = "flex";
+  if (miniGameStatus) miniGameStatus.textContent = "Başla: hedefe ulaş";
+  stopMiniGameLoop();
+  initLoginMiniGame();
+});
+if (miniGameCloseBtn) miniGameCloseBtn.addEventListener("click", () => {
+  if (miniGameModal) miniGameModal.style.display = "none";
+  stopMiniGameLoop();
+});
+if (miniGameModal) miniGameModal.addEventListener("click", (e) => {
+  if (e.target?.id === "login-mini-game-modal") {
+    miniGameModal.style.display = "none";
+    stopMiniGameLoop();
+  }
+});
 
 /* ================= SORU EKLEME ================= */
 const taskTypeInput = document.getElementById("task-type");
@@ -15043,7 +15629,7 @@ function renderLoginCardsModal() {
         <article class="login-card-item">
           <span class="login-card-accent" aria-hidden="true"></span>
           <div class="login-card-head">
-            <img src="logo.png" alt="Logo" class="login-card-logo">
+            <img src="${appUrl("logo.png")}" alt="Logo" class="login-card-logo">
             <div class="login-card-title-row" style="flex:1;">
               <div class="login-card-title">
                 <span class="name">${escapeHtmlBasic(name)}</span>
@@ -15107,7 +15693,7 @@ function openLoginCardsPrintPreview() {
         <article class="print-login-card">
           <span class="print-accent" aria-hidden="true"></span>
           <div class="print-head">
-            <img src="logo.png" alt="Logo" class="print-logo">
+            <img src="${appUrl("logo.png")}" alt="Logo" class="print-logo">
             <div class="print-title-row">
               <div class="print-title">
                 <span class="print-name">${name}</span>
@@ -16037,9 +16623,16 @@ async function openStudentReportWindow(detail) {
   const computeAssignmentCounts = getComputeHomeworkAssignmentCounts(computeStats);
   let computeCompletedCount = Math.max(0, Number(computeAssignmentCounts.completedCount || 0));
   let computeTotalCount = Math.max(0, Number(computeAssignmentCounts.totalCount || 0));
-  if (computeTotalCount === 0 && Math.max(0, Number(computeStats?.totalLevels || 0)) > 0) {
-    computeTotalCount = 1;
-    computeCompletedCount = Math.max(computeCompletedCount, Number(computeStats?.progressPercent || 0) >= 100 ? 1 : 0);
+  if (String(detail?.student?.id || "") === String(currentUserId || "")) {
+    const liveComputeAssignments = (Array.isArray(computeAssignments) ? computeAssignments : [])
+      .filter((a) => !a?.isDeleted && computeAssignmentMatchesStudent(a));
+    const liveTotal = liveComputeAssignments.length;
+    const liveCompleted = liveComputeAssignments.filter((a) => {
+      const p = computeAssignmentProgressMap.get(String(a.id)) || {};
+      return isComputeProgressCompleted(p, a);
+    }).length;
+    computeTotalCount = Math.max(computeTotalCount, liveTotal);
+    computeCompletedCount = Math.max(computeCompletedCount, Math.min(liveCompleted, computeTotalCount));
   }
   const computePendingCount = Math.max(0, computeTotalCount - computeCompletedCount);
   const blockRuns = Array.isArray(blockStats?.runs) ? blockStats.runs : [];
@@ -16062,9 +16655,9 @@ async function openStudentReportWindow(detail) {
   const pythonTotal = pythonRuns.length;
   const pythonCompleted = pythonRuns.filter(isBlockRunDone).length;
   const quizTotal = Math.max(0, Number(quizStats.totalQuizzes || 0));
-  const quizCompleted = quizTotal;
-  const combinedTotal = (stats.totalTasks || 0) + totalActivities + lessonTotalCount + blockTotalCount + computeTotalCount + (quizStats.totalQuizzes || 0);
-  const combinedCompleted = (stats.completedCount || 0) + activityCompleted + lessonCompletedCount + blockCompletedCount + computeCompletedCount + (quizStats.totalQuizzes || 0);
+  const quizCompleted = Math.min(quizTotal, Math.max(0, Number(quizStats.totalQuizzes || 0)));
+  const combinedTotal = (stats.totalTasks || 0) + totalActivities + lessonTotalCount + blockTotalCount + computeTotalCount + quizTotal;
+  const combinedCompleted = (stats.completedCount || 0) + activityCompleted + lessonCompletedCount + blockCompletedCount + computeCompletedCount + quizCompleted;
   const combinedCompletionRate = combinedTotal > 0 ? Math.round((combinedCompleted / combinedTotal) * 100) : 0;
   let combinedAvgScore = combinedCompletionRate;
   const totalXPCombined = Math.max(0, Number(stats.totalXP || getStudentXPValue(detail.student) || 0));
@@ -16165,8 +16758,8 @@ async function openStudentReportWindow(detail) {
   const group1Total = taskTotalCount + activityTotalCount + lessonTotalCount;
   const group1Completed = taskCompletedCount + activityCompletedCount + lessonCompletedCount;
   const group1Pending = Math.max(0, group1Total - group1Completed);
-  const group2Total = blockTotalCount + computeTotalCount + (quizStats.totalQuizzes || 0);
-  const group2Completed = blockCompletedCount + computeCompletedCount + (quizStats.totalQuizzes || 0);
+  const group2Total = blockTotalCount + computeTotalCount + quizTotal;
+  const group2Completed = blockCompletedCount + computeCompletedCount + quizCompleted;
   const group2Pending = Math.max(0, group2Total - group2Completed);
   const group1Chart = buildCategoryBarChartSvg(
     ["Ödev", "Etkinlik", "Ders"],
@@ -16412,14 +17005,14 @@ async function openStudentReportWindow(detail) {
     </head>
     <body>
       <div class="actions actions-fixed no-print">
-        <button id="downloadFileBtn" class="btn btn-secondary">Raporu İndir</button>
+        <button id="downloadFileBtn" class="btn btn-secondary">PDF İndir</button>
         <button id="downloadBtn" class="btn btn-primary">Yazdır</button>
         <button id="closeBtn" class="btn btn-secondary">Kapat</button>
       </div>
       <div class="page content-page">
         <div class="card header">
           <div style="flex:1;">
-            <img src="logo.png" alt="Logo" class="logo" />
+            <img src="${appUrl("logo.png")}" alt="Logo" class="logo" />
             <div class="title">Öğrenci Performans Raporu</div>
             <div class="subtitle">${new Date().toLocaleDateString("tr-TR")} • Kurumsal Öğrenci Takip Sistemi</div>
           </div>
@@ -16467,40 +17060,10 @@ async function openStudentReportWindow(detail) {
             </div>
           </div>
           <div class="card">
-            <div class="section-title">Analiz ve Gelişim Planı</div>
-            <ul style="margin:8px 0 0 16px; padding:0; line-height:1.65; color:#334155;">
-              ${analysisItems.map((x) => `<li style="margin-bottom:6px;">${x}</li>`).join("")}
-            </ul>
-          </div>
-          <div class="card">
             <div class="section-title">Kazanılan Rozetler</div>
             <div class="badge-mini-grid">
               ${badgeRows}
             </div>
-          </div>
-          <div class="card">
-            <div class="section-title">Dersler - Ödevler - Etkinlikler</div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Ders</th><th>Tarih</th><th>İlerleme</th><th>Süre</th><th>XP</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${lessonHistoryRows || "<tr><td colspan='5'>Veri yok.</td></tr>"}
-              </tbody>
-            </table>
-            <div class="section-title" style="margin-top:10px;">Kodlama ve Uygulamalar</div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Uygulama</th><th>Level Aralığı</th><th>Süre</th><th>XP</th><th>İlerleme</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${codingRows || "<tr><td colspan='5'>Veri yok.</td></tr>"}
-              </tbody>
-            </table>
           </div>
           <div class="report-two-col">
             <div class="card">
@@ -16552,24 +17115,50 @@ async function openStudentReportWindow(detail) {
       <div class="page content-page">
         <div class="card header">
           <div style="flex:1;">
-            <img src="logo.png" alt="Logo" class="logo" />
+            <img src="${appUrl("logo.png")}" alt="Logo" class="logo" />
             <div class="title">Öğrenci Gelişim Raporu • Sayfa 2</div>
             <div class="subtitle">Güçlü Yönler ve Odak Alanları</div>
           </div>
         </div>
-        <div class="card">
-          <div class="section-title">Nelerde İyi? (3 Madde)</div>
-          <ol style="margin:8px 0 0 18px; padding:0; line-height:1.75; color:#1e293b; font-weight:600;">
-            ${strengths.map((x) => `<li style="margin-bottom:8px;">${x}</li>`).join("")}
-          </ol>
+        <div class="report-two-col">
+          <div class="card">
+            <div class="section-title">Nelerde İyi? (3 Madde)</div>
+            <ol style="margin:8px 0 0 18px; padding:0; line-height:1.45; color:#1e293b; font-size:10px; font-weight:600;">
+              ${strengths.map((x) => `<li style="margin-bottom:8px;">${x}</li>`).join("")}
+            </ol>
+          </div>
+          <div class="card">
+            <div class="section-title">Kısa Eylem Planı</div>
+            <ul style="margin:8px 0 0 16px; padding:0; line-height:1.45; color:#1e293b; font-size:10px; font-weight:600;">
+              <li style="margin-bottom:8px;">Her gün en az 1 bekleyen görev tamamla.</li>
+              <li style="margin-bottom:8px;">Kodlama uygulamaları için günlük kısa tekrar oturumu planla.</li>
+              <li style="margin-bottom:8px;">Haftalık ilerleme yüzdesini kontrol edip bir sonraki hedefini yazılı belirle.</li>
+            </ul>
+          </div>
         </div>
         <div class="card">
-          <div class="section-title">Kısa Eylem Planı</div>
-          <ul style="margin:8px 0 0 16px; padding:0; line-height:1.65; color:#334155;">
-            <li>Her gün en az 1 bekleyen görev tamamla.</li>
-            <li>Kodlama uygulamaları için günlük kısa tekrar oturumu planla.</li>
-            <li>Haftalık ilerleme yüzdesini kontrol edip bir sonraki hedefini yazılı belirle.</li>
-          </ul>
+          <div class="section-title">Dersler - Ödevler - Etkinlikler</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Ders</th><th>Tarih</th><th>İlerleme</th><th>Süre</th><th>XP</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${lessonHistoryRows || "<tr><td colspan='5'>Veri yok.</td></tr>"}
+            </tbody>
+          </table>
+          <div class="section-title" style="margin-top:10px;">Kodlama ve Uygulamalar</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Uygulama</th><th>Level Aralığı</th><th>Süre</th><th>XP</th><th>İlerleme</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${codingRows || "<tr><td colspan='5'>Veri yok.</td></tr>"}
+            </tbody>
+          </table>
         </div>
       </div>
       <script>
@@ -16585,20 +17174,50 @@ async function openStudentReportWindow(detail) {
     const btn = reportWindow.document.getElementById("downloadBtn");
     const closeBtn = reportWindow.document.getElementById("closeBtn");
     if (downloadFileBtn) {
-      downloadFileBtn.onclick = () => {
-        const safeName = String(studentName || "ogrenci").replace(/[^a-z0-9_-]+/gi, "_");
-        const datePart = new Date().toISOString().slice(0, 10);
-        const html = "<!doctype html>\\n" + reportWindow.document.documentElement.outerHTML;
-        const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-        const a = reportWindow.document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = `${safeName}_gelisim_raporu_${datePart}.html`;
-        reportWindow.document.body.appendChild(a);
-        a.click();
-        setTimeout(() => {
-          URL.revokeObjectURL(a.href);
-          try { a.remove(); } catch (e) {}
-        }, 1500);
+      downloadFileBtn.onclick = async () => {
+        try {
+          const jsPdfCtor = reportWindow?.jspdf?.jsPDF || window?.jspdf?.jsPDF;
+          const h2c = reportWindow?.html2canvas || window?.html2canvas;
+          if (!jsPdfCtor || !h2c) {
+            reportWindow.focus();
+            reportWindow.print();
+            return;
+          }
+
+          const pages = Array.from(reportWindow.document.querySelectorAll(".page"));
+          if (!pages.length) {
+            reportWindow.focus();
+            reportWindow.print();
+            return;
+          }
+
+          const pdf = new jsPdfCtor("p", "mm", "a4");
+          const pageWidth = pdf.internal.pageSize.getWidth();
+          const pageHeight = pdf.internal.pageSize.getHeight();
+
+          for (let i = 0; i < pages.length; i += 1) {
+            const canvas = await h2c(pages[i], {
+              scale: 2,
+              useCORS: true,
+              backgroundColor: "#ffffff"
+            });
+            const imgData = canvas.toDataURL("image/png");
+            const imgProps = pdf.getImageProperties(imgData);
+            const imgWidth = pageWidth;
+            const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+
+            if (i > 0) pdf.addPage();
+            pdf.addImage(imgData, "PNG", 0, 0, imgWidth, Math.min(imgHeight, pageHeight));
+          }
+
+          const safeName = String(studentName || "ogrenci").replace(/[^a-z0-9_-]+/gi, "_");
+          const datePart = new Date().toISOString().slice(0, 10);
+          pdf.save(`${safeName}_gelisim_raporu_${datePart}.pdf`);
+        } catch (e) {
+          console.error("pdf export failed", e);
+          reportWindow.focus();
+          reportWindow.print();
+        }
       };
     }
     if (btn) {
@@ -16824,13 +17443,20 @@ async function buildStudentReportHtml(detail) {
   const computeAssignmentCounts = getComputeHomeworkAssignmentCounts(computeStats);
   let computeCompletedCount = Math.max(0, Number(computeAssignmentCounts.completedCount || 0));
   let computeTotalCount = Math.max(0, Number(computeAssignmentCounts.totalCount || 0));
-  if (computeTotalCount === 0 && Math.max(0, Number(computeStats?.totalLevels || 0)) > 0) {
-    computeTotalCount = 1;
-    computeCompletedCount = Math.max(computeCompletedCount, Number(computeStats?.progressPercent || 0) >= 100 ? 1 : 0);
+  if (String(detail?.student?.id || "") === String(currentUserId || "")) {
+    const liveComputeAssignments = (Array.isArray(computeAssignments) ? computeAssignments : [])
+      .filter((a) => !a?.isDeleted && computeAssignmentMatchesStudent(a));
+    const liveTotal = liveComputeAssignments.length;
+    const liveCompleted = liveComputeAssignments.filter((a) => {
+      const p = computeAssignmentProgressMap.get(String(a.id)) || {};
+      return isComputeProgressCompleted(p, a);
+    }).length;
+    computeTotalCount = Math.max(computeTotalCount, liveTotal);
+    computeCompletedCount = Math.max(computeCompletedCount, Math.min(liveCompleted, computeTotalCount));
   }
   const computePendingCount = Math.max(0, computeTotalCount - computeCompletedCount);
-  const combinedTotal = (stats.totalTasks || 0) + totalActivities + lessonTotalCount + blockTotalCount + computeTotalCount + (quizStats.totalQuizzes || 0);
-  const combinedCompleted = (stats.completedCount || 0) + activityCompleted + lessonCompletedCount + blockCompletedCount + computeCompletedCount + (quizStats.totalQuizzes || 0);
+  const combinedTotal = (stats.totalTasks || 0) + totalActivities + lessonTotalCount + blockTotalCount + computeTotalCount + quizTotal;
+  const combinedCompleted = (stats.completedCount || 0) + activityCompleted + lessonCompletedCount + blockCompletedCount + computeCompletedCount + quizCompleted;
   const combinedCompletionRate = combinedTotal > 0 ? Math.round((combinedCompleted / combinedTotal) * 100) : 0;
   const workTotalCount = taskTotalCount + lessonTotalCount + (contentStats.totalItems || 0);
   const workCompletedCount = taskCompletedCount + lessonCompletedCount + (contentStats.completedItems || 0);
@@ -16840,8 +17466,8 @@ async function buildStudentReportHtml(detail) {
   const group1Total = taskTotalCount + activityTotalCount + lessonTotalCount;
   const group1Completed = taskCompletedCount + activityCompletedCount + lessonCompletedCount;
   const group1Pending = Math.max(0, group1Total - group1Completed);
-  const group2Total = blockTotalCount + computeTotalCount + (quizStats.totalQuizzes || 0);
-  const group2Completed = blockCompletedCount + computeCompletedCount + (quizStats.totalQuizzes || 0);
+  const group2Total = blockTotalCount + computeTotalCount + quizTotal;
+  const group2Completed = blockCompletedCount + computeCompletedCount + quizCompleted;
   const group2Pending = Math.max(0, group2Total - group2Completed);
   const group1Chart = buildCategoryBarChartSvg(
     ["Ödev", "Etkinlik", "Ders"],
@@ -16998,7 +17624,7 @@ async function buildStudentReportHtml(detail) {
       <div class="page content-page">
         <div class="card header">
           <div style="flex:1;">
-            <img src="logo.png" alt="Logo" class="logo" />
+            <img src="${appUrl("logo.png")}" alt="Logo" class="logo" />
             <div class="title">Öğrenci Performans Raporu</div>
             <div class="subtitle">${new Date().toLocaleDateString("tr-TR")} • Kurumsal Öğrenci Takip Sistemi</div>
           </div>
@@ -17044,28 +17670,6 @@ async function buildStudentReportHtml(detail) {
                 <div style="font-size:11px; color:#475569;">Toplam: ${group2Total} • Tamamlandı: ${group2Completed}</div>
               </div>
             </div>
-            <div class="section-title" style="margin-top:10px;">Dersler - Ödevler - Etkinlikler</div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Ders</th><th>Tarih</th><th>İlerleme</th><th>Süre</th><th>XP</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${lessonHistoryRows || "<tr><td colspan='5'>Veri yok.</td></tr>"}
-              </tbody>
-            </table>
-            <div class="section-title" style="margin-top:10px;">Kodlama ve Uygulamalar</div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Uygulama</th><th>Level Aralığı</th><th>Süre</th><th>XP</th><th>İlerleme</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${codingRows || "<tr><td colspan='5'>Veri yok.</td></tr>"}
-              </tbody>
-            </table>
           </div>
           <div class="report-two-col">
             <div class="card">
@@ -17113,6 +17717,39 @@ async function buildStudentReportHtml(detail) {
               </table>
             </div>
           </div>
+      </div>
+      <div class="page content-page">
+        <div class="card header">
+          <div style="flex:1;">
+            <img src="${appUrl("logo.png")}" alt="Logo" class="logo" />
+            <div class="title">Öğrenci Gelişim Raporu • Sayfa 2</div>
+            <div class="subtitle">Ders, Ödev ve Kodlama Detayı</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="section-title" style="margin-top:10px;">Dersler - Ödevler - Etkinlikler</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Ders</th><th>Tarih</th><th>İlerleme</th><th>Süre</th><th>XP</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${lessonHistoryRows || "<tr><td colspan='5'>Veri yok.</td></tr>"}
+            </tbody>
+          </table>
+          <div class="section-title" style="margin-top:10px;">Kodlama ve Uygulamalar</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Uygulama</th><th>Level Aralığı</th><th>Süre</th><th>XP</th><th>İlerleme</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${codingRows || "<tr><td colspan='5'>Veri yok.</td></tr>"}
+            </tbody>
+          </table>
+        </div>
       </div>
     </body>
     </html>
@@ -20206,7 +20843,7 @@ function buildCertificatePageHtml(page) {
     <section class="cert-page">
       <div class="cert-card">
         <div class="cert-frame">
-          <img src="logo.png" alt="Logo" class="cert-logo" />
+          <img src="${appUrl("logo.png")}" alt="Logo" class="cert-logo" />
           <div class="cert-badge">?</div>
           <h1 class="cert-title">BAŞARI SERTİFİKASI</h1>
           <div class="cert-name">${fullName}</div>
@@ -23657,27 +24294,22 @@ function populateTaskTargets() {
   const targetSelect = document.getElementById("task-target");
   if (!targetSelect) return;
   targetSelect.innerHTML = "<option value=\"all\">Tüm Sınıflar</option>";
-  
-  const studentsQuery = query(collection(db, "users"), where("role", "==", "student"));
-  getDocs(studentsQuery).then((snap) => {
-    const classMap = new Map();
-    const rows = [];
-    snap.forEach(docSnap => {
-      rows.push({ id: docSnap.id, ...docSnap.data() });
-    });
-    scopeStudentsForCurrentRole(rows).forEach((data) => {
-      if (!data.className) return;
-      if (!classMap.has(data.className)) classMap.set(data.className, new Set());
-      if (data.section) classMap.get(data.className).add(data.section);
-    });
-    
-    Array.from(classMap.keys()).sort().forEach(className => {
+  const classMap = new Map();
+  (Array.isArray(classSectionCatalog) ? classSectionCatalog : []).forEach((row) => {
+    const cls = normalizeClassSectionText(row?.className);
+    const sec = normalizeClassSectionText(row?.section);
+    if (!cls) return;
+    if (!classMap.has(cls)) classMap.set(cls, new Set());
+    if (sec) classMap.get(cls).add(sec);
+  });
+
+  const renderOptions = () => {
+    Array.from(classMap.keys()).sort().forEach((className) => {
       const optClass = document.createElement("option");
       optClass.value = `class:${className}`;
       optClass.textContent = `Sınıf ${className} (Tümü)`;
       targetSelect.appendChild(optClass);
-      
-      Array.from(classMap.get(className)).sort().forEach(section => {
+      Array.from(classMap.get(className)).sort().forEach((section) => {
         const opt = document.createElement("option");
         opt.value = `class:${className}|section:${section}`;
         opt.textContent = `Sınıf ${className}/${section}`;
@@ -23685,6 +24317,27 @@ function populateTaskTargets() {
       });
     });
     syncTaskClassSectionFromTarget();
+  };
+
+  if (classMap.size > 0) {
+    renderOptions();
+    return;
+  }
+
+  const studentsQuery = query(collection(db, "users"), where("role", "==", "student"));
+  getDocs(studentsQuery).then((snap) => {
+    const rows = [];
+    snap.forEach((docSnap) => {
+      rows.push({ id: docSnap.id, ...docSnap.data() });
+    });
+    scopeStudentsForCurrentRole(rows).forEach((data) => {
+      const cls = normalizeClassSectionText(data.className);
+      const sec = normalizeClassSectionText(data.section);
+      if (!cls) return;
+      if (!classMap.has(cls)) classMap.set(cls, new Set());
+      if (sec) classMap.get(cls).add(sec);
+    });
+    renderOptions();
   });
 }
 
@@ -26014,3 +26667,4 @@ async function loadMyStatsModal() {
     showNotice("İstatistikler yüklenemedi. Lütfen tekrar deneyin.", "#e74c3c");
   }
 }
+

@@ -1,15 +1,22 @@
 <?php
 
 use App\Http\Controllers\ClientDataController;
+use App\Http\Controllers\StudentPanelController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
+    return view('legacy.home');
+});
+Route::get('/legacy-home', function () {
     return view('legacy.home');
 });
 
 // Shared hosting / stale frontend compatibility:
 // older clients may still POST to /login instead of /api/client/auth/login.
 Route::post('/login', [ClientDataController::class, 'login']);
+
+Route::get('/ogrenci-paneli', fn () => redirect('/ogrenci-paneli/dashboard'));
+Route::get('/ogrenci-paneli/{page?}', [StudentPanelController::class, 'show']);
 
 Route::get('/block-3d-runner', fn () => response()->file(public_path('block-3d-runner/index.html')));
 Route::get('/block-grid-runner', fn () => response()->file(public_path('block-grid-runner/index.html')));

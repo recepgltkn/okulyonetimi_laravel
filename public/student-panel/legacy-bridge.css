@@ -1,0 +1,192 @@
+﻿body.student-panel-mode {
+  --sp-purple: #7c4dff;
+  --sp-blue: #2b90ff;
+  --sp-orange: #ff9f43;
+  --sp-green: #2ecc71;
+  --sp-bg: #f3f7ff;
+  --sp-soft: #eef3ff;
+  --sp-surface: #ffffff;
+  --sp-ink: #1f2544;
+  --sp-muted: #64748b;
+  --sp-shadow: 0 14px 34px rgba(30, 41, 59, 0.14);
+  background:
+    radial-gradient(circle at 8% 2%, #dbeafe 0, transparent 30%),
+    radial-gradient(circle at 92% 8%, #dcfce7 0, transparent 24%),
+    linear-gradient(155deg, #f8fbff 0%, #eef6ff 100%) !important;
+}
+
+body.student-panel-mode,
+body.student-panel-mode :not(code):not(pre):not(kbd):not(samp) {
+  font-family: 'Baloo 2', 'Nunito', 'Poppins', sans-serif !important;
+}
+
+body.student-panel-mode #app-screen.student-view {
+  background: transparent !important;
+  border-radius: 28px !important;
+  padding: 14px !important;
+  gap: 14px !important;
+}
+
+body.student-panel-mode #app-screen.student-view .app-header {
+  background: #fff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 18px !important;
+  box-shadow: var(--sp-shadow) !important;
+  padding: 10px 14px !important;
+}
+
+body.student-panel-mode #app-screen.student-view #student-hero-panel,
+body.student-panel-mode #app-screen.student-view #student-homework-shell,
+body.student-panel-mode #app-screen.student-view #student-apps-shell,
+body.student-panel-mode #app-screen.student-view #leaderboard-section,
+body.student-panel-mode #app-screen.student-view .card {
+  background: var(--sp-surface) !important;
+  border: 1px solid #dbeafe !important;
+  border-radius: 22px !important;
+  box-shadow: var(--sp-shadow) !important;
+}
+
+body.student-panel-mode #app-screen.student-view .student-hero-side,
+body.student-panel-mode #app-screen.student-view #leaderboard-section {
+  background: linear-gradient(180deg, #f8fbff 0%, #f1f6ff 100%) !important;
+}
+
+body.student-panel-mode #app-screen.student-view .student-hero-main {
+  background: linear-gradient(135deg, #7c4dff 0%, #2b90ff 56%, #06b6d4 100%) !important;
+  color: #fff !important;
+  border-radius: 22px !important;
+}
+
+body.student-panel-mode #app-screen.student-view .student-hero-title {
+  color: #fff !important;
+  font-size: clamp(1.5rem, 2.4vw, 2rem) !important;
+  font-weight: 800 !important;
+}
+
+body.student-panel-mode #app-screen.student-view .student-hero-kicker,
+body.student-panel-mode #app-screen.student-view .student-hero-message,
+body.student-panel-mode #app-screen.student-view .student-hero-progress-note,
+body.student-panel-mode #app-screen.student-view .student-hero-progress-head {
+  color: rgba(255, 255, 255, 0.94) !important;
+}
+
+body.student-panel-mode #app-screen.student-view .student-hero-progress-track {
+  background: rgba(255, 255, 255, 0.3) !important;
+  border-radius: 999px !important;
+}
+
+body.student-panel-mode #app-screen.student-view .student-hero-progress-fill {
+  background: linear-gradient(90deg, #ffd166, #ff9f43) !important;
+  border-radius: 999px !important;
+}
+
+body.student-panel-mode #app-screen.student-view .student-hero-stat,
+body.student-panel-mode #app-screen.student-view .student-mini-card,
+body.student-panel-mode #app-screen.student-view .student-spark-card,
+body.student-panel-mode #app-screen.student-view .student-quick-card {
+  border-radius: 18px !important;
+  border: 1px solid #e2e8f0 !important;
+  background: var(--sp-soft) !important;
+}
+
+body.student-panel-mode #app-screen.student-view .student-mini-card:nth-child(1),
+body.student-panel-mode #app-screen.student-view .student-mini-card:nth-child(2),
+body.student-panel-mode #app-screen.student-view .student-mini-card:nth-child(3),
+body.student-panel-mode #app-screen.student-view .student-mini-card:nth-child(4),
+body.student-panel-mode #app-screen.student-view .student-mini-card:nth-child(5) {
+  background: var(--sp-soft) !important;
+}
+
+body.student-panel-mode #app-screen.student-view .student-mini-label,
+body.student-panel-mode #app-screen.student-view .student-mini-meta,
+body.student-panel-mode #app-screen.student-view .student-hero-stat-label {
+  color: #5b6b87 !important;
+}
+
+body.student-panel-mode #app-screen.student-view .student-mini-value,
+body.student-panel-mode #app-screen.student-view .student-hero-stat-value {
+  color: #1f2a44 !important;
+}
+
+body.student-panel-mode #app-screen.student-view .tabs {
+  background: #e9f0ff !important;
+  border-radius: 14px !important;
+  padding: 5px !important;
+  border: 1px solid #dbeafe !important;
+}
+
+body.student-panel-mode #app-screen.student-view .tab-btn {
+  border-radius: 10px !important;
+  font-weight: 800 !important;
+  color: #475569 !important;
+}
+
+body.student-panel-mode #app-screen.student-view .tab-btn.active {
+  background: linear-gradient(135deg, var(--sp-purple), var(--sp-blue)) !important;
+  color: #fff !important;
+  border-bottom-color: transparent !important;
+}
+
+body.student-panel-mode #app-screen.student-view .list-item,
+body.student-panel-mode #app-screen.student-view .top-student-row {
+  background: #f8fbff !important;
+  border-radius: 14px !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05) !important;
+}
+
+body.student-panel-mode #app-screen.student-view .top-student-xp {
+  background: #e7f8ef !important;
+  color: #0f766e !important;
+  border-radius: 999px !important;
+  font-weight: 800 !important;
+}
+
+body.student-panel-mode #app-screen.student-view .student-hero-alert {
+  background: #fff1f2 !important;
+  border: 2px solid #f43f5e !important;
+  color: #881337 !important;
+}
+
+body.student-panel-mode #app-screen.student-view .student-hero-alert-title,
+body.student-panel-mode #app-screen.student-view .student-hero-alert-text {
+  color: #881337 !important;
+}
+
+body.student-panel-mode #app-screen.student-view .btn {
+  border-radius: 12px !important;
+  font-weight: 800 !important;
+}
+
+body.student-panel-mode #app-screen.student-view .btn.btn-primary {
+  background: linear-gradient(135deg, var(--sp-orange), #ff6b4a) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+}
+
+body.student-panel-mode #app-screen.student-view .btn.btn-success {
+  background: linear-gradient(135deg, var(--sp-green), #16a34a) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+}
+
+body.student-panel-mode .modal-overlay {
+  background: rgba(15, 23, 42, 0.55) !important;
+}
+
+body.student-panel-mode .modal-content {
+  border-radius: 18px !important;
+  border: 1px solid #dbeafe !important;
+  box-shadow: 0 22px 48px rgba(15, 23, 42, 0.32) !important;
+}
+
+@media (max-width: 920px) {
+  body.student-panel-mode #app-screen.student-view {
+    padding: 8px !important;
+    gap: 10px !important;
+  }
+
+  body.student-panel-mode #app-screen.student-view .app-header {
+    border-radius: 14px !important;
+  }
+}

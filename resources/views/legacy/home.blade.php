@@ -16,7 +16,7 @@
     <link rel="dns-prefetch" href="//cdn.jsdelivr.net">
     <link rel="dns-prefetch" href="//fonts.googleapis.com">
     <link rel="dns-prefetch" href="//fonts.gstatic.com">
-    <link rel="icon" type="image/png" href="logo.png">
+    <link rel="icon" type="image/png" href="{{ asset('logo.png') }}">
     <link rel="manifest" href="{{ asset('manifest.json') }}">
     <link rel="apple-touch-icon" href="{{ asset('logo192.png') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -629,7 +629,7 @@
         #app-screen.student-view .student-shell-head {
             display: flex;
             justify-content: space-between;
-            align-items: flex-start;
+            align-items: center;
             gap: 12px;
             margin-bottom: 10px;
         }
@@ -2258,7 +2258,7 @@
         #teacher-analytics .teacher-pie-wrap {
             min-height: 0;
             display: flex;
-            align-items: flex-start;
+            align-items: center;
             justify-content: center;
             padding-top: 0;
             padding-bottom: 0;
@@ -2611,7 +2611,7 @@
 
         /* Leaderboard (student view) — follow teacher list layout */
         #leaderboard-list {
-            align-items: flex-start;
+            align-items: center;
         }
 
         /* Make each leaderboard item a horizontal card: avatar | name/meta | xp */
@@ -2635,7 +2635,7 @@
             display: flex;
             flex-direction: column;
             justify-content: center;
-            align-items: flex-start;
+            align-items: center !important;
             flex: 1 1 auto;
             min-width: 0; /* allow ellipsis to work */
             gap: 2px;
@@ -2767,6 +2767,7 @@
         #side-menu.student-minimal #btn-open-content,
         #side-menu.student-minimal #btn-open-books,
         #side-menu.student-minimal #btn-open-add-student,
+        #side-menu.student-minimal #btn-open-class-sections,
         #side-menu.student-minimal #btn-open-students,
         #side-menu.student-minimal #btn-open-classes,
         #side-menu.student-minimal #btn-open-reports,
@@ -4325,7 +4326,7 @@
             z-index: 1;
             display: flex;
             justify-content: flex-start;
-            align-items: flex-start;
+            align-items: center !important;
             gap: 10px;
             padding-top: 2px;
         }
@@ -6309,13 +6310,10 @@
             position: fixed;
             inset: 0;
             display: flex;
-            align-items: center;
+            align-items: stretch;
             justify-content: center;
-            padding: clamp(14px, 2vw, 24px);
-            background:
-                radial-gradient(1000px 460px at 5% 0%, rgba(148, 163, 184, 0.22), transparent 62%),
-                radial-gradient(900px 460px at 95% 100%, rgba(99, 102, 241, 0.16), transparent 60%),
-                linear-gradient(145deg, #f1f5f9 0%, #e8eef9 46%, #f7fafc 100%);
+            padding: 0;
+            background: linear-gradient(135deg, #090f1f 0%, #0f1f44 45%, #132a60 100%);
             z-index: 3000;
             min-height: 100svh;
             height: 100svh;
@@ -6324,39 +6322,110 @@
         .login-screen.hidden { display: none !important; }
         .login-screen .login-card { position: relative; top: auto; left: auto; transform: none; margin: 0; pointer-events: auto; }
         .login-card {
-            width: min(1160px, 100%);
-            min-height: min(710px, 94svh);
-            border-radius: 28px;
-            border: 1px solid rgba(148, 163, 184, 0.34);
-            background: rgba(255, 255, 255, 0.9);
-            box-shadow: 0 26px 70px rgba(15, 23, 42, 0.2);
-            backdrop-filter: blur(4px);
+            width: 100%;
+            min-height: 100svh;
+            border-radius: 0;
+            border: 0;
+            background: transparent;
+            box-shadow: none;
             overflow: hidden;
             padding: 0;
         }
         .login-layout {
             display: grid;
-            grid-template-columns: minmax(0, 1.12fr) minmax(420px, 0.88fr);
-            min-height: min(710px, 94svh);
+            grid-template-columns: minmax(0, 1.2fr) minmax(460px, 0.8fr);
+            min-height: 100svh;
         }
         .login-left {
             position: relative;
-            padding: clamp(28px, 3vw, 42px);
+            padding: clamp(28px, 4vw, 56px);
             display: flex;
             flex-direction: column;
             justify-content: center;
-            align-items: center;
-            gap: 18px;
+            align-items: flex-start;
+            gap: 20px;
             isolation: isolate;
             overflow: hidden;
             background:
-                radial-gradient(780px 380px at 15% 0%, rgba(191, 219, 254, 0.5), transparent 65%),
-                linear-gradient(165deg, #dce7f8 0%, #dbeafe 40%, #e2e8f0 100%);
+                radial-gradient(700px 420px at 15% 12%, rgba(147, 197, 253, 0.46), transparent 65%),
+                radial-gradient(560px 300px at 88% 82%, rgba(186, 230, 253, 0.42), transparent 70%),
+                linear-gradient(135deg, #e7f0ff 0%, #dbeafe 55%, #e0f2fe 100%);
         }
         .login-left-top {
             text-align: center;
             max-width: 560px;
+            z-index: 3;
+            width: 100%;
+            margin: 0 auto;
         }
+        .login-scene {
+            position: absolute;
+            inset: 0;
+            overflow: hidden;
+            pointer-events: none;
+            z-index: 9;
+            display: block !important;
+        }
+        .scene-item {
+            position: absolute;
+            opacity: 1;
+            color: rgba(255, 255, 255, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.65);
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 999px;
+            padding: 8px 13px;
+            backdrop-filter: blur(2px);
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.22);
+            font-weight: 800;
+            letter-spacing: 0.45px;
+            filter: none;
+            z-index: 10;
+            text-shadow: 0 2px 8px rgba(15, 23, 42, 0.55);
+            animation-timing-function: ease-in-out;
+            animation-iteration-count: infinite;
+        }
+        .scene-rocket { font-size: clamp(16px, 1.55vw, 22px); animation-name: rocketFly; animation-duration: 4.8s; }
+        .scene-robot { font-size: clamp(16px, 1.55vw, 22px); animation-name: robotFloat; animation-duration: 3.4s; }
+        .scene-code { font-family: "JetBrains Mono", monospace; font-size: clamp(14px, 1.3vw, 18px); animation-name: codeDrift; animation-duration: 4.1s; }
+        .scene-rocket.r1 { top: 10%; left: 9%; animation-delay: -1s; }
+        .scene-rocket.r2 { top: 64%; left: 64%; animation-delay: -5s; }
+        .scene-robot.b1 { top: 18%; right: 10%; animation-delay: -2s; }
+        .scene-robot.b2 { top: 76%; right: 24%; animation-delay: -4s; }
+        .scene-code.c1 { top: 36%; left: 14%; animation-delay: -3s; }
+        .scene-code.c2 { top: 52%; right: 13%; animation-delay: -6s; }
+        .login-scene::before,
+        .login-scene::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+        }
+        .login-scene::before {
+            background-image:
+                radial-gradient(circle, rgba(255,255,255,0.82) 1.2px, transparent 1.2px),
+                radial-gradient(circle, rgba(255,255,255,0.6) 1px, transparent 1px);
+            background-size: 84px 84px, 56px 56px;
+            background-position: 0 0, 20px 10px;
+            opacity: 0.5;
+            animation: starDrift 18s linear infinite;
+        }
+        .login-scene::after {
+            background: radial-gradient(500px 220px at 50% 40%, rgba(255,255,255,0.16), transparent 70%);
+            opacity: 0.7;
+        }
+        .scene-dot {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 0 0 8px rgba(255, 255, 255, 0.2);
+            animation: dotFloat 4.8s ease-in-out infinite;
+            z-index: 9;
+        }
+        .scene-dot.d1 { top: 20%; left: 44%; animation-delay: -1s; }
+        .scene-dot.d2 { top: 46%; left: 74%; animation-delay: -3s; }
+        .scene-dot.d3 { top: 72%; left: 36%; animation-delay: -5s; }
         .login-left::before,
         .login-left::after {
             content: "";
@@ -6383,10 +6452,7 @@
             background: radial-gradient(circle, rgba(56, 189, 248, 0.32) 0%, rgba(125, 211, 252, 0.14) 56%, transparent 82%);
             animation: loginFloatB 11s ease-in-out infinite alternate;
         }
-        .login-left > * {
-            position: relative;
-            z-index: 1;
-        }
+        .login-left > * { position: relative; }
         @keyframes loginFloatA {
             0% { transform: translate(0, 0) scale(1); }
             100% { transform: translate(18px, 14px) scale(1.08); }
@@ -6409,11 +6475,15 @@
             line-height: 1.5;
         }
         .login-hero-logo {
-            max-width: 360px;
+            max-width: 520px;
             width: 100%;
             margin: 2px auto;
             display: block;
-            filter: drop-shadow(0 14px 32px rgba(30, 64, 175, 0.2));
+            filter: drop-shadow(0 16px 32px rgba(2, 6, 23, 0.55));
+            z-index: 3;
+            position: relative;
+            left: 0;
+            right: 0;
         }
         .login-slogan {
             margin: 6px 0 0;
@@ -6422,15 +6492,17 @@
             letter-spacing: 0.32px;
             font-weight: 700;
             text-align: center;
+            z-index: 3;
+            width: 100%;
         }
         .login-right {
             position: relative;
-            padding: clamp(24px, 3vw, 40px);
+            padding: clamp(24px, 3vw, 40px) clamp(22px, 2.6vw, 42px);
             display: flex;
             align-items: center;
             justify-content: center;
             overflow: hidden;
-            background: #f8fbff;
+            background: linear-gradient(170deg, #f8fbff 0%, #eef4ff 100%);
         }
         .login-form-wrap {
             width: 100%;
@@ -6525,6 +6597,28 @@
             background: linear-gradient(90deg, #2563eb 0%, #1d4ed8 52%, #1e40af 100%);
             border: 0;
             letter-spacing: 0.2px;
+        }
+        @keyframes rocketFly {
+            0% { transform: translate(0, 0) rotate(-6deg); opacity: 0.85; }
+            50% { transform: translate(52px, -30px) rotate(-2deg); opacity: 1; }
+            100% { transform: translate(96px, -62px) rotate(4deg); opacity: 0.9; }
+        }
+        @keyframes robotFloat {
+            0%, 100% { transform: translateY(0px) scale(1); }
+            50% { transform: translateY(-18px) scale(1.04); }
+        }
+        @keyframes codeDrift {
+            0% { transform: translateY(20px); opacity: 0.65; }
+            20% { opacity: 1; }
+            100% { transform: translateY(-74px); opacity: 0.75; }
+        }
+        @keyframes starDrift {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-32px); }
+        }
+        @keyframes dotFloat {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-18px); }
         }
 
         body.dark-mode { background: #0b1220 !important; color: #e5e7eb; }
@@ -8084,19 +8178,19 @@
             .completed-summary .item { flex: 1 1 calc(50% - 6px); min-width: 96px; }
             #my-stats-content .my-stats-charts { grid-template-columns: 1fr !important; }
             #my-stats-content .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-            .login-screen { padding: 10px; }
-            .login-card { width: 100%; min-height: auto; border-radius: 16px; }
+            .login-screen { padding: 0; }
+            .login-card { width: 100%; min-height: 100svh; border-radius: 0; }
             .login-layout { grid-template-columns: 1fr; min-height: auto; }
             .login-left {
                 padding: 20px 16px 12px;
                 gap: 12px;
-                border-radius: 14px;
+                border-radius: 0;
             }
             .login-left::before { width: 220px; height: 220px; top: -80px; left: -70px; filter: blur(32px); }
             .login-left::after { width: 190px; height: 190px; right: -70px; bottom: -80px; filter: blur(32px); }
             .login-left-top h2 { font-size: 1.45rem; }
             .login-left-top p { font-size: 0.88rem; margin-top: 8px; }
-            .login-hero-logo { max-width: 180px; margin-top: 2px; }
+            .login-hero-logo { max-width: 260px; margin-top: 2px; }
             .login-slogan { font-size: 0.84rem; margin-top: 2px; }
             .login-right {
                 padding: 14px 14px 18px;
@@ -8116,12 +8210,21 @@
             .login-form-wrap .login-sub { font-size: 0.88rem; margin-bottom: 6px; }
             #login-screen .form-control, #btn-login { height: 46px; }
             #login-screen .btn { width: 100%; }
+            .login-scene { display: block !important; }
         }
         @media (max-width: 360px) {
             .login-left-top h2 { font-size: 1.25rem; }
             .login-hero-logo { max-width: 150px; }
             .login-slogan { font-size: 0.8rem; }
             .login-form-wrap h3 { font-size: 1.16rem; }
+        }
+        #login-mini-game-modal .login-mini-game-content {
+            width: min(960px, 94vw) !important;
+            max-width: 94vw !important;
+        }
+        #login-mini-game-canvas {
+            width: 100% !important;
+            max-height: 56vh !important;
         }
         @media (max-width: 768px) {
             #app-screen.teacher-view #home-overview-strip {
@@ -8487,12 +8590,23 @@
         }
     </style>
 </head>
-<body>
+<body class="{{ !empty($studentPanelMode) ? 'student-panel-mode' : '' }}">
+    @if (!empty($studentPanelMode))
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="{{ asset('student-panel/legacy-bridge.css') }}">
+        <script>
+            window.STUDENT_PANEL_MODE = true;
+            window.STUDENT_PANEL_PAGE = @json($studentPanelPage ?? 'dashboard');
+        </script>
+        <script defer src="{{ asset('student-panel/legacy-bridge.js') }}"></script>
+    @endif
 
     <div id="side-menu" class="sidebar">
         <button id="close-menu" style="font-size: 30px; margin-bottom: 20px;">×</button>
         <div class="sidebar-logo-wrap">
-            <img src="logo.png" alt="Logo" class="sidebar-logo">
+            <img src="{{ asset('logo.png') }}" alt="Logo" class="sidebar-logo">
         </div>
         <button id="btn-open-home" onclick="showPage('home')" class="nav-btn active" data-page="home">🏠 Anasayfa</button>
         <button id="btn-open-lessons" class="nav-btn" style="display: none;">📚 Derslerim</button>
@@ -8509,6 +8623,7 @@
             <button id="btn-open-content" class="nav-btn submenu-item" style="display: none;">🧩 Etkinlik Ekle</button>
             <button id="btn-open-books" class="nav-btn submenu-item" style="display: none;">📚 Kitap Ekle</button>
             <button id="btn-open-add-student" class="nav-btn submenu-item" style="display: none;">👤 Öğrenci Ekle</button>
+            <button id="btn-open-class-sections" class="nav-btn submenu-item" style="display: none;">🏫 Sınıf/Şube Ekle</button>
         </div>
         <button id="btn-toggle-student-data-menu" class="nav-btn sidebar-group-toggle" style="display: none;">👥 Öğrenci Verileri <span class="arrow">▸</span></button>
         <div id="submenu-student-data" class="sidebar-submenu">
@@ -8554,49 +8669,49 @@
             </div>
             <div class="apps-hub-grid">
                 <article class="apps-hub-card">
-                    <img src="blok-kodlama.png" alt="Blok Kodlama" class="apps-hub-card-image">
+                    <img src="{{ asset('blok-kodlama.png') }}" alt="Blok Kodlama" class="apps-hub-card-image">
                     <h4>Blok Kodlama</h4>
                     <p>Bloklarla temel kodlama becerilerini geliştir.</p>
                     <button id="btn-apps-hub-open-block2d" class="btn btn-primary apps-hub-start-btn">Uygulamaya Başla</button>
                 </article>
                 <article class="apps-hub-card">
-                    <img src="3d-blok-kodlama.png" alt="3D Blok Kodlama" class="apps-hub-card-image">
+                    <img src="{{ asset('3d-blok-kodlama.png') }}" alt="3D Blok Kodlama" class="apps-hub-card-image">
                     <h4>3D Blok Kodlama</h4>
                     <p>3 boyutlu sahnede kodlamayı deneyimle.</p>
                     <button id="btn-apps-hub-open-block3d" class="btn btn-primary apps-hub-start-btn">Uygulamaya Başla</button>
                 </article>
                 <article class="apps-hub-card">
-                    <img src="compute-it.png" alt="Compute It" class="apps-hub-card-image">
+                    <img src="{{ asset('compute-it.png') }}" alt="Compute It" class="apps-hub-card-image">
                     <h4>Compute It</h4>
                     <p>Algoritma ve problem çözme becerini güçlendir.</p>
                     <button id="btn-apps-hub-open-compute" class="btn btn-primary apps-hub-start-btn">Uygulamaya Başla</button>
                 </article>
                 <article class="apps-hub-card">
-                    <img src="python.png" alt="Python Quiz Lab" class="apps-hub-card-image">
+                    <img src="{{ asset('python.png') }}" alt="Python Quiz Lab" class="apps-hub-card-image">
                     <h4>Python Quiz Lab</h4>
                     <p>Python temelinden zora giden 3 bolumde soru ve mini konu anlatimi.</p>
                     <button id="btn-apps-hub-open-silent-teacher" class="btn btn-primary apps-hub-start-btn">Uygulamaya Başla</button>
                 </article>
                 <article class="apps-hub-card" id="apps-hub-card-live-quiz" style="display:none;">
-                    <img src="quiz.png" alt="Canlı Quiz" class="apps-hub-card-image">
+                    <img src="{{ asset('quiz.png') }}" alt="Canlı Quiz" class="apps-hub-card-image">
                     <h4>Canlı Quiz</h4>
                     <p>Quiz oluştur, başlat ve sonuçları yönet.</p>
                     <button id="btn-apps-hub-open-live-quiz" class="btn btn-primary apps-hub-start-btn">Quiz Yönet</button>
                 </article>
                 <article class="apps-hub-card">
-                    <img src="code-robot.png" alt="Code Robot Lab" class="apps-hub-card-image">
+                    <img src="{{ asset('code-robot.png') }}" alt="Code Robot Lab" class="apps-hub-card-image">
                     <h4>Code Robot Lab</h4>
                     <p>Lightbot mantiginda komutlarla robotu yonet, kolaydan zora bolumleri gec.</p>
                     <button id="btn-apps-hub-open-lightbot" class="btn btn-primary apps-hub-start-btn">Uygulamaya Başla</button>
                 </article>
                 <article class="apps-hub-card">
-                    <img src="flowchart.png" alt="Flowchart" class="apps-hub-card-image">
+                    <img src="{{ asset('flowchart.png') }}" alt="Flowchart" class="apps-hub-card-image">
                     <h4>Flowchart</h4>
                     <p>Akış şeması ile mantıksal düşünmeyi pekiştir.</p>
                     <button id="btn-apps-hub-open-flowchart" class="btn btn-primary apps-hub-start-btn">Uygulamaya Başla</button>
                 </article>
                 <article class="apps-hub-card">
-                    <img src="cizgi-oyunu.png" alt="Çizgi Oyunu" class="apps-hub-card-image">
+                    <img src="{{ asset('cizgi-oyunu.png') }}" alt="Çizgi Oyunu" class="apps-hub-card-image">
                     <h4>Çizgi Oyunu</h4>
                     <p>Refleks ve dikkat becerilerini eğlenceli şekilde test et.</p>
                     <button id="btn-apps-hub-open-line-trace" class="btn btn-primary apps-hub-start-btn">Uygulamaya Başla</button>
@@ -8619,7 +8734,7 @@
     </div>
     <button id="student-ai-fab" class="edu-ai-fab" title="Yapay Zeka Asistanı">
         <span class="edu-ai-wing left" aria-hidden="true"></span>
-        <span class="edu-ai-core"><img src="logo.png" alt="Asistan Avatar"></span>
+        <span class="edu-ai-core"><img src="{{ asset('logo.png') }}" alt="Asistan Avatar"></span>
         <span class="edu-ai-wing right" aria-hidden="true"></span>
     </button>
     <div id="student-ai-panel" class="edu-ai-panel">
@@ -8648,11 +8763,22 @@
         <div class="card login-card">
             <div class="login-layout">
                 <section class="login-left">
+                    <div class="login-scene" aria-hidden="true">
+                        <span class="scene-item scene-rocket r1">ROCKET</span>
+                        <span class="scene-item scene-rocket r2">LAUNCH</span>
+                        <span class="scene-item scene-robot b1">ROBOT</span>
+                        <span class="scene-item scene-robot b2">BOT LAB</span>
+                        <span class="scene-item scene-code c1">&lt;/&gt; CODE</span>
+                        <span class="scene-item scene-code c2">if(win){login()}</span>
+                        <span class="scene-dot d1"></span>
+                        <span class="scene-dot d2"></span>
+                        <span class="scene-dot d3"></span>
+                    </div>
                     <div class="login-left-top">
                         <h2>Dijital Bilişim Eğitim Platformu</h2>
                         <p>Kısa, odaklı ve uygulamalı içeriklerle öğrenme sürecini hızlandır.</p>
                     </div>
-                    <img src="logo.png" alt="Logo" class="login-hero-logo">
+                    <img src="{{ asset('logo.png') }}" alt="Logo" class="login-hero-logo">
                     <div class="login-slogan">Özelsin Çünkü Gelecek Sensin</div>
                 </section>
                 <section class="login-right">
@@ -8669,8 +8795,24 @@
                         <div class="login-actions">
                             <button id="btn-login" type="button" class="btn btn-success" style="flex: 1;">Giriş Yap</button>
                         </div>
+                        <button id="btn-login-mini-game" type="button" class="btn" style="background:linear-gradient(90deg,#0ea5e9,#2563eb);color:#fff;border:none;height:44px;border-radius:12px;font-weight:700;">🎮 Mini Oyunla Şifresiz Giriş</button>
+                        <div id="login-mini-game-wrap" style="display:none;"></div>
                     </div>
                 </section>
+            </div>
+        </div>
+    </div>
+    <div id="login-mini-game-modal" class="modal-overlay" style="display:none; z-index:31000;">
+        <div class="modal-content login-mini-game-content" style="width:min(960px,94vw); max-width:94vw; padding:16px; border-radius:20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <h3 style="margin:0;">Kanatlı Kahraman Oyunu</h3>
+                <button id="btn-close-login-mini-game" class="btn" style="background:#eee;">Kapat</button>
+            </div>
+            <div style="font-size:14px; color:#334155; margin-bottom:8px;">Bilgi: Ok tuşları ile oyna. 3 yıldız toplayıp hedefe çıkınca giriş yapılır.</div>
+            <canvas id="login-mini-game-canvas" width="1100" height="550" style="width:100%; height:auto; border-radius:14px; background:#0f172a; border:1px solid #1e293b;"></canvas>
+            <div style="display:flex; justify-content:space-between; margin-top:8px; font-size:13px; color:#475569;">
+                <span>Kontrol: `←` `→` hareket, `↑` zıpla</span>
+                <span id="login-mini-game-status">Hazır</span>
             </div>
         </div>
     </div>
@@ -8696,7 +8838,7 @@
             <div class="app-header">
                 <div id="user-fullname" style="min-width: 160px; font-family: 'Poppins', sans-serif; font-weight: 600; color: #2c2c2c;"></div>
                 <button id="open-menu" style="display:none;">☰</button>
-                <div id="header-center-logo"><img src="logo.png" alt="Logo" style="transform: scale(1.95); transform-origin: center; display:block;"></div>
+                <div id="header-center-logo"><img src="{{ asset('logo.png') }}" alt="Logo" style="transform: scale(1.95); transform-origin: center; display:block;"></div>
                 <h3 id="user-welcome" style="margin: 0; display:none;">Hoş geldin!</h3>
                 <div id="user-menu" style="position: relative; display: flex; align-items: center; gap: 8px;">
                     <button id="theme-toggle-app" class="theme-toggle-inline" type="button" title="Karanlık Mod">🌙</button>
@@ -10200,11 +10342,11 @@ Ayşe, Yılmaz, ayse, 123456, 9, B"></textarea>
         </div>
     </div>
 
-    <!-- Sınıflarım Modal -->
+    <!-- Sınıf/Şube Yönetimi Modal -->
     <div id="classes-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content modal-large">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <h2 style="margin: 0;">Sınıflarım</h2>
+                <h2 style="margin: 0;">Sınıf/Şube Yönetimi</h2>
                 <button id="btn-close-classes" class="btn" style="background: #eee;">Kapat</button>
             </div>
             <div style="display:grid; grid-template-columns:1fr 1fr auto auto auto; gap:8px; margin-bottom:10px;">
@@ -10963,7 +11105,7 @@ Ayşe, Yılmaz, ayse, 123456, 9, B"></textarea>
                 </div>
             </div>
             <div id="student-certificate-card" class="student-certificate">
-                <img src="logo.png" alt="Logo" class="certificate-logo">
+                <img src="{{ asset('logo.png') }}" alt="Logo" class="certificate-logo">
                 <div class="certificate-badge">✦</div>
                 <div class="certificate-title">BAŞARI SERTİFİKASI</div>
                 <div id="certificate-student-name" class="certificate-student-name">Öğrenci Adı Soyadı</div>
@@ -11038,7 +11180,7 @@ Ayşe, Yılmaz, ayse, 123456, 9, B"></textarea>
                 <button id="btn-download-class-certificates" class="btn btn-success">Filtredeki Tümünü Önizle</button>
             </div>
             <div id="teacher-certificate-card" class="student-certificate">
-                <img src="logo.png" alt="Logo" class="certificate-logo">
+                <img src="{{ asset('logo.png') }}" alt="Logo" class="certificate-logo">
                 <div class="certificate-badge">✦</div>
                 <div class="certificate-title">BAŞARI SERTİFİKASI</div>
                 <div id="teacher-certificate-student-name" class="certificate-student-name">Öğrenci Adı Soyadı</div>
@@ -11089,3 +11231,4 @@ Ayşe, Yılmaz, ayse, 123456, 9, B"></textarea>
     <script type="module" src="{{ asset('script.js') }}?v={{ filemtime(public_path('script.js')) }}"></script>
 </body>
 </html>
+

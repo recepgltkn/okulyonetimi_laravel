@@ -1,0 +1,22 @@
+﻿.app-bg { background: radial-gradient(circle at 5% 0%, #1e293b, #0b1020 42%), #070b16; min-height: 100vh; }
+.title { font-family: 'Orbitron', sans-serif; letter-spacing: .5px; }
+.glass { background: linear-gradient(160deg, rgba(15,23,42,.88), rgba(15,23,42,.66)); border: 1px solid rgba(96,165,250,.28); backdrop-filter: blur(9px); }
+.chip { padding: 8px 12px; border-radius: 999px; border: 1px solid rgba(148,163,184,.35); background: rgba(30,41,59,.82); font-weight: 700; }
+.neon-btn { background: linear-gradient(135deg,#22d3ee,#3b82f6); color: white; border: 0; border-radius: 12px; padding: 10px 14px; font-weight: 800; }
+.muted-btn { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 10px 14px; font-weight: 700; }
+.xp-bar { background: linear-gradient(90deg,#22d3ee,#8b5cf6); box-shadow: 0 0 22px rgba(34,211,238,.45); }
+.soft-card { background: rgba(30,41,59,.75); border: 1px solid rgba(148,163,184,.2); border-radius: 16px; padding: 12px; }
+.soft-card .label { color: #94a3b8; font-size: 12px; }
+.soft-card .value { color: #f8fafc; font-size: 20px; font-weight: 800; }
+.badge { padding: 10px 12px; border: 1px solid #475569; border-radius: 12px; color: #94a3b8; }
+.badge.on { color: #22d3ee; border-color: rgba(34,211,238,.5); background: rgba(8,47,73,.5); }
+.mission { width: 100%; text-align: left; padding: 10px; border-radius: 12px; border: 1px solid #334155; background: rgba(30,41,59,.55); }
+.mission.active { border-color: #22d3ee; box-shadow: 0 0 0 1px rgba(34,211,238,.35) inset; }
+.mode-btn { padding: 9px 12px; border-radius: 10px; border: 1px solid #334155; background: #111827; font-weight: 800; }
+.mode-btn.active { background: linear-gradient(135deg,#7c3aed,#2563eb); border-color: transparent; }
+.cmd-btn { border-radius: 10px; padding: 10px; border: 1px solid #334155; background: #0f172a; font-weight: 700; }
+.codebox { background: #0b1220; border: 1px dashed #334155; border-radius: 12px; padding: 10px; color: #e2e8f0; }
+.code-editor { width: 100%; min-height: 210px; border-radius: 12px; border: 1px solid #334155; background: #020617; color: #a5f3fc; padding: 12px; font-family: Consolas, monospace; }
+.hint-box { background: rgba(251,191,36,.1); border: 1px solid rgba(251,191,36,.45); color: #fde68a; border-radius: 12px; padding: 10px; }
+.bridge-item { background: rgba(15,23,42,.55); border: 1px solid rgba(148,163,184,.25); border-radius: 12px; padding: 10px; }
+.bridge-item .list-item { background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; }
