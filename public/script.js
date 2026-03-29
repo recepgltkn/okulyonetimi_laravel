@@ -540,6 +540,12 @@ let liveQuizResultRepairCache = new Set();
 let myStatsSummaryCache = null;
 let teacherCertificateStudents = [];
 let teacherCertificateMetricsCache = new Map();
+let notificationsModalUnsub = null;
+let notificationFeedUnsub = null;
+let notificationPollTimer = null;
+let notificationSessionStartedAt = Date.now();
+let shownNotificationIds = new Set();
+const SYSTEM_NOTIFICATIONS_COLLECTION = "systemNotifications";
 let flowNodes = [];
 let flowEdges = [];
 let flowSelectedTool = "start";
@@ -667,49 +673,6 @@ function ensureLoginSceneRuntime() {
       background: `rgba(255,255,255,${c.o})`
     });
     floaters.push({ el, bx: c.x, by: c.y, ax: 0.4 + i * 0.12, ay: 0.5 + i * 0.1, mx: 0.8, my: 0.8 });
-  });
-
-  // code labels
-  [
-    { t: "class FutureEngineer {}", x: 42, y: 6 },
-    { t: "</> while(code){learn();}", x: 82, y: 12 },
-    { t: 'if(future) return you;', x: 14, y: 22 },
-    { t: 'deploy("dreams")', x: 90, y: 43 },
-    { t: "for(;;){ build(); }", x: 10, y: 83 },
-    { t: "const xp = progress + effort;", x: 88, y: 95 }
-  ].forEach((m, i) => {
-    const el = make("div", {
-      position: "absolute",
-      left: `${m.x}%`,
-      top: `${m.y}%`,
-      transform: "translate(-50%, -50%)",
-      color: "rgba(30,58,138,0.62)",
-      fontSize: "14px",
-      fontWeight: "700",
-      letterSpacing: "0.3px",
-      fontFamily: "'JetBrains Mono','Consolas','Menlo',monospace",
-      whiteSpace: "nowrap"
-    });
-    el.textContent = m.t;
-    floaters.push({ el, bx: m.x, by: m.y, ax: 0.7 + i * 0.08, ay: 0.65 + i * 0.07, mx: 0.9, my: 0.7 });
-  });
-
-  // thin white lines
-  [
-    { x: 15, y: 25, w: 12 }, { x: 48, y: 14, w: 14 }, { x: 82, y: 14, w: 10 },
-    { x: 60, y: 33, w: 9 }, { x: 74, y: 48, w: 11 }, { x: 90, y: 52, w: 13 },
-    { x: 16, y: 65, w: 13 }, { x: 30, y: 81, w: 11 }, { x: 82, y: 73, w: 14 }
-  ].forEach((l, i) => {
-    const el = make("div", {
-      position: "absolute",
-      left: `${l.x}%`,
-      top: `${l.y}%`,
-      width: `${l.w}%`,
-      height: "2px",
-      borderRadius: "4px",
-      background: "rgba(255,255,255,0.68)"
-    });
-    floaters.push({ el, bx: l.x, by: l.y, ax: 0.55 + i * 0.03, ay: 0.5 + i * 0.02, mx: 0.8, my: 0.55 });
   });
 
   // little robots / icons
@@ -2141,6 +2104,218 @@ function showNotice(msg, color = "#4a90e2") {
   `;
   document.body.appendChild(n);
   setTimeout(() => n.remove(), 3000);
+}
+
+function getNotificationStorageKey() {
+  return `system_notifications_seen:${String(currentUserId || "guest")}`;
+}
+
+function loadSeenNotificationIds() {
+  try {
+    const raw = localStorage.getItem(getNotificationStorageKey());
+    const parsed = raw ? JSON.parse(raw) : [];
+    shownNotificationIds = new Set(Array.isArray(parsed) ? parsed.map((v) => String(v || "")) : []);
+  } catch {
+    shownNotificationIds = new Set();
+  }
+}
+
+function persistSeenNotificationIds() {
+  try {
+    localStorage.setItem(getNotificationStorageKey(), JSON.stringify(Array.from(shownNotificationIds).slice(-200)));
+  } catch {}
+}
+
+function getNotificationPermissionState() {
+  if (!("Notification" in window)) return "unsupported";
+  return String(Notification.permission || "default");
+}
+
+function updateNotificationsPermissionLabel() {
+  const el = document.getElementById("notifications-permission-state");
+  if (!el) return;
+  const state = getNotificationPermissionState();
+  if (state === "granted") {
+    el.textContent = "Bildirim izni açık.";
+    el.style.color = "#166534";
+    return;
+  }
+  if (state === "denied") {
+    el.textContent = "Bildirim izni tarayıcıda kapalı.";
+    el.style.color = "#b91c1c";
+    return;
+  }
+  if (state === "unsupported") {
+    el.textContent = "Bu tarayıcı bildirim desteklemiyor.";
+    el.style.color = "#b45309";
+    return;
+  }
+  el.textContent = "Bildirim izni henüz verilmedi.";
+  el.style.color = "#475569";
+}
+
+async function ensureNotificationPermission() {
+  if (!("Notification" in window)) {
+    showNotice("Bu tarayıcı bildirim desteklemiyor.", "#f39c12");
+    updateNotificationsPermissionLabel();
+    return false;
+  }
+  if (Notification.permission === "granted") {
+    updateNotificationsPermissionLabel();
+    return true;
+  }
+  const result = await Notification.requestPermission();
+  updateNotificationsPermissionLabel();
+  if (result !== "granted") {
+    showNotice("Bildirim izni verilmedi.", "#f39c12");
+    return false;
+  }
+  showNotice("Bildirim izni açıldı.", "#2ecc71");
+  return true;
+}
+
+function toNotificationCreatedAtMs(value) {
+  if (!value) return 0;
+  if (typeof value?.toDate === "function") {
+    const dateValue = value.toDate();
+    return dateValue instanceof Date ? dateValue.getTime() : 0;
+  }
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  if (typeof value === "object" && Number.isFinite(value.seconds)) {
+    return (Number(value.seconds) * 1000) + Math.floor(Number(value.nanoseconds || 0) / 1000000);
+  }
+  return 0;
+}
+
+function normalizeNotificationDoc(row = {}) {
+  const createdAtMs = toNotificationCreatedAtMs(row.createdAt);
+  return {
+    id: String(row.id || ""),
+    title: String(row.title || "Yeni Bildirim"),
+    body: String(row.body || ""),
+    url: String(row.url || row.link || appUrl("")).trim() || appUrl(""),
+    createdAt: createdAtMs ? new Date(createdAtMs).toISOString() : "",
+    createdAtMs,
+    createdByName: String(row.createdByName || row.createdBy || ""),
+  };
+}
+
+async function showSystemNotification(payload = {}) {
+  const normalized = normalizeNotificationDoc(payload);
+  if (getNotificationPermissionState() !== "granted") return false;
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    if (registration.showNotification) {
+      await registration.showNotification(normalized.title, {
+        body: normalized.body,
+        tag: normalized.id || `system-notification-${Date.now()}`,
+        renotify: true,
+        icon: appUrl("logo192.png"),
+        badge: appUrl("logo192.png"),
+        data: { url: normalized.url },
+      });
+    }
+    return true;
+  } catch (e) {
+    console.warn("showSystemNotification", e);
+    return false;
+  }
+}
+
+function renderNotificationsHistory(rows = []) {
+  const list = document.getElementById("notifications-history-list");
+  if (!list) return;
+  if (!rows.length) {
+    list.innerHTML = `<div style="padding:10px; color:#64748b;">Henüz bildirim yok.</div>`;
+    return;
+  }
+  list.innerHTML = rows.map((row) => {
+    const item = normalizeNotificationDoc(row);
+    const whenText = item.createdAtMs ? new Date(item.createdAtMs).toLocaleString("tr-TR") : "-";
+    return `
+      <div style="border:1px solid #e2e8f0; border-radius:10px; background:#fff; padding:10px; margin-bottom:8px;">
+        <div style="display:flex; justify-content:space-between; gap:8px; margin-bottom:4px;">
+          <strong>${escapeHtmlBasic(item.title)}</strong>
+          <span style="font-size:12px; color:#64748b;">${escapeHtmlBasic(whenText)}</span>
+        </div>
+        <div style="font-size:13px; color:#334155;">${escapeHtmlBasic(item.body || "-")}</div>
+        <div style="font-size:12px; color:#64748b; margin-top:6px;">Gönderen: ${escapeHtmlBasic(item.createdByName || "-")}</div>
+      </div>
+    `;
+  }).join("");
+}
+
+function stopNotificationsFeedListener() {
+  if (notificationFeedUnsub) {
+    try { notificationFeedUnsub(); } catch {}
+    notificationFeedUnsub = null;
+  }
+}
+
+function stopNotificationPolling() {
+  if (notificationsModalUnsub) {
+    try { notificationsModalUnsub(); } catch {}
+    notificationsModalUnsub = null;
+  }
+  if (notificationPollTimer) {
+    clearInterval(notificationPollTimer);
+    notificationPollTimer = null;
+  }
+}
+
+function startNotificationFeedListener() {
+  stopNotificationsFeedListener();
+  if (userRole !== "teacher") return;
+  const q = query(collection(db, SYSTEM_NOTIFICATIONS_COLLECTION), orderBy("createdAt", "desc"), limit(20));
+  notificationFeedUnsub = onSnapshot(q, (snap) => {
+    const rows = [];
+    snap.forEach((docSnap) => rows.push({ id: docSnap.id, ...(docSnap.data() || {}) }));
+    renderNotificationsHistory(rows);
+  });
+}
+
+function startNotificationPolling() {
+  stopNotificationPolling();
+  if (!currentUserId) return;
+  loadSeenNotificationIds();
+  const processRows = (rows = []) => {
+    rows.reverse().forEach((row) => {
+      const item = normalizeNotificationDoc(row);
+      if (!item.id || shownNotificationIds.has(item.id)) return;
+      if (item.createdAtMs && item.createdAtMs + 1000 < notificationSessionStartedAt) return;
+      shownNotificationIds.add(item.id);
+      persistSeenNotificationIds();
+      showSystemNotification(item);
+    });
+  };
+  notificationsModalUnsub = onSnapshot(
+    query(collection(db, SYSTEM_NOTIFICATIONS_COLLECTION), orderBy("createdAt", "desc"), limit(20)),
+    (snap) => {
+      const rows = [];
+      snap.forEach((docSnap) => rows.push({ id: docSnap.id, ...(docSnap.data() || {}) }));
+      processRows(rows);
+    },
+    (e) => {
+      console.warn("notification realtime listener failed", e);
+    }
+  );
+  const poll = async () => {
+    try {
+      const snap = await getDocs(query(collection(db, SYSTEM_NOTIFICATIONS_COLLECTION), orderBy("createdAt", "desc"), limit(20)));
+      const rows = [];
+      snap.forEach((docSnap) => rows.push({ id: docSnap.id, ...(docSnap.data() || {}) }));
+      processRows(rows);
+    } catch (e) {
+      console.warn("notification poll failed", e);
+    }
+  };
+  poll();
+  notificationPollTimer = setInterval(poll, 30000);
 }
 
 let loadingNoticeEl = null;
@@ -5183,6 +5358,8 @@ async function handleUserLogout({ closeSideMenu = true, closeDropdown = true } =
   stopProfileChangeApprovalsListener();
   stopStudentLiveSessionPolling();
   stopTeacherLiveSessionPolling({ resetState: true });
+  stopNotificationsFeedListener();
+  stopNotificationPolling();
   if (userProfileUnsub) {
     try { userProfileUnsub(); } catch (e) {}
     userProfileUnsub = null;
@@ -5244,6 +5421,8 @@ if (logoutSideBtn) logoutSideBtn.onclick = async function () {
   if (certificatesModalEl) certificatesModalEl.style.display = "none";
   const teacherCertificatesModalEl = document.getElementById("teacher-certificates-modal");
   if (teacherCertificatesModalEl) teacherCertificatesModalEl.style.display = "none";
+  const notificationsModalEl = document.getElementById("notifications-modal");
+  if (notificationsModalEl) notificationsModalEl.style.display = "none";
   await handleUserLogout({ closeSideMenu: true, closeDropdown: true });
 };
 
@@ -5266,6 +5445,12 @@ document.getElementById("password-modal").onclick = function(e) {
 document.getElementById("reports-modal").onclick = function(e) {
   if (e.target === this && reportsModal) reportsModal.style.display = "none";
 };
+document.getElementById("notifications-modal")?.addEventListener("click", function(e) {
+  if (e.target === this && notificationsModal) {
+    notificationsModal.style.display = "none";
+    stopNotificationsFeedListener();
+  }
+});
 document.getElementById("leaderboard-modal")?.addEventListener("click", function(e) {
   if (e.target === this) this.style.display = "none";
 });
@@ -6675,8 +6860,16 @@ function normalizeUserRole(rawRole) {
 
 function isSystemAdminUser(profile = null) {
   const role = String(profile?.role || "").trim().toLowerCase();
+  const username = String(profile?.username || "").trim().toLowerCase();
+  const email = String(profile?.email || "").trim().toLowerCase();
+  const emailAlias = email.includes("@") ? email.split("@")[0] : email;
   if (role === "admin" || role === "administrator") return true;
-  return profile?.isAdmin === true;
+  if (profile?.isAdmin === true) return true;
+  if (profile?.systemOwner === true) return true;
+  if (profile?.fullAccess === true) return true;
+  if (profile?.canManageTeachers === true) return true;
+  if (profile?.undeletable === true && normalizeUserRole(role) === "teacher") return true;
+  return FORCED_TEACHER_ALIASES.has(username) || FORCED_TEACHER_ALIASES.has(emailAlias);
 }
 
 function getStrictUserRole(rawRole) {
@@ -6818,10 +7011,25 @@ function generateTempPassword(length = 8) {
 function getCallableErrorMessage(err) {
   const code = String(err?.code || "").toLowerCase();
   const message = String(err?.message || err?.details || "Bilinmeyen hata");
+  const normalized = message.trim().toLowerCase();
   if (code.includes("permission-denied")) return "Yetki hatası. Fonksiyon erişimi engellendi.";
   if (code.includes("unauthenticated")) return "Oturum doğrulanamadı. Lütfen tekrar giriş yapın.";
   if (code.includes("not-found")) return "Bulut fonksiyonu bulunamadı. Functions deploy gerekli olabilir.";
   if (code.includes("unavailable")) return "Şu anda sunucuya ulaşılamıyor.";
+  if (normalized === "invalid credentials") return "Kullanıcı adı veya şifre hatalı.";
+  if (normalized === "unauthenticated") return "Oturum doğrulanamadı. Lütfen tekrar giriş yapın.";
+  if (normalized === "forbidden") return "Bu işlem için yetkiniz yok.";
+  if (normalized === "invalid input") return "Gönderilen bilgiler geçersiz.";
+  if (normalized === "email and password are required") return "E-posta ve şifre zorunludur.";
+  if (normalized === "email already exists") return "Bu e-posta adresi zaten kayıtlı.";
+  if (normalized === "teacher/admin account is protected") return "Bu öğretmen/yönetici hesabı korumalıdır.";
+  if (normalized === "quiz not found") return "Quiz bulunamadı.";
+  if (normalized === "session not found") return "Oturum bulunamadı.";
+  if (normalized === "session is not live") return "Canlı oturum aktif değil.";
+  if (normalized === "question locked") return "Soru öğretmen tarafından kilitlendi.";
+  if (normalized === "time is over") return "Bu soru için süre doldu.";
+  if (normalized === "question not found") return "Soru bulunamadı.";
+  if (normalized === "already answered") return "Bu soruya zaten cevap verildi.";
   return message;
 }
 
@@ -8963,9 +9171,9 @@ function setProfileModalRoleMode() {
   const isTeacher = userRole === "teacher";
   const teacherTools = document.getElementById("profile-teacher-tools");
   const isAdmin = isSystemAdminUser(userData);
-  if (teacherTools) teacherTools.style.display = isAdmin ? "block" : "none";
+  if (teacherTools) teacherTools.style.display = isTeacher ? "block" : "none";
   const approvalsWrap = document.getElementById("profile-change-approvals-wrap");
-  if (approvalsWrap) approvalsWrap.style.display = isAdmin ? "block" : "none";
+  if (approvalsWrap) approvalsWrap.style.display = isTeacher ? "block" : "none";
   const usernameInput = document.getElementById("profile-username");
   if (usernameInput) usernameInput.disabled = !isTeacher;
   const branchInput = document.getElementById("profile-branch");
@@ -8973,6 +9181,20 @@ function setProfileModalRoleMode() {
     branchInput.style.display = isTeacher ? "block" : "none";
     branchInput.disabled = !isTeacher;
   }
+  const addTeacherBtn = document.getElementById("btn-add-teacher-save");
+  if (addTeacherBtn) addTeacherBtn.style.display = isAdmin ? "block" : "none";
+  const addTeacherFirst = document.getElementById("add-teacher-firstname");
+  if (addTeacherFirst) addTeacherFirst.style.display = isAdmin ? "block" : "none";
+  const addTeacherLast = document.getElementById("add-teacher-lastname");
+  if (addTeacherLast) addTeacherLast.style.display = isAdmin ? "block" : "none";
+  const addTeacherUser = document.getElementById("add-teacher-username");
+  if (addTeacherUser) addTeacherUser.style.display = isAdmin ? "block" : "none";
+  const addTeacherBranch = document.getElementById("add-teacher-branch");
+  if (addTeacherBranch) addTeacherBranch.style.display = isAdmin ? "block" : "none";
+  const addTeacherClassSections = document.getElementById("add-teacher-class-sections");
+  if (addTeacherClassSections) addTeacherClassSections.style.display = isAdmin ? "block" : "none";
+  const addTeacherPassword = document.getElementById("add-teacher-password");
+  if (addTeacherPassword) addTeacherPassword.style.display = isAdmin ? "block" : "none";
 }
 
 function fillProfileModalFromUserData() {
@@ -9081,6 +9303,7 @@ const addStudentModal = document.getElementById("add-student-modal");
 const booksModal = document.getElementById("books-modal");
 const approvalsModal = document.getElementById("approvals-modal");
 const avatarShopModal = document.getElementById("avatar-shop-modal");
+const notificationsModal = document.getElementById("notifications-modal");
 
 document.getElementById("btn-open-create").onclick = function() {
   if (userRole !== "teacher") return;
@@ -9324,6 +9547,14 @@ document.getElementById("btn-open-reports").onclick = function() {
   loadReportsModal();
   document.getElementById("side-menu").style.width = "0";
 };
+
+document.getElementById("btn-open-notifications")?.addEventListener("click", function() {
+  if (userRole !== "teacher") return;
+  if (notificationsModal) notificationsModal.style.display = "flex";
+  updateNotificationsPermissionLabel();
+  startNotificationFeedListener();
+  document.getElementById("side-menu").style.width = "0";
+});
 
 document.getElementById("btn-close-reports").onclick = function() {
   if (reportsModal) reportsModal.style.display = "none";
@@ -11384,6 +11615,60 @@ document.getElementById("btn-profile-cancel").onclick = function() {
   stopProfileChangeApprovalsListener();
 };
 
+document.getElementById("btn-close-notifications")?.addEventListener("click", function() {
+  if (notificationsModal) notificationsModal.style.display = "none";
+  stopNotificationsFeedListener();
+});
+
+document.getElementById("btn-enable-notifications")?.addEventListener("click", async function() {
+  await ensureNotificationPermission();
+});
+
+document.getElementById("btn-test-notification")?.addEventListener("click", async function() {
+  const ok = await ensureNotificationPermission();
+  if (!ok) return;
+  await showSystemNotification({
+    id: `test-${Date.now()}`,
+    title: "Test Bildirimi",
+    body: "Bildirim sistemi aktif.",
+    url: appUrl(""),
+  });
+});
+
+document.getElementById("btn-send-notification")?.addEventListener("click", async function() {
+  if (userRole !== "teacher") return;
+  const title = String(document.getElementById("notifications-title")?.value || "").trim();
+  const body = String(document.getElementById("notifications-body")?.value || "").trim();
+  const link = String(document.getElementById("notifications-link")?.value || "").trim();
+  if (!title || !body) {
+    showNotice("Bildirim başlığı ve mesajı zorunludur.", "#e74c3c");
+    return;
+  }
+  try {
+    const payload = {
+      title,
+      body,
+      url: link || appUrl(""),
+      createdBy: String(currentUserId || ""),
+      createdByName: getUserDisplayName(userData || {}) || String(userData?.username || ""),
+      createdAt: serverTimestamp(),
+      audience: "all-open-apps",
+      status: "active",
+    };
+    const ref = await addDoc(collection(db, SYSTEM_NOTIFICATIONS_COLLECTION), payload);
+    await showSystemNotification({ id: String(ref?.id || ""), ...payload, createdAt: new Date() });
+    shownNotificationIds.add(String(ref?.id || ""));
+    persistSeenNotificationIds();
+    renderNotificationsHistory([{ id: ref?.id, ...payload, createdAt: new Date() }]);
+    showNotice("Bildirim gönderildi.", "#2ecc71");
+    document.getElementById("notifications-title").value = "";
+    document.getElementById("notifications-body").value = "";
+    document.getElementById("notifications-link").value = "";
+  } catch (e) {
+    showNotice("Bildirim gönderilemedi: " + getCallableErrorMessage(e), "#e74c3c");
+  }
+});
+
 document.getElementById("btn-profile-save").onclick = async function() {
   const newFirstName = (document.getElementById("profile-firstname")?.value || "").trim();
   const newLastName = (document.getElementById("profile-lastname")?.value || "").trim();
@@ -12089,7 +12374,7 @@ document.getElementById("bulk-students-file").onchange = async function (e) {
   if (userRole !== "teacher") return;
   const file = e.target.files && e.target.files[0];
   if (!file) return;
-  const hideOverlay = showBulkStudentsDeleteOverlay("Toplu öğrenci kaydı yapılıyor, lütfen bekleyin...");
+  const hideOverlay = showBulkStudentProgressOverlay("Toplu öğrenci kaydı hazırlanıyor... %0");
   const isExcel = /\.xlsx?$|\.xls$/i.test(file.name);
   const reader = new FileReader();
   reader.onload = async function () {
@@ -12114,30 +12399,49 @@ document.getElementById("bulk-students-file").onchange = async function (e) {
       if (header.includes("ad") && header.includes("soyad") && header.includes("kullanıcı")) {
         rows.shift();
       }
+      const total = Math.max(0, rows.length);
       let okCount = 0;
       let failCount = 0;
+      let done = 0;
+      const updateProgress = () => {
+        const pct = total > 0 ? Math.round((done / total) * 100) : 100;
+        const txt = document.getElementById("bulk-student-progress-text");
+        const bar = document.getElementById("bulk-student-progress-bar");
+        if (txt) txt.textContent = `İşleniyor... %${pct} (${done}/${total})`;
+        if (bar) bar.style.width = `${pct}%`;
+      };
       for (const r of rows) {
         const parts = r.map(p => (p ?? "").toString().trim()).filter(Boolean);
         if (parts.length < 6) {
           failCount++;
+          done++;
+          updateProgress();
           continue;
         }
-      const [firstName, lastName, username, pass, className, section] = parts;
-      if (!pass || pass.length < 6) {
-        failCount++;
-        continue;
-      }
-      try {
-        await createStudentAccount({ firstName, lastName, username, password: pass, className, section });
-        okCount++;
-      } catch (err) {
-        failCount++;
+        const [firstName, lastName, username, pass, className, section] = parts;
+        if (!pass || pass.length < 6) {
+          failCount++;
+          done++;
+          updateProgress();
+          continue;
         }
+        try {
+          await createStudentAccount({ firstName, lastName, username, password: pass, className, section });
+          okCount++;
+        } catch (err) {
+          failCount++;
+        }
+        done++;
+        updateProgress();
       }
+      const txt = document.getElementById("bulk-student-progress-text");
+      const bar = document.getElementById("bulk-student-progress-bar");
+      if (txt) txt.textContent = `Tamamlandı %100 (${total}/${total})`;
+      if (bar) bar.style.width = "100%";
       showNotice(`Dosyadan kayıt tamamlandı. Başarılı: ${okCount}, Hatalı: ${failCount}`, "#4a90e2");
       e.target.value = "";
     } finally {
-      hideOverlay();
+      setTimeout(() => hideOverlay(), 500);
     }
   };
   reader.onerror = function () {
@@ -12576,6 +12880,8 @@ onAuthStateChanged(auth, (user) => {
     flushAuthReadyWaiters(false);
     logoutInProgress = false;
     stopProfileChangeApprovalsListener();
+    stopNotificationsFeedListener();
+    stopNotificationPolling();
     if (userProfileUnsub) {
       try { userProfileUnsub(); } catch (e) {}
       userProfileUnsub = null;
@@ -12667,6 +12973,8 @@ onAuthStateChanged(auth, (user) => {
     if (reportsBtn) reportsBtn.style.display = "none";
     const loginCardsBtn = document.getElementById("btn-open-login-cards");
     if (loginCardsBtn) loginCardsBtn.style.display = "none";
+    const notificationsBtn = document.getElementById("btn-open-notifications");
+    if (notificationsBtn) notificationsBtn.style.display = "none";
     const studentDataToggleBtn = document.getElementById("btn-toggle-student-data-menu");
     if (studentDataToggleBtn) studentDataToggleBtn.style.display = "none";
     const contentBtn = document.getElementById("btn-open-content");
@@ -12709,6 +13017,7 @@ onAuthStateChanged(auth, (user) => {
     setSidebarSubmenuState("submenu-student-data", "btn-toggle-student-data-menu", false);
     if (certificatesModal) certificatesModal.style.display = "none";
     if (teacherCertificatesModal) teacherCertificatesModal.style.display = "none";
+    if (notificationsModal) notificationsModal.style.display = "none";
     const loginCardsModal = document.getElementById("login-cards-modal");
     if (loginCardsModal) loginCardsModal.style.display = "none";
     closeAvatarShopModal();
@@ -12833,6 +13142,10 @@ onAuthStateChanged(auth, (user) => {
       teacherOwnerAliasTokens = new Set();
       setTeacherAssignedClasses([]);
     }
+    notificationSessionStartedAt = Date.now();
+    loadSeenNotificationIds();
+    updateNotificationsPermissionLabel();
+    startNotificationPolling();
     
     loginScreen.classList.add("hidden");
     appScreen.style.display = "grid";
@@ -12955,6 +13268,8 @@ onAuthStateChanged(auth, (user) => {
     if (reportsBtn) reportsBtn.style.display = teacherUiEnabled ? "block" : "none";
     const loginCardsBtn = document.getElementById("btn-open-login-cards");
     if (loginCardsBtn) loginCardsBtn.style.display = teacherUiEnabled ? "block" : "none";
+    const notificationsBtn = document.getElementById("btn-open-notifications");
+    if (notificationsBtn) notificationsBtn.style.display = teacherUiEnabled ? "block" : "none";
     const contentBtn = document.getElementById("btn-open-content");
     if (contentBtn) {
       contentBtn.style.display = isTeacher ? "block" : "none";
@@ -13706,7 +14021,7 @@ if (loginButtonEl) loginButtonEl.onclick = async function () {
     }
     return;
   } catch (err) {
-    showNotice("Giriş Hatalı: " + (err?.message || "Kullanıcı adı/şifre hatalı"), "#e74c3c");
+    showNotice("Giriş hatası: " + getCallableErrorMessage(err), "#e74c3c");
   } finally {
     const stillOnLogin = !!loginScreen && !loginScreen.classList.contains("hidden");
     if (loginBtn && stillOnLogin) {
@@ -16136,6 +16451,36 @@ function showBulkStudentsDeleteOverlay(message = "Tüm öğrenciler siliniyor l�
   document.body.appendChild(overlay);
   return () => {
     const el = document.getElementById("bulk-students-delete-overlay");
+    if (el) el.remove();
+  };
+}
+
+function showBulkStudentProgressOverlay(message = "Toplu öğrenci kaydı hazırlanıyor... %0") {
+  const existing = document.getElementById("bulk-student-progress-overlay");
+  if (existing) existing.remove();
+  const overlay = document.createElement("div");
+  overlay.id = "bulk-student-progress-overlay";
+  overlay.style.cssText = [
+    "position:fixed",
+    "inset:0",
+    "display:flex",
+    "align-items:center",
+    "justify-content:center",
+    "background:rgba(15,23,42,0.38)",
+    "backdrop-filter:blur(5px)",
+    "z-index:26000"
+  ].join(";");
+  overlay.innerHTML = `
+    <div style="min-width:320px; max-width:420px; background:#fff; color:#111827; border:1px solid #e5e7eb; border-radius:12px; padding:16px 20px; box-shadow:0 12px 28px rgba(0,0,0,0.2);">
+      <div id="bulk-student-progress-text" style="font-weight:700;">${escapeHtml(message)}</div>
+      <div style="margin-top:12px; height:12px; background:#e5e7eb; border-radius:999px; overflow:hidden;">
+        <div id="bulk-student-progress-bar" style="height:100%; width:0%; background:linear-gradient(90deg,#2563eb,#0ea5e9);"></div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  return () => {
+    const el = document.getElementById("bulk-student-progress-overlay");
     if (el) el.remove();
   };
 }
@@ -26667,4 +27012,3 @@ async function loadMyStatsModal() {
     showNotice("İstatistikler yüklenemedi. Lütfen tekrar deneyin.", "#e74c3c");
   }
 }
-

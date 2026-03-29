@@ -87,3 +87,55 @@ self.addEventListener("fetch", (event) => {
     );
   }
 });
+
+function normalizeNotificationPayload(payload = {}) {
+  const title = String(payload.title || "Yeni Bildirim").trim() || "Yeni Bildirim";
+  const body = String(payload.body || "").trim();
+  const url = String(payload.url || payload.link || `${SCOPE_PATH}/`).trim() || `${SCOPE_PATH}/`;
+  const tag = String(payload.tag || `system-notification-${Date.now()}`).trim();
+  return {
+    title,
+    options: {
+      body,
+      tag,
+      renotify: true,
+      icon: withScope("logo192.png"),
+      badge: withScope("logo192.png"),
+      data: {
+        url,
+      },
+    },
+  };
+}
+
+self.addEventListener("message", (event) => {
+  const data = event.data || {};
+  if (data?.type !== "SHOW_NOTIFICATION") return;
+  const payload = normalizeNotificationPayload(data.payload || {});
+  event.waitUntil(self.registration.showNotification(payload.title, payload.options));
+});
+
+self.addEventListener("push", (event) => {
+  const raw = event.data ? event.data.json() : {};
+  const payload = normalizeNotificationPayload(raw || {});
+  event.waitUntil(self.registration.showNotification(payload.title, payload.options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const targetUrl = String(event.notification?.data?.url || `${SCOPE_PATH}/`).trim() || `${SCOPE_PATH}/`;
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+      for (const client of windowClients) {
+        const clientUrl = new URL(client.url);
+        if (clientUrl.pathname === new URL(targetUrl, self.location.origin).pathname && "focus" in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
+      return undefined;
+    })
+  );
+});

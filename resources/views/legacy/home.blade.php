@@ -6384,13 +6384,37 @@
             animation-timing-function: ease-in-out;
             animation-iteration-count: infinite;
         }
-        .scene-rocket { font-size: clamp(16px, 1.55vw, 22px); animation-name: rocketFly; animation-duration: 4.8s; }
+        .scene-robot::before {
+            display: inline-block;
+            line-height: 1;
+        }
+        .scene-robot::before { content: "🤖"; }
+        .scene-rocket {
+            width: 44px;
+            height: 44px;
+            padding: 0;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            line-height: 1;
+            background: rgba(255, 255, 255, 0.24);
+            animation-name: rocketFly;
+            animation-duration: 4.8s;
+        }
         .scene-robot { font-size: clamp(16px, 1.55vw, 22px); animation-name: robotFloat; animation-duration: 3.4s; }
         .scene-code { font-family: "JetBrains Mono", monospace; font-size: clamp(14px, 1.3vw, 18px); animation-name: codeDrift; animation-duration: 4.1s; }
         .scene-rocket.r1 { top: 10%; left: 9%; animation-delay: -1s; }
         .scene-rocket.r2 { top: 64%; left: 64%; animation-delay: -5s; }
+        .scene-rocket.r3 { top: 22%; left: 58%; animation-delay: -2.4s; }
+        .scene-rocket.r4 { top: 54%; left: 20%; animation-delay: -3.6s; }
+        .scene-rocket.r5 { top: 80%; left: 52%; animation-delay: -6.2s; }
         .scene-robot.b1 { top: 18%; right: 10%; animation-delay: -2s; }
         .scene-robot.b2 { top: 76%; right: 24%; animation-delay: -4s; }
+        .scene-robot.b3 { top: 12%; left: 28%; animation-delay: -1.5s; }
+        .scene-robot.b4 { top: 48%; left: 72%; animation-delay: -3.2s; }
+        .scene-robot.b5 { top: 70%; left: 18%; animation-delay: -5.4s; }
         .scene-code.c1 { top: 36%; left: 14%; animation-delay: -3s; }
         .scene-code.c2 { top: 52%; right: 13%; animation-delay: -6s; }
         .login-scene::before,
@@ -8632,6 +8656,7 @@
             <button id="btn-open-reports" class="nav-btn submenu-item" style="display: none;">🧾 Raporlar</button>
             <button id="btn-open-login-cards" class="nav-btn submenu-item" style="display: none;">🪪 Giriş Kartları</button>
             <button id="btn-open-teacher-certificates" class="nav-btn submenu-item" style="display: none;">🏅 Sertifika Yönetimi</button>
+            <button id="btn-open-notifications" class="nav-btn submenu-item" style="display: none;">🔔 Bildirimler</button>
         </div>
         <button id="btn-open-my-stats" class="nav-btn" style="display: none;">📈 İstatistiklerim</button>
         <button id="btn-open-badges" class="nav-btn" style="display: none;">🏅 Rozetlerim</button>
@@ -8764,12 +8789,16 @@
             <div class="login-layout">
                 <section class="login-left">
                     <div class="login-scene" aria-hidden="true">
-                        <span class="scene-item scene-rocket r1">ROCKET</span>
-                        <span class="scene-item scene-rocket r2">LAUNCH</span>
-                        <span class="scene-item scene-robot b1">ROBOT</span>
-                        <span class="scene-item scene-robot b2">BOT LAB</span>
-                        <span class="scene-item scene-code c1">&lt;/&gt; CODE</span>
-                        <span class="scene-item scene-code c2">if(win){login()}</span>
+                        <span class="scene-item scene-rocket r1">🚀</span>
+                        <span class="scene-item scene-rocket r2">🚀</span>
+                        <span class="scene-item scene-rocket r3">🚀</span>
+                        <span class="scene-item scene-rocket r4">🚀</span>
+                        <span class="scene-item scene-rocket r5">🚀</span>
+                        <span class="scene-item scene-robot b1"></span>
+                        <span class="scene-item scene-robot b2"></span>
+                        <span class="scene-item scene-robot b3"></span>
+                        <span class="scene-item scene-robot b4"></span>
+                        <span class="scene-item scene-robot b5"></span>
                         <span class="scene-dot d1"></span>
                         <span class="scene-dot d2"></span>
                         <span class="scene-dot d3"></span>
@@ -10440,6 +10469,33 @@ Ayşe, Yılmaz, ayse, 123456, 9, B"></textarea>
         </div>
     </div>
 
+    <div id="notifications-modal" class="modal-overlay" style="display:none; z-index:23020;">
+        <div class="modal-content modal-large" style="max-width:720px; width:min(92vw,720px);">
+            <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; margin-bottom:12px;">
+                <div>
+                    <h2 style="margin:0;">Bildirimler</h2>
+                    <div style="font-size:13px; color:#64748b;">Açık olan tüm sistem oturumlarına tarayıcı bildirimi gönderin.</div>
+                </div>
+                <button id="btn-close-notifications" class="btn" style="background:#e5e7eb;">Kapat</button>
+            </div>
+            <div style="display:grid; gap:10px;">
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button id="btn-enable-notifications" class="btn btn-primary" type="button">Bildirim İzni Aç</button>
+                    <button id="btn-test-notification" class="btn" type="button" style="background:#eff6ff; color:#1d4ed8;">Test Bildirimi</button>
+                    <span id="notifications-permission-state" style="align-self:center; font-size:13px; color:#475569;">İzin durumu kontrol ediliyor...</span>
+                </div>
+                <input id="notifications-title" class="form-control" type="text" maxlength="120" placeholder="Bildirim başlığı">
+                <textarea id="notifications-body" class="form-control" rows="4" maxlength="500" placeholder="Bildirim mesajı"></textarea>
+                <input id="notifications-link" class="form-control" type="text" maxlength="255" placeholder="Açılacak sayfa yolu (opsiyonel) örn: /v1-okul/okulyonetimi_laravel/">
+                <button id="btn-send-notification" class="btn btn-success" type="button">Tüm Açık Uygulamalara Gönder</button>
+                <div style="margin-top:8px;">
+                    <div style="font-weight:700; margin-bottom:8px;">Son Bildirimler</div>
+                    <div id="notifications-history-list" style="max-height:280px; overflow:auto; border:1px solid #e5e7eb; border-radius:12px; padding:10px; background:#f8fafc;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Öğrenci İstatistik Modal -->
     <div id="my-stats-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content modal-large">
@@ -11231,4 +11287,3 @@ Ayşe, Yılmaz, ayse, 123456, 9, B"></textarea>
     <script type="module" src="{{ asset('script.js') }}?v={{ filemtime(public_path('script.js')) }}"></script>
 </body>
 </html>
-

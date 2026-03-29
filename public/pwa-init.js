@@ -49,7 +49,9 @@
         document.querySelector('meta[name="app-base-url"]')?.content || ""
       ).trim().replace(/\/+$/, "");
       const swUrl = `${metaBaseUrl || window.location.origin}/service-worker.js`;
-      navigator.serviceWorker.register(swUrl).catch(() => {});
+      navigator.serviceWorker.register(swUrl).then((registration) => {
+        window.__APP_SW_REGISTRATION__ = registration;
+      }).catch(() => {});
     });
   }
 

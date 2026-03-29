@@ -17,6 +17,9 @@ use Illuminate\Validation\ValidationException;
 
 class ClientAuthService
 {
+    private const SYSTEM_OWNER_EMAIL = 'dogu@okul.local';
+    private const SYSTEM_OWNER_USERNAME = 'dogu';
+
     public function login(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -130,9 +133,7 @@ class ClientAuthService
 
     public function deleteUserByAdmin(string $targetUid): JsonResponse
     {
-        $targetProfile = UserProfile::query()->where('user_id', $targetUid)->first();
-        $targetRole = Str::lower(Str::ascii(trim((string) ($targetProfile?->role ?? 'student'))));
-        if (in_array($targetRole, ['teacher', 'admin', 'administrator', 'ogretmen'], true)) {
+        if ($this->isProtectedUser($targetUid)) {
             return response()->json(['data' => ['ok' => false, 'message' => 'teacher/admin account is protected']], 403);
         }
 
@@ -155,9 +156,31 @@ class ClientAuthService
         if ($uid === '') {
             return false;
         }
+        if ($this->isSystemOwner($uid)) {
+            return true;
+        }
         $role = (string) (UserProfile::query()->where('user_id', $uid)->value('role') ?? '');
         $normalized = Str::lower(Str::ascii(trim($role)));
         return in_array($normalized, ['teacher', 'admin', 'administrator', 'ogretmen'], true);
+    }
+
+    public function isSystemOwner(string $uid): bool
+    {
+        if ($uid === '') {
+            return false;
+        }
+
+        $user = User::query()->find($uid);
+        if (! $user) {
+            return false;
+        }
+
+        $profile = UserProfile::query()->where('user_id', $uid)->first();
+        $email = Str::lower(trim((string) $user->email));
+        $username = Str::lower(trim((string) ($profile?->username ?: $user->name)));
+
+        return $email === self::SYSTEM_OWNER_EMAIL
+            || $username === self::SYSTEM_OWNER_USERNAME;
     }
 
     public function normalizeMeta(mixed $meta): array

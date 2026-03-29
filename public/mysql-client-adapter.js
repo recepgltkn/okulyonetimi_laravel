@@ -24,6 +24,41 @@ const authListeners = new Set();
 const watchRegistry = new Map();
 const authInstances = new Set();
 
+function translateApiErrorMessage(message, status = 0) {
+  const raw = String(message || "").trim();
+  const normalized = raw.toLowerCase();
+  if (!raw) {
+    if (status === 401) return "Oturum doğrulanamadı. Lütfen tekrar giriş yapın.";
+    if (status === 403) return "Bu işlem için yetkiniz yok.";
+    if (status === 404) return "İstenen kayıt bulunamadı.";
+    if (status === 409) return "İşlem çakışması oluştu.";
+    if (status === 422) return "Gönderilen bilgiler geçersiz.";
+    return "Bilinmeyen bir hata oluştu.";
+  }
+
+  if (normalized === "invalid credentials") return "Kullanıcı adı veya şifre hatalı.";
+  if (normalized === "unauthenticated") return "Oturum doğrulanamadı. Lütfen tekrar giriş yapın.";
+  if (normalized === "forbidden") return "Bu işlem için yetkiniz yok.";
+  if (normalized === "invalid input") return "Gönderilen bilgiler geçersiz.";
+  if (normalized === "invalid user") return "Geçersiz kullanıcı.";
+  if (normalized === "email and password are required") return "E-posta ve şifre zorunludur.";
+  if (normalized === "email already exists") return "Bu e-posta adresi zaten kayıtlı.";
+  if (normalized === "teacher/admin account is protected") return "Bu öğretmen/yönetici hesabı korumalıdır.";
+  if (normalized === "too many constraints") return "Çok fazla filtre kullanıldı.";
+  if (normalized === "too many operations") return "Tek seferde çok fazla işlem gönderildi.";
+  if (normalized === "invalid source") return "Geçersiz veri kaynağı.";
+  if (normalized === "quiz not found") return "Quiz bulunamadı.";
+  if (normalized === "session not found") return "Oturum bulunamadı.";
+  if (normalized === "session is not live") return "Canlı oturum aktif değil.";
+  if (normalized === "question locked") return "Soru öğretmen tarafından kilitlendi.";
+  if (normalized === "time is over") return "Bu soru için süre doldu.";
+  if (normalized === "question not found") return "Soru bulunamadı.";
+  if (normalized === "already answered") return "Bu soruya zaten cevap verildi.";
+  if (normalized.startsWith("unknown callable:")) return "Bilinmeyen işlem çağrısı.";
+
+  return raw;
+}
+
 function isPrimaryApp(app) {
   return String(app?.name || "default") === "default";
 }
@@ -78,7 +113,7 @@ async function api(path, method = "GET", body = null) {
     });
     if (uid && token) persistAuthUser(null);
   }
-  if (!res.ok) throw new Error(json?.message || `HTTP ${res.status}`);
+  if (!res.ok) throw new Error(translateApiErrorMessage(json?.message || `HTTP ${res.status}`, res.status));
   return json;
 }
 
@@ -325,4 +360,3 @@ export function httpsCallable(_functions, name) {
     return { data: res?.data };
   };
 }
-

@@ -15,6 +15,9 @@ use Illuminate\Support\Str;
 
 class ClientLiveQuizService
 {
+    private const SYSTEM_OWNER_EMAIL = 'dogu@okul.local';
+    private const SYSTEM_OWNER_USERNAME = 'dogu';
+
     public function createQuiz(Request $request): JsonResponse
     {
         $uid = (string) $request->attributes->get('client_uid', '');
@@ -297,9 +300,39 @@ class ClientLiveQuizService
 
     private function isTeacher(string $uid): bool
     {
+        if ($this->isSystemOwner($uid)) {
+            return true;
+        }
         $role = (string) (UserProfile::query()->where('user_id', $uid)->value('role') ?? '');
         $r = Str::lower(Str::ascii(trim($role)));
         return in_array($r, ['teacher', 'admin', 'administrator', 'ogretmen'], true);
+    }
+
+    private function isSystemOwner(string $uid): bool
+    {
+        if ($uid === '') {
+            return false;
+        }
+
+        $profile = UserProfile::query()->where('user_id', $uid)->first();
+        if (! $profile) {
+            return false;
+        }
+
+        $record = DB::table('users')
+            ->where('id', (int) $uid)
+            ->select(['email', 'name'])
+            ->first();
+
+        if (! $record) {
+            return false;
+        }
+
+        $email = Str::lower(trim((string) ($record->email ?? '')));
+        $username = Str::lower(trim((string) ($profile->username ?: $record->name ?? '')));
+
+        return $email === self::SYSTEM_OWNER_EMAIL
+            || $username === self::SYSTEM_OWNER_USERNAME;
     }
 
     private function quizPayload(LiveQuiz $quiz): array

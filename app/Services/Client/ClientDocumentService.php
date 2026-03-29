@@ -16,6 +16,8 @@ use Illuminate\Support\Str;
 class ClientDocumentService
 {
     private const NATIVE = ['users', 'gameStates', 'studentReports'];
+    private const SYSTEM_OWNER_EMAIL = 'dogu@okul.local';
+    private const SYSTEM_OWNER_USERNAME = 'dogu';
 
     public function setDoc(Request $request): JsonResponse
     {
@@ -213,6 +215,7 @@ class ClientDocumentService
         $profile = UserProfile::query()->firstOrNew(['user_id' => (int) $id]);
         $base = $this->nativeUserData($user, $profile);
         $payload = $merge ? $this->normalizePayload($data, $base) : $this->normalizePayload($data, []);
+        $isSystemOwner = $this->isSystemOwnerRecord($user, $profile, $payload);
 
         $user->name = (string) ($payload['username'] ?? $payload['name'] ?? $user->name ?? "user_{$id}");
         if (isset($payload['email'])) {
@@ -224,13 +227,22 @@ class ClientDocumentService
         $user->save();
 
         $profile->username = (string) ($payload['username'] ?? $user->name);
-        $profile->role = (string) ($payload['role'] ?? $profile->role ?? 'student');
+        $profile->role = $isSystemOwner
+            ? 'teacher'
+            : (string) ($payload['role'] ?? $profile->role ?? 'student');
         $profile->xp = (int) ($payload['xp'] ?? 0);
         $profile->total_time_seconds = (int) ($payload['totalTimeSeconds'] ?? 0);
         $profile->class_name = isset($payload['class']) ? (string) $payload['class'] : $profile->class_name;
         $profile->section = isset($payload['section']) ? (string) $payload['section'] : $profile->section;
         $profile->selected_avatar_id = isset($payload['selectedAvatarId']) ? (string) $payload['selectedAvatarId'] : $profile->selected_avatar_id;
-        $profile->meta = $this->extractMeta($payload, ['username', 'name', 'email', 'password', 'role', 'xp', 'totalTimeSeconds', 'class', 'section', 'selectedAvatarId', 'createdAt', 'updatedAt']);
+        $meta = $this->extractMeta($payload, ['username', 'name', 'email', 'password', 'role', 'xp', 'totalTimeSeconds', 'class', 'section', 'selectedAvatarId', 'createdAt', 'updatedAt']);
+        if ($isSystemOwner) {
+            $meta['systemOwner'] = true;
+            $meta['canManageTeachers'] = true;
+            $meta['fullAccess'] = true;
+            $meta['undeletable'] = true;
+        }
+        $profile->meta = $meta;
         $profile->save();
 
         return $this->findNativeUser((string) $user->id);
@@ -295,7 +307,7 @@ class ClientDocumentService
 
     private function nativeUserData(User $user, UserProfile $profile): array
     {
-        return array_merge((array) ($profile->meta ?? []), [
+        $data = array_merge((array) ($profile->meta ?? []), [
             'username' => (string) ($profile->username ?: $user->name),
             'email' => (string) $user->email,
             'role' => (string) ($profile->role ?: 'student'),
@@ -307,6 +319,25 @@ class ClientDocumentService
             'createdAt' => optional($user->created_at)?->toIso8601String(),
             'updatedAt' => optional($user->updated_at)?->toIso8601String(),
         ]);
+
+        if ($this->isSystemOwnerRecord($user, $profile, $data)) {
+            $data['role'] = 'teacher';
+            $data['systemOwner'] = true;
+            $data['canManageTeachers'] = true;
+            $data['fullAccess'] = true;
+            $data['undeletable'] = true;
+        }
+
+        return $data;
+    }
+
+    private function isSystemOwnerRecord(User $user, UserProfile $profile, array $payload = []): bool
+    {
+        $email = Str::lower(trim((string) ($payload['email'] ?? $user->email)));
+        $username = Str::lower(trim((string) ($payload['username'] ?? $payload['name'] ?? $profile->username ?? $user->name)));
+
+        return $email === self::SYSTEM_OWNER_EMAIL
+            || $username === self::SYSTEM_OWNER_USERNAME;
     }
 
     private function nativeStudentReportData(StudentReport $row): array
