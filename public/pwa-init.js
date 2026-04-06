@@ -48,10 +48,21 @@
       const metaBaseUrl = String(
         document.querySelector('meta[name="app-base-url"]')?.content || ""
       ).trim().replace(/\/+$/, "");
-      const swUrl = `${metaBaseUrl || window.location.origin}/service-worker.js`;
-      navigator.serviceWorker.register(swUrl).then((registration) => {
-        window.__APP_SW_REGISTRATION__ = registration;
-      }).catch(() => {});
+      const root = metaBaseUrl || window.location.origin;
+      const candidates = [
+        `${root}/public/service-worker.js`,
+        `${root}/service-worker.js`,
+      ];
+
+      (async () => {
+        for (const swUrl of candidates) {
+          try {
+            const registration = await navigator.serviceWorker.register(swUrl);
+            window.__APP_SW_REGISTRATION__ = registration;
+            return;
+          } catch (_) {}
+        }
+      })();
     });
   }
 

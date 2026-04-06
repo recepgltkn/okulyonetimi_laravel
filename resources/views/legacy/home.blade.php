@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
-    <meta name="app-base-url" content="{{ rtrim(url('/'), '/') }}">
+    <meta name="app-base-url" content="{{ rtrim(request()->getSchemeAndHttpHost() . request()->getBaseUrl(), '/') }}">
     <meta name="theme-color" content="#2563eb">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -16,9 +16,9 @@
     <link rel="dns-prefetch" href="//cdn.jsdelivr.net">
     <link rel="dns-prefetch" href="//fonts.googleapis.com">
     <link rel="dns-prefetch" href="//fonts.gstatic.com">
-    <link rel="icon" type="image/png" href="{{ asset('logo.png') }}">
-    <link rel="manifest" href="{{ asset('manifest.json') }}">
-    <link rel="apple-touch-icon" href="{{ asset('logo192.png') }}">
+    <link rel="icon" type="image/png" href="{{ url('public/logo.png') }}">
+    <link rel="manifest" href="{{ url('public/manifest.json') }}">
+    <link rel="apple-touch-icon" href="{{ url('public/logo192.png') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Poppins:wght@300;400&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&display=swap" rel="stylesheet">
@@ -2760,7 +2760,6 @@
         #side-menu.student-minimal #btn-toggle-add-menu,
         #side-menu.student-minimal #btn-toggle-apps-menu,
         #side-menu.student-minimal #btn-toggle-student-data-menu,
-        #side-menu.student-minimal #btn-open-lessons,
         #side-menu.student-minimal #btn-open-create,
         #side-menu.student-minimal #btn-open-tasks,
         #side-menu.student-minimal #btn-open-approvals,
@@ -2787,6 +2786,7 @@
             display: none !important;
         }
         #side-menu.student-minimal #btn-open-home,
+        #side-menu.student-minimal #btn-open-lessons,
         #side-menu.student-minimal #btn-open-my-stats,
         #side-menu.student-minimal #btn-open-certificates,
         #side-menu.student-minimal #btn-logout-side {
@@ -8619,49 +8619,49 @@
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
-        <link rel="stylesheet" href="{{ asset('student-panel/legacy-bridge.css') }}">
+        <link rel="stylesheet" href="{{ url('public/student-panel/legacy-bridge.css') }}">
         <script>
             window.STUDENT_PANEL_MODE = true;
             window.STUDENT_PANEL_PAGE = @json($studentPanelPage ?? 'dashboard');
         </script>
-        <script defer src="{{ asset('student-panel/legacy-bridge.js') }}"></script>
+        <script defer src="{{ url('public/student-panel/legacy-bridge.js') }}"></script>
     @endif
 
     <div id="side-menu" class="sidebar">
         <button id="close-menu" style="font-size: 30px; margin-bottom: 20px;">×</button>
         <div class="sidebar-logo-wrap">
-            <img src="{{ asset('logo.png') }}" alt="Logo" class="sidebar-logo">
+            <img src="{{ url('public/logo.png') }}" alt="Logo" class="sidebar-logo">
         </div>
         <button id="btn-open-home" onclick="showPage('home')" class="nav-btn active" data-page="home">🏠 Anasayfa</button>
         <button id="btn-open-lessons" class="nav-btn" style="display: none;">📚 Derslerim</button>
-        <button id="btn-toggle-apps-menu" class="nav-btn sidebar-group-toggle" style="display: none;">🧠 Uygulamalarım</button>
+        <button id="btn-toggle-apps-menu" class="nav-btn sidebar-group-toggle" style="display: none;">🧪 Uygulamalarım</button>
         <div id="submenu-apps" class="sidebar-submenu" style="display:none;"></div>
-        <button id="btn-toggle-tasks-menu" class="nav-btn sidebar-group-toggle" style="display: none;">🗂️ Ödevler <span class="arrow">▸</span></button>
+        <button id="btn-toggle-tasks-menu" class="nav-btn sidebar-group-toggle" style="display: none;">🧩 Ödevler <span class="arrow">▸</span></button>
         <div id="submenu-tasks" class="sidebar-submenu">
             <button id="btn-open-create" class="nav-btn submenu-item" style="display: none;">➕ Ödev Ekle</button>
-            <button id="btn-open-tasks" class="nav-btn submenu-item" style="display: none;">🗂️ Ödevler</button>
+            <button id="btn-open-tasks" class="nav-btn submenu-item" style="display: none;">🧩 Ödevler</button>
             <button id="btn-open-approvals" class="nav-btn submenu-item" style="display: none;">✅ Ödev Onayları</button>
         </div>
         <button id="btn-toggle-add-menu" class="nav-btn sidebar-group-toggle" style="display: none;">➕ Ekle <span class="arrow">▸</span></button>
         <div id="submenu-add" class="sidebar-submenu">
-            <button id="btn-open-content" class="nav-btn submenu-item" style="display: none;">🧩 Etkinlik Ekle</button>
-            <button id="btn-open-books" class="nav-btn submenu-item" style="display: none;">📚 Kitap Ekle</button>
-            <button id="btn-open-add-student" class="nav-btn submenu-item" style="display: none;">👤 Öğrenci Ekle</button>
+            <button id="btn-open-content" class="nav-btn submenu-item" style="display: none;">🎯 Etkinlik Ekle</button>
+            <button id="btn-open-books" class="nav-btn submenu-item" style="display: none;">📖 Kitap Ekle</button>
+            <button id="btn-open-add-student" class="nav-btn submenu-item" style="display: none;">👩‍🎓 Öğrenci Ekle</button>
             <button id="btn-open-class-sections" class="nav-btn submenu-item" style="display: none;">🏫 Sınıf/Şube Ekle</button>
         </div>
-        <button id="btn-toggle-student-data-menu" class="nav-btn sidebar-group-toggle" style="display: none;">👥 Öğrenci Verileri <span class="arrow">▸</span></button>
+        <button id="btn-toggle-student-data-menu" class="nav-btn sidebar-group-toggle" style="display: none;">📊 Öğrenci Verileri <span class="arrow">▸</span></button>
         <div id="submenu-student-data" class="sidebar-submenu">
             <button id="btn-open-students" class="nav-btn submenu-item" style="display: none;">👥 Öğrencilerim</button>
             <button id="btn-open-classes" class="nav-btn submenu-item" style="display: none;">🏫 Sınıflarım</button>
-            <button id="btn-open-reports" class="nav-btn submenu-item" style="display: none;">🧾 Raporlar</button>
+            <button id="btn-open-reports" class="nav-btn submenu-item" style="display: none;">📈 Raporlar</button>
             <button id="btn-open-login-cards" class="nav-btn submenu-item" style="display: none;">🪪 Giriş Kartları</button>
-            <button id="btn-open-teacher-certificates" class="nav-btn submenu-item" style="display: none;">🏅 Sertifika Yönetimi</button>
+            <button id="btn-open-teacher-certificates" class="nav-btn submenu-item" style="display: none;">🎓 Sertifika Yönetimi</button>
             <button id="btn-open-notifications" class="nav-btn submenu-item" style="display: none;">🔔 Bildirimler</button>
         </div>
-        <button id="btn-open-my-stats" class="nav-btn" style="display: none;">📈 İstatistiklerim</button>
+        <button id="btn-open-my-stats" class="nav-btn" style="display: none;">📊 İstatistiklerim</button>
         <button id="btn-open-badges" class="nav-btn" style="display: none;">🏅 Rozetlerim</button>
-        <button id="btn-open-certificates" class="nav-btn" style="display: none;">🎓 Sertifikalarım</button>
-        <button id="btn-open-avatar-shop" class="nav-btn" style="display: none;">🛍️ Avatar Al</button>
+        <button id="btn-open-certificates" class="nav-btn" style="display: none;">📜 Sertifikalarım</button>
+        <button id="btn-open-avatar-shop" class="nav-btn" style="display: none;">🧩 Avatar Al</button>
         <div class="sidebar-footer">
             <div class="sidebar-footer-title">Sitede Geçen Süren</div>
             <div id="student-total-time" class="time-widget" style="display:none;">
@@ -8694,53 +8694,71 @@
             </div>
             <div class="apps-hub-grid">
                 <article class="apps-hub-card">
-                    <img src="{{ asset('blok-kodlama.png') }}" alt="Blok Kodlama" class="apps-hub-card-image">
+                    <img src="{{ url('public/blok-kodlama.png') }}" alt="Blok Kodlama" class="apps-hub-card-image">
                     <h4>Blok Kodlama</h4>
                     <p>Bloklarla temel kodlama becerilerini geliştir.</p>
                     <button id="btn-apps-hub-open-block2d" class="btn btn-primary apps-hub-start-btn">Uygulamaya Başla</button>
                 </article>
                 <article class="apps-hub-card">
-                    <img src="{{ asset('3d-blok-kodlama.png') }}" alt="3D Blok Kodlama" class="apps-hub-card-image">
+                    <img src="{{ url('public/3d-blok-kodlama.png') }}" alt="3D Blok Kodlama" class="apps-hub-card-image">
                     <h4>3D Blok Kodlama</h4>
                     <p>3 boyutlu sahnede kodlamayı deneyimle.</p>
                     <button id="btn-apps-hub-open-block3d" class="btn btn-primary apps-hub-start-btn">Uygulamaya Başla</button>
                 </article>
                 <article class="apps-hub-card">
-                    <img src="{{ asset('compute-it.png') }}" alt="Compute It" class="apps-hub-card-image">
+                    <img src="{{ url('public/compute-it.png') }}" alt="Compute It" class="apps-hub-card-image">
                     <h4>Compute It</h4>
                     <p>Algoritma ve problem çözme becerini güçlendir.</p>
                     <button id="btn-apps-hub-open-compute" class="btn btn-primary apps-hub-start-btn">Uygulamaya Başla</button>
                 </article>
                 <article class="apps-hub-card">
-                    <img src="{{ asset('python.png') }}" alt="Python Quiz Lab" class="apps-hub-card-image">
+                    <img src="{{ url('public/python.png') }}" alt="Python Quiz Lab" class="apps-hub-card-image">
                     <h4>Python Quiz Lab</h4>
                     <p>Python temelinden zora giden 3 bolumde soru ve mini konu anlatimi.</p>
                     <button id="btn-apps-hub-open-silent-teacher" class="btn btn-primary apps-hub-start-btn">Uygulamaya Başla</button>
                 </article>
                 <article class="apps-hub-card" id="apps-hub-card-live-quiz" style="display:none;">
-                    <img src="{{ asset('quiz.png') }}" alt="Canlı Quiz" class="apps-hub-card-image">
+                    <img src="{{ url('public/quiz.png') }}" alt="Canlı Quiz" class="apps-hub-card-image">
                     <h4>Canlı Quiz</h4>
                     <p>Quiz oluştur, başlat ve sonuçları yönet.</p>
                     <button id="btn-apps-hub-open-live-quiz" class="btn btn-primary apps-hub-start-btn">Quiz Yönet</button>
                 </article>
+                <article class="apps-hub-card" id="apps-hub-card-keyboard-race" style="display:none;">
+                    <img src="{{ url('public/quiz.png') }}" alt="Klavye Yarışması" class="apps-hub-card-image">
+                    <h4>Klavye Yarışması</h4>
+                    <p>Gerçek zamanlı oda aç, yarışı başlat ve canlı sıralamayı yönet.</p>
+                    <button id="btn-apps-hub-open-keyboard-race" class="btn btn-primary apps-hub-start-btn">Yarışı Başlat</button>
+                    <button id="btn-apps-hub-keyboard-race-report" class="btn apps-hub-start-btn" style="margin-top:8px; background:#e2e8f0; color:#0f172a;">Rapor Al (PDF)</button>
+                </article>
                 <article class="apps-hub-card">
-                    <img src="{{ asset('code-robot.png') }}" alt="Code Robot Lab" class="apps-hub-card-image">
+                    <img src="{{ url('public/code-robot.png') }}" alt="Code Robot Lab" class="apps-hub-card-image">
                     <h4>Code Robot Lab</h4>
                     <p>Lightbot mantiginda komutlarla robotu yonet, kolaydan zora bolumleri gec.</p>
                     <button id="btn-apps-hub-open-lightbot" class="btn btn-primary apps-hub-start-btn">Uygulamaya Başla</button>
                 </article>
                 <article class="apps-hub-card">
-                    <img src="{{ asset('flowchart.png') }}" alt="Flowchart" class="apps-hub-card-image">
+                    <img src="{{ url('public/flowchart.png') }}" alt="Flowchart" class="apps-hub-card-image">
                     <h4>Flowchart</h4>
                     <p>Akış şeması ile mantıksal düşünmeyi pekiştir.</p>
                     <button id="btn-apps-hub-open-flowchart" class="btn btn-primary apps-hub-start-btn">Uygulamaya Başla</button>
                 </article>
                 <article class="apps-hub-card">
-                    <img src="{{ asset('cizgi-oyunu.png') }}" alt="Çizgi Oyunu" class="apps-hub-card-image">
+                    <img src="{{ url('public/cizgi-oyunu.png') }}" alt="Çizgi Oyunu" class="apps-hub-card-image">
                     <h4>Çizgi Oyunu</h4>
                     <p>Refleks ve dikkat becerilerini eğlenceli şekilde test et.</p>
                     <button id="btn-apps-hub-open-line-trace" class="btn btn-primary apps-hub-start-btn">Uygulamaya Başla</button>
                 </article>
+            </div>
+        </div>
+    </div>
+
+    <div id="keyboard-race-alert-modal" class="modal-overlay" style="display:none; z-index:27000;">
+        <div class="modal-content" style="max-width:520px;">
+            <h3 style="margin-top:0;">Klavye Yarışmasına Katıl</h3>
+            <p id="keyboard-race-alert-text" style="color:#334155;">Öğretmen bir klavye yarışı başlattı.</p>
+            <div style="display:flex; gap:10px; justify-content:flex-end;">
+                <button id="btn-keyboard-race-dismiss" class="btn" style="background:#e2e8f0;">Daha Sonra</button>
+                <button id="btn-keyboard-race-join" class="btn btn-primary">Şimdi Katıl</button>
             </div>
         </div>
     </div>
@@ -8759,7 +8777,7 @@
     </div>
     <button id="student-ai-fab" class="edu-ai-fab" title="Yapay Zeka Asistanı">
         <span class="edu-ai-wing left" aria-hidden="true"></span>
-        <span class="edu-ai-core"><img src="{{ asset('logo.png') }}" alt="Asistan Avatar"></span>
+        <span class="edu-ai-core"><img src="{{ url('public/logo.png') }}" alt="Asistan Avatar"></span>
         <span class="edu-ai-wing right" aria-hidden="true"></span>
     </button>
     <div id="student-ai-panel" class="edu-ai-panel">
@@ -8789,11 +8807,11 @@
             <div class="login-layout">
                 <section class="login-left">
                     <div class="login-scene" aria-hidden="true">
-                        <span class="scene-item scene-rocket r1">🚀</span>
-                        <span class="scene-item scene-rocket r2">🚀</span>
-                        <span class="scene-item scene-rocket r3">🚀</span>
-                        <span class="scene-item scene-rocket r4">🚀</span>
-                        <span class="scene-item scene-rocket r5">🚀</span>
+                        <span class="scene-item scene-rocket r1">📌</span>
+                        <span class="scene-item scene-rocket r2">📌</span>
+                        <span class="scene-item scene-rocket r3">📌</span>
+                        <span class="scene-item scene-rocket r4">📌</span>
+                        <span class="scene-item scene-rocket r5">📌</span>
                         <span class="scene-item scene-robot b1"></span>
                         <span class="scene-item scene-robot b2"></span>
                         <span class="scene-item scene-robot b3"></span>
@@ -8807,7 +8825,7 @@
                         <h2>Dijital Bilişim Eğitim Platformu</h2>
                         <p>Kısa, odaklı ve uygulamalı içeriklerle öğrenme sürecini hızlandır.</p>
                     </div>
-                    <img src="{{ asset('logo.png') }}" alt="Logo" class="login-hero-logo">
+                    <img src="{{ url('public/logo.png') }}" alt="Logo" class="login-hero-logo">
                     <div class="login-slogan">Özelsin Çünkü Gelecek Sensin</div>
                 </section>
                 <section class="login-right">
@@ -8824,7 +8842,7 @@
                         <div class="login-actions">
                             <button id="btn-login" type="button" class="btn btn-success" style="flex: 1;">Giriş Yap</button>
                         </div>
-                        <button id="btn-login-mini-game" type="button" class="btn" style="background:linear-gradient(90deg,#0ea5e9,#2563eb);color:#fff;border:none;height:44px;border-radius:12px;font-weight:700;">🎮 Mini Oyunla Şifresiz Giriş</button>
+                        <button id="btn-login-mini-game" type="button" class="btn" style="background:linear-gradient(90deg,#0ea5e9,#2563eb);color:#fff;border:none;height:44px;border-radius:12px;font-weight:700;">📌 Mini Oyunla Şifresiz Giriş</button>
                         <div id="login-mini-game-wrap" style="display:none;"></div>
                     </div>
                 </section>
@@ -8840,7 +8858,7 @@
             <div style="font-size:14px; color:#334155; margin-bottom:8px;">Bilgi: Ok tuşları ile oyna. 3 yıldız toplayıp hedefe çıkınca giriş yapılır.</div>
             <canvas id="login-mini-game-canvas" width="1100" height="550" style="width:100%; height:auto; border-radius:14px; background:#0f172a; border:1px solid #1e293b;"></canvas>
             <div style="display:flex; justify-content:space-between; margin-top:8px; font-size:13px; color:#475569;">
-                <span>Kontrol: `←` `→` hareket, `↑` zıpla</span>
+                <span>Kontrol: `‹` `›` hareket, `^` zıpla</span>
                 <span id="login-mini-game-status">Hazır</span>
             </div>
         </div>
@@ -8867,7 +8885,7 @@
             <div class="app-header">
                 <div id="user-fullname" style="min-width: 160px; font-family: 'Poppins', sans-serif; font-weight: 600; color: #2c2c2c;"></div>
                 <button id="open-menu" style="display:none;">☰</button>
-                <div id="header-center-logo"><img src="{{ asset('logo.png') }}" alt="Logo" style="transform: scale(1.95); transform-origin: center; display:block;"></div>
+                <div id="header-center-logo"><img src="{{ url('public/logo.png') }}" alt="Logo" style="transform: scale(1.95); transform-origin: center; display:block;"></div>
                 <h3 id="user-welcome" style="margin: 0; display:none;">Hoş geldin!</h3>
                 <div id="user-menu" style="position: relative; display: flex; align-items: center; gap: 8px;">
                     <button id="theme-toggle-app" class="theme-toggle-inline" type="button" title="Karanlık Mod">🌙</button>
@@ -9228,7 +9246,7 @@
             <div class="card" id="student-homework-shell">
                 <div class="student-shell-head">
                     <div>
-                        <h3>📚 Görev Merkezi</h3>
+                        <h3>📌 Görev Merkezi</h3>
                         <p>Ödev, etkinlik ve derslerini tek ekranda takip et. Önce bekleyenleri bitir, sonra tamamladıklarını kontrol et.</p>
                     </div>
                 </div>
@@ -9247,14 +9265,14 @@
                         <div id="student-homework-pending" class="tab-content active">
                             <ul id="list-student-homework-pending" style="padding:0; margin:0; list-style:none;"></ul>
                             <div id="no-student-homework-pending" class="empty-state" style="display:none;">
-                                <div class="empty-state-icon">📚</div>
+                                <div class="empty-state-icon">📌</div>
                                 Bekleyen içerik yok.
                             </div>
                         </div>
                         <div id="student-homework-completed" class="tab-content">
                             <ul id="list-student-homework-completed" style="padding:0; margin:0; list-style:none;"></ul>
                             <div id="no-student-homework-completed" class="empty-state" style="display:none;">
-                                <div class="empty-state-icon">✅</div>
+                                <div class="empty-state-icon">📌</div>
                                 Tamamlanan içerik yok.
                             </div>
                         </div>
@@ -9264,7 +9282,7 @@
                 <div class="student-shell-body">
             <!-- Verilen Ödevler / Ödevlerim -->
             <div class="card" id="tasks-section">
-                <h3 id="tasks-title">📚 Ödevlerim</h3>
+                <h3 id="tasks-title">📌 Ödevlerim</h3>
                 
                 <!-- Filtreleme (Öğretmen için) -->
                 <div id="teacher-filters" class="filter-bar" style="display: none;">
@@ -9298,7 +9316,7 @@
                 <div id="tab-pending" class="tab-content active">
                     <ul id="list-pending" style="padding: 0; margin: 0; list-style: none;"></ul>
                     <div id="no-pending" class="empty-state" style="display: none;">
-                        <div class="empty-state-icon">⏳</div>
+                        <div class="empty-state-icon">📌</div>
                         <div>Bekleyen ödev yok!</div>
                     </div>
                 </div>
@@ -9306,7 +9324,7 @@
                 <div id="tab-completed" class="tab-content">
                     <ul id="list-completed" style="padding: 0; margin: 0; list-style: none;"></ul>
                     <div id="no-completed" class="empty-state" style="display: none;">
-                        <div class="empty-state-icon">📚</div>
+                        <div class="empty-state-icon">📌</div>
                         <div>Henüz tamamlanan ödev yok.</div>
                     </div>
                 </div>
@@ -9315,7 +9333,7 @@
 
             <!-- Etkinliklerim / Verilen Etkinlikler -->
             <div class="card" id="activities-section">
-                <h3 id="activities-title">🎯 Etkinliklerim</h3>
+                <h3 id="activities-title">📌 Etkinliklerim</h3>
 
                 <!-- Filtreleme (Öğretmen için) -->
                 <div id="activity-filters" class="filter-bar" style="display: none;">
@@ -9347,7 +9365,7 @@
                 <div id="activity-pending" class="tab-content active">
                     <ul id="list-activity-pending" style="padding: 0; margin: 0; list-style: none;"></ul>
                     <div id="no-activity-pending" class="empty-state" style="display: none;">
-                        <div class="empty-state-icon">🎯</div>
+                        <div class="empty-state-icon">📌</div>
                         Bekleyen etkinlik yok.
                     </div>
                 </div>
@@ -9355,7 +9373,7 @@
                 <div id="activity-completed" class="tab-content">
                     <ul id="list-activity-completed" style="padding: 0; margin: 0; list-style: none;"></ul>
                     <div id="no-activity-completed" class="empty-state" style="display: none;">
-                        <div class="empty-state-icon">✅</div>
+                        <div class="empty-state-icon">📌</div>
                         Tamamlanan etkinlik yok.
                     </div>
                 </div>
@@ -9364,7 +9382,7 @@
             
             <!-- Dersler -->
             <div class="card" id="lessons-section">
-                <h3 id="lessons-title">📑 Derslerim</h3>
+                <h3 id="lessons-title">📌 Derslerim</h3>
                 <div id="lessons-tabs" class="tabs" style="display:none; margin-top:10px;">
                     <button class="tab-btn active" onclick="switchLessonTab('pending')">Bekleyen</button>
                     <button class="tab-btn" onclick="switchLessonTab('completed')">Tamamlanan</button>
@@ -9389,14 +9407,14 @@
                 <div id="lessons-pending" class="tab-content active">
                     <ul id="list-lessons-pending" style="padding:0; margin:0; list-style:none;"></ul>
                     <div id="no-lessons-pending" class="empty-state" style="display:none;">
-                        <div class="empty-state-icon">📖</div>
+                        <div class="empty-state-icon">📌</div>
                         Bekleyen ders yok.
                     </div>
                 </div>
                 <div id="lessons-completed" class="tab-content">
                     <ul id="list-lessons-completed" style="padding:0; margin:0; list-style:none;"></ul>
                     <div id="no-lessons-completed" class="empty-state" style="display:none;">
-                        <div class="empty-state-icon">✅</div>
+                        <div class="empty-state-icon">📌</div>
                         Tamamlanan ders yok.
                     </div>
                 </div>
@@ -9408,7 +9426,7 @@
             <!-- Quizler (Öğretmen) -->
             <div class="card" id="quiz-section" style="display:none;">
                 <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
-                    <h3 style="margin:0;">🧠 Verilen Quizler</h3>
+                    <h3 style="margin:0;">📌 Verilen Quizler</h3>
                     <button id="btn-open-live-quiz-home" class="btn btn-primary">Quiz Yönet</button>
                 </div>
                 <div id="quiz-tabs" class="tabs" style="display:none; margin-top:10px;">
@@ -9421,14 +9439,14 @@
                 <div id="quiz-pending" class="tab-content active">
                     <div id="quiz-list-pending" style="display:flex;flex-direction:column;gap:8px;"></div>
                     <div id="no-quiz-pending" class="empty-state" style="display:none;">
-                        <div class="empty-state-icon">🧠</div>
+                        <div class="empty-state-icon">📌</div>
                         Bekleyen quiz yok.
                     </div>
                 </div>
                 <div id="quiz-completed" class="tab-content">
                     <div id="quiz-list-completed" style="display:flex;flex-direction:column;gap:8px;"></div>
                     <div id="no-quiz-completed" class="empty-state" style="display:none;">
-                        <div class="empty-state-icon">✅</div>
+                        <div class="empty-state-icon">📌</div>
                         Tamamlanan quiz yok.
                     </div>
                 </div>
@@ -9437,7 +9455,7 @@
             <div class="card" id="student-apps-shell">
                 <div class="student-shell-head">
                     <div>
-                        <h3>🧩 Uygulama Atölyesi</h3>
+                        <h3>📌 Uygulama Atölyesi</h3>
                         <p>Blok Kodlama, 3D Blok, Python Quiz Lab, Code Robot ve Compute It çalışmalarını burada aç.</p>
                     </div>
                 </div>
@@ -9450,14 +9468,14 @@
                         <div id="student-apps-pending" class="tab-content active">
                             <ul id="list-student-apps-pending" style="padding:0; margin:0; list-style:none;"></ul>
                             <div id="no-student-apps-pending" class="empty-state" style="display:none;">
-                                <div class="empty-state-icon">🧩</div>
+                                <div class="empty-state-icon">📌</div>
                                 Bekleyen uygulama içeriği yok.
                             </div>
                         </div>
                         <div id="student-apps-completed" class="tab-content">
                             <ul id="list-student-apps-completed" style="padding:0; margin:0; list-style:none;"></ul>
                             <div id="no-student-apps-completed" class="empty-state" style="display:none;">
-                                <div class="empty-state-icon">✅</div>
+                                <div class="empty-state-icon">📌</div>
                                 Tamamlanan uygulama içeriği yok.
                             </div>
                         </div>
@@ -9511,21 +9529,21 @@
                     <div id="block-homework-pending" class="tab-content active">
                         <ul id="list-block-homework-pending" style="padding:0; margin:0; list-style:none;"></ul>
                         <div id="no-block-homework-pending" class="empty-state" style="display:none;">
-                            <div class="empty-state-icon">🧩</div>
+                            <div class="empty-state-icon">📌</div>
                             Bekleyen blok kodlama ödevi yok.
                         </div>
                     </div>
                     <div id="block-homework-completed" class="tab-content">
                         <ul id="list-block-homework-completed" style="padding:0; margin:0; list-style:none;"></ul>
                         <div id="no-block-homework-completed" class="empty-state" style="display:none;">
-                            <div class="empty-state-icon">✅</div>
+                            <div class="empty-state-icon">📌</div>
                             Tamamlanan blok kodlama ödevi yok.
                         </div>
                     </div>
                 </div>
                 <button id="btn-show-all-block-homework" class="btn btn-primary" style="width: 100%; display: none; margin-top: 10px;">Daha Fazla Göster</button>
                 <div id="compute-homework-section" style="margin-top:0; padding-top:0; border-top:none;">
-                    <h3 id="compute-homework-title" style="display:none; margin:0;">🧠 Compute It Ödevi</h3>
+                    <h3 id="compute-homework-title" style="display:none; margin:0;">📌 Compute It Ödevi</h3>
                     <div id="compute-homework-tabs" class="tabs" style="display:none; margin-top:10px;">
                         <button class="tab-btn active" onclick="switchComputeHomeworkTab('pending')">Bekleyen</button>
                         <button class="tab-btn" onclick="switchComputeHomeworkTab('completed')">Tamamlanan</button>
@@ -9560,14 +9578,14 @@
                         <div id="compute-homework-pending" class="tab-content active">
                             <ul id="list-compute-homework-pending" style="padding:0; margin:0; list-style:none;"></ul>
                             <div id="no-compute-homework-pending" class="empty-state" style="display:none;">
-                                <div class="empty-state-icon">🧠</div>
+                                <div class="empty-state-icon">📌</div>
                                 Bekleyen Compute It ödevi yok.
                             </div>
                         </div>
                         <div id="compute-homework-completed" class="tab-content">
                             <ul id="list-compute-homework-completed" style="padding:0; margin:0; list-style:none;"></ul>
                             <div id="no-compute-homework-completed" class="empty-state" style="display:none;">
-                                <div class="empty-state-icon">✅</div>
+                                <div class="empty-state-icon">📌</div>
                                 Tamamlanan Compute It ödevi yok.
                             </div>
                         </div>
@@ -9581,7 +9599,7 @@
             <div id="teacher-lessons-modal" class="modal-overlay" style="display:none; z-index:23000;">
                 <div class="modal-content modal-large" style="width:min(96vw,1400px); height:92vh; max-width:none; display:flex; flex-direction:column;">
                     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px; margin-bottom:10px;">
-                        <h2 style="margin:0;">📖 Derslerim</h2>
+                        <h2 style="margin:0;">📌 Derslerim</h2>
                         <div style="display:flex; gap:8px; align-items:center;">
                             <button id="btn-open-lesson-builder-from-modal" class="btn btn-primary">Ders Oluştur</button>
                             <button id="btn-close-teacher-lessons-modal" class="btn" style="background:#e2e8f0;">Kapat</button>
@@ -9600,6 +9618,22 @@
                             Ders bulunamadı.
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <div id="student-lessons-fullpage" class="card" style="display:none; position:fixed; inset:0; width:100vw; height:100vh; z-index:24000; margin:0; border-radius:0; box-shadow:none; flex-direction:column; background:radial-gradient(circle at 15% 10%, #dbeafe 0%, #eef2ff 35%, #f8fafc 70%, #f8fafc 100%); padding:18px 18px 14px; overflow:hidden;">
+                <div style="position:relative; display:flex;justify-content:space-between;align-items:flex-start;gap:12px; margin-bottom:14px; padding:18px 20px; border-radius:24px; background:linear-gradient(135deg,#0f172a,#1d4ed8 45%,#22d3ee); box-shadow:0 14px 40px rgba(30,64,175,.28);">
+                    <div>
+                        <div style="font-size:12px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#bae6fd;">Öğrenci Akademi</div>
+                        <h2 style="margin:6px 0 4px; font-size:44px; line-height:1; color:#fff;">Derslerim</h2>
+                        <div id="student-lessons-subtitle" style="font-size:14px; color:#dbeafe;">Öğretmen tarafından yayınlanan ders slaytları</div>
+                    </div>
+                    <button id="btn-student-lessons-back" class="btn" style="background:#fff; color:#0f172a; font-weight:700; border-radius:12px;">Anasayfaya Dön</button>
+                </div>
+                <div id="student-lessons-grid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:18px; align-content:start; overflow:auto; padding:2px 4px 10px;"></div>
+                <div id="student-lessons-empty" class="empty-state" style="display:none; margin-top:10px; border:1px dashed #cbd5e1; border-radius:16px; background:#fff; padding:30px;">
+                    <div class="empty-state-icon">📚</div>
+                    Henüz yayınlanan ders bulunmuyor.
                 </div>
             </div>
 
@@ -9628,15 +9662,15 @@
 
         <!-- Aktivite Detay Ekranı -->
         <div id="activity-detail" style="display: none;" class="card">
-            <button id="btn-back" class="btn btn-primary" style="margin-bottom: 20px;">↩️ Vazgeç ve Geri Dön</button>
+            <button id="btn-back" class="btn btn-primary" style="margin-bottom: 20px;">📌 Vazgeç ve Geri Dön</button>
             <div class="progress-bar"><div id="game-progress" class="progress-fill" style="width: 0%"></div></div>
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                 <h2 id="detail-title" style="margin: 0;"></h2>
-                <span class="time-badge" id="game-timer">⏱️ 00:00</span>
+                <span class="time-badge" id="game-timer">📌 00:00</span>
             </div>
             <div id="dynamic-game-container"></div>
             <div id="game-results" style="display: none; text-align: center; padding: 20px;">
-                <h3 style="color: var(--success);">🎉 Tebrikler!</h3>
+                <h3 style="color: var(--success);">📌 Tebrikler!</h3>
                 <p id="result-text"></p>
                 <div id="time-result" style="margin-top: 15px; padding: 10px; background: #e3f2fd; border-radius: 8px;"></div>
             </div>
@@ -9666,11 +9700,11 @@
             </div>
             
             <div id="teacher-actions" style="display: none; gap: 10px; margin-bottom: 10px;">
-                <button id="btn-edit-task" class="btn btn-primary" style="flex: 1;">✏️ Düzenle</button>
-                <button id="btn-delete-task" class="btn btn-danger" style="flex: 1;">🗑️ Sil</button>
+                <button id="btn-edit-task" class="btn btn-primary" style="flex: 1;">📌 Düzenle</button>
+                <button id="btn-delete-task" class="btn btn-danger" style="flex: 1;">🧩 Sil</button>
             </div>
             <div id="book-approval-section" style="display:none; margin-bottom:10px; padding:10px; background:#f8fafc; border-radius:8px; border:1px solid #e5e7eb;">
-                <div id="book-approval-title" style="font-weight:600; margin-bottom:6px;">📘 Kitap/Test Ödevi Onayı</div>
+                <div id="book-approval-title" style="font-weight:600; margin-bottom:6px;">📌 Kitap/Test Ödevi Onayı</div>
                 <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
                     <select id="book-approve-class" class="form-control" style="max-width:160px;">
                         <option value="">Sınıf</option>
@@ -9713,7 +9747,7 @@
                 <button id="btn-add-new-question" class="btn btn-warning" style="width: 100%; margin-bottom: 10px;">➕ Yeni Soru Ekle</button>
                 
                 <div style="display: flex; gap: 10px;">
-                    <button id="btn-save-edit" class="btn btn-success" style="flex: 1;">💾 Tüm Değişiklikleri Kaydet</button>
+                    <button id="btn-save-edit" class="btn btn-success" style="flex: 1;">📌 Tüm Değişiklikleri Kaydet</button>
                     <button id="btn-cancel-edit" class="btn" style="flex: 1; background: #eee;">İptal</button>
                 </div>
             </div>
@@ -9726,7 +9760,7 @@
                     <p id="completed-time" style="margin: 5px 0 0 0; font-size: 0.9rem; color: #666;"></p>
                 </div>
                 <div id="book-task-actions" style="display:none; margin-top: 12px; padding: 12px; background:#f8fafc; border-radius:10px; border:1px solid #e5e7eb;">
-                    <div id="book-task-title" style="font-weight:600; margin-bottom:6px;">📗 Kitap/Test Ödevi</div>
+                    <div id="book-task-title" style="font-weight:600; margin-bottom:6px;">📌 Kitap/Test Ödevi</div>
                     <div id="book-task-status" style="color:#666; font-size:0.9rem; margin-bottom:8px;">Durum: Başlanmadı</div>
                     <div style="display:flex; gap:8px; flex-wrap:wrap;">
                         <button id="btn-book-started" class="btn btn-primary" style="flex:1;">Yapmaya Başladım</button>
@@ -9748,7 +9782,7 @@
                 <button id="btn-close-create" class="btn" style="background: #eee;">Kapat</button>
             </div>
             <div id="teacher-panel" class="card" style="display: none;">
-                <h3>🧪 Yeni Karma Ödev Oluştur</h3>
+                <h3>📌 Yeni Karma Ödev Oluştur</h3>
                 <input type="text" id="task-title" placeholder="Ödev Başlığı" class="form-control">
                 <input type="text" id="task-desc" placeholder="Ödev Açıklaması (Opsiyonel)" class="form-control">
                 <select id="task-target" class="form-control">
@@ -9869,7 +9903,7 @@
                                         <div class="app-topbar-left">
                                             <div id="app-title" class="app-title">Uygulama</div>
                                             <div id="app-link" class="app-link">Uygulama linki yok</div>
-                                            <div id="app-timer" class="app-timer">⏱️ 0 dk 0 sn</div>
+                                            <div id="app-timer" class="app-timer">📌 0 dk 0 sn</div>
                                         </div>
                                         <div class="app-topbar-actions">
                                             <button id="btn-app-open" class="app-btn primary">Başlat</button>
@@ -9900,7 +9934,7 @@
             <div id="activity-fullbar" class="activity-fullbar">
                 <div class="left">
                     <span id="activity-full-title">Uygulama</span>
-                    <span id="activity-full-timer">⏱️ 0 dk 0 sn</span>
+                    <span id="activity-full-timer">📌 0 dk 0 sn</span>
                 </div>
                 <div class="right">
                     <button id="btn-activity-full-start" class="btn">Başlat</button>
@@ -9918,7 +9952,7 @@
                         <button id="btn-activity-head-start" class="app-btn primary">Başlat</button>
                         <button id="btn-activity-head-save" class="app-btn warn">Kaydet</button>
                         <button id="btn-activity-head-exit" class="app-btn danger">Çık</button>
-                        <span id="block-runner-timer" class="app-timer">⏱️ 0 dk 0 sn</span>
+                        <span id="block-runner-timer" class="app-timer">📌 0 dk 0 sn</span>
                     </div>
                     <button id="btn-close-activity" class="btn" style="background:#eee;">Kapat</button>
                 </div>
@@ -9927,7 +9961,7 @@
                     <div class="activity-left">
                     <div id="activity-title" class="activity-title">Uygulama</div>
                     <div id="activity-link" class="activity-link">Link yok</div>
-                    <div class="activity-timer" id="activity-timer">⏱️ 0 dk 0 sn</div>
+                    <div class="activity-timer" id="activity-timer">📌 0 dk 0 sn</div>
                     <div class="activity-actions">
                         <button id="btn-activity-start" class="app-btn primary">Başlat</button>
                         <button id="btn-activity-fullscreen" class="app-btn primary">Tam Ekran</button>
@@ -9940,7 +9974,7 @@
                         <div class="activity-pause-overlay">
                             <div class="activity-pause-card">
                                 <div id="activity-pause-title" class="pause-title" style="font-weight:700;">Duraklatıldı</div>
-                                <button id="btn-activity-resume" class="btn btn-play-resume" title="Devam Et" aria-label="Devam Et">▶</button>
+                                <button id="btn-activity-resume" class="btn btn-play-resume" title="Devam Et" aria-label="Devam Et">📌</button>
                             </div>
                         </div>
                         <iframe id="activity-iframe" src="about:blank" scrolling="no"></iframe>
@@ -9978,7 +10012,7 @@
                 <button id="btn-delete-assignment" class="btn btn-danger" style="flex:1;">Sil</button>
             </div>
             <div id="assignment-students-section" style="margin-top:12px; padding:10px; background:#f8fafc; border-radius:10px; border:1px solid #e5e7eb; display:none;">
-                <div style="font-weight:600; margin-bottom:6px;">👥 Öğrenci Durumu</div>
+                <div style="font-weight:600; margin-bottom:6px;">📌 Öğrenci Durumu</div>
                 <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
                     <select id="assignment-filter-class" class="form-control" style="max-width:160px;">
                         <option value="">Sınıf</option>
@@ -10017,7 +10051,7 @@
               <div id="info-message" style="margin-bottom:16px; color:#374151;">Bilgi mesajı</div>
               <div style="display:flex; gap:8px;">
                   <button id="btn-info-ok" class="btn btn-primary" style="flex:1;">Tamam</button>
-                  <button id="btn-info-continue" class="btn btn-continue-play" style="flex:1; display:none;" title="Devam Et" aria-label="Devam Et"><span class="play-ico">▶</span></button>
+                  <button id="btn-info-continue" class="btn btn-continue-play" style="flex:1; display:none;" title="Devam Et" aria-label="Devam Et"><span class="play-ico">📌</span></button>
               </div>
           </div>
       </div>
@@ -10125,7 +10159,7 @@
         <div class="modal-content login-cards-modal-content">
             <div class="login-cards-toolbar">
                 <div>
-                    <h3 style="margin:0;">🪪 Giriş Kartları</h3>
+                    <h3 style="margin:0;">📌 Giriş Kartları</h3>
                     <small id="login-cards-summary" style="color:#64748b;">Öğrenciler yükleniyor...</small>
                 </div>
                 <div style="display:flex; gap:8px;">
@@ -10264,7 +10298,7 @@
                 Satır formatı: Ad, Soyad, Kullanıcı Adı, Şifre, Sınıf, Şube
             </small>
             <div style="display:flex; gap:10px; flex-wrap: wrap; margin-bottom:8px;">
-                <button id="btn-download-student-template" class="btn btn-primary" style="flex:1;">⬇️ Örnek Excel (CSV) İndir</button>
+                <button id="btn-download-student-template" class="btn btn-primary" style="flex:1;">📌 Örnek Excel (CSV) İndir</button>
                 <input type="file" id="bulk-students-file" class="form-control" accept=".csv,.xlsx,.xls" style="flex:1;">
             </div>
             <textarea id="bulk-students-input" class="form-control" rows="6" placeholder="Örn:
@@ -10294,7 +10328,7 @@ Ayşe, Yılmaz, ayse, 123456, 9, B"></textarea>
                 Satır formatı: Kitap Adı, Testler (Test1|Test2|Test3)
             </small>
             <div style="display:flex; gap:10px; flex-wrap: wrap; margin-bottom:8px;">
-                <button id="btn-download-book-template" class="btn btn-primary" style="flex:1;">⬇️ Örnek Şablon İndir</button>
+                <button id="btn-download-book-template" class="btn btn-primary" style="flex:1;">📌 Örnek Şablon İndir</button>
                 <input type="file" id="bulk-books-file" class="form-control" accept=".csv,.xlsx,.xls" style="flex:1;">
             </div>
             <hr style="margin: 18px 0;">
@@ -10572,7 +10606,7 @@ Ayşe, Yılmaz, ayse, 123456, 9, B"></textarea>
                     </div>
                 </div>
                 <div style="margin-top:16px;">
-                    <h4 style="margin:0 0 10px;">🏅 Rozetler</h4>
+                    <h4 style="margin:0 0 10px;">📌 Rozetler</h4>
                     <div id="my-badges-grid" class="badges-grid"></div>
                 </div>
             </div>
@@ -10582,7 +10616,7 @@ Ayşe, Yılmaz, ayse, 123456, 9, B"></textarea>
     <div id="badges-modal" class="modal-overlay" style="display:none;">
         <div class="modal-content modal-large">
             <div style="display:flex; justify-content:space-between; align-items:center;">
-                <h3 style="margin:0;">🏅 Rozetlerim</h3>
+                <h3 style="margin:0;">📌 Rozetlerim</h3>
                 <button id="btn-close-badges" class="btn" style="background:#eee;">Kapat</button>
             </div>
             <div style="margin-top:12px;">
@@ -10621,19 +10655,19 @@ Ayşe, Yılmaz, ayse, 123456, 9, B"></textarea>
 
                 <section class="lesson-panel center">
                     <div class="lesson-quick-tools">
-                        <button id="btn-lesson-quick-text" type="button" class="btn btn-primary">📝 Yazı Ekle</button>
-                        <button id="btn-lesson-quick-image" type="button" class="btn">🖼️ Görsel Ekle</button>
+                        <button id="btn-lesson-quick-text" type="button" class="btn btn-primary">📌 Yazı Ekle</button>
+                        <button id="btn-lesson-quick-image" type="button" class="btn">🧩 Görsel Ekle</button>
                         <button id="btn-lesson-quick-code" type="button" class="btn" style="background:#dbeafe;color:#1d4ed8;">&lt;/&gt; Kod Ekle</button>
                         <button id="btn-lesson-quick-question" type="button" class="btn" style="background:#ecfeff;color:#0f766e;">❓ Soru Ekle</button>
                     </div>
                     <div class="lesson-toolbar">
                         <button type="button" class="btn" data-lesson-cmd="bold" title="Kalın">T</button>
-                        <button type="button" class="btn" data-lesson-cmd="createLink" title="Link">🔗</button>
+                        <button type="button" class="btn" data-lesson-cmd="createLink" title="Link">📌</button>
                         <button type="button" id="btn-lesson-insert-image" class="btn" title="Görsel">🖼️</button>
                         <button type="button" class="btn" data-lesson-cmd="insertUnorderedList" title="Liste">•</button>
-                        <button type="button" class="btn" data-lesson-cmd="justifyLeft" title="Sola">⬅</button>
-                        <button type="button" class="btn" data-lesson-cmd="justifyCenter" title="Ortala">↔</button>
-                        <button type="button" class="btn" data-lesson-cmd="justifyRight" title="Sağa">➡</button>
+                        <button type="button" class="btn" data-lesson-cmd="justifyLeft" title="Sola">📌</button>
+                        <button type="button" class="btn" data-lesson-cmd="justifyCenter" title="Ortala">-</button>
+                        <button type="button" class="btn" data-lesson-cmd="justifyRight" title="Sağa">📌</button>
                         <button type="button" id="btn-add-canvas-text" class="btn" title="Metin kutusu">T+</button>
                         <button type="button" id="btn-add-canvas-image" class="btn" title="Görsel kutusu">🖼️+</button>
                         <button type="button" id="btn-delete-selected-canvas-text" class="btn" title="Seçili metni sil">🗑️T</button>
@@ -10703,19 +10737,19 @@ Ayşe, Yılmaz, ayse, 123456, 9, B"></textarea>
                             <div id="lesson-question-multiple-fields" style="display:none;">
                                 <div class="lesson-question-options-grid">
                                     <div class="lesson-option-row" data-opt-row="0">
-                                        <button type="button" class="lesson-option-tick" data-correct-idx="0">✓</button>
+                                        <button type="button" class="lesson-option-tick" data-correct-idx="0">📌</button>
                                         <input id="slide-option-0" class="form-control lesson-quiz-option" placeholder="A şıkkı">
                                     </div>
                                     <div class="lesson-option-row" data-opt-row="1">
-                                        <button type="button" class="lesson-option-tick" data-correct-idx="1">✓</button>
+                                        <button type="button" class="lesson-option-tick" data-correct-idx="1">📌</button>
                                         <input id="slide-option-1" class="form-control lesson-quiz-option" placeholder="B şıkkı">
                                     </div>
                                     <div class="lesson-option-row" data-opt-row="2">
-                                        <button type="button" class="lesson-option-tick" data-correct-idx="2">✓</button>
+                                        <button type="button" class="lesson-option-tick" data-correct-idx="2">📌</button>
                                         <input id="slide-option-2" class="form-control lesson-quiz-option" placeholder="C şıkkı">
                                     </div>
                                     <div class="lesson-option-row" data-opt-row="3">
-                                        <button type="button" class="lesson-option-tick" data-correct-idx="3">✓</button>
+                                        <button type="button" class="lesson-option-tick" data-correct-idx="3">📌</button>
                                         <input id="slide-option-3" class="form-control lesson-quiz-option" placeholder="D şıkkı">
                                     </div>
                                 </div>
@@ -10766,12 +10800,12 @@ Ayşe, Yılmaz, ayse, 123456, 9, B"></textarea>
         <div class="modal-content modal-large lesson-player-shell">
             <div class="lesson-player-topbar">
                 <div class="lesson-player-left-controls">
-                    <button id="btn-lesson-nav-toggle" class="btn lesson-nav-toggle-btn" type="button">☰ Konular</button>
+                    <button id="btn-lesson-nav-toggle" class="btn lesson-nav-toggle-btn" type="button">📚 Konular</button>
                     <h2 id="lesson-player-title" style="margin:0;">Ders</h2>
                 </div>
                 <div class="lesson-player-right-controls">
-                    <button id="btn-lesson-prev" class="btn lesson-nav-btn">◀ Önceki</button>
-                    <button id="btn-lesson-next" class="btn lesson-nav-btn btn-primary">Sonraki ▶</button>
+                    <button id="btn-lesson-prev" class="btn lesson-nav-btn">⬅️ Önceki</button>
+                    <button id="btn-lesson-next" class="btn lesson-nav-btn btn-primary">Sonraki ?</button>
                     <button id="btn-close-lesson-player" class="btn" style="background:#eee;">Kapat</button>
                 </div>
             </div>
@@ -10785,7 +10819,7 @@ Ayşe, Yılmaz, ayse, 123456, 9, B"></textarea>
             </div>
             <div id="lesson-player-track" style="margin-top:8px;display:flex;gap:6px;align-items:center;overflow:auto;"></div>
             <div class="lesson-player-zoom-controls">
-                <button id="lesson-zoom-out" class="lesson-zoom-btn" type="button">−</button>
+                <button id="lesson-zoom-out" class="lesson-zoom-btn" type="button">-</button>
                 <button id="lesson-zoom-reset" class="lesson-zoom-btn" type="button">100%</button>
                 <button id="lesson-zoom-in" class="lesson-zoom-btn" type="button">+</button>
             </div>
@@ -10829,19 +10863,19 @@ Ayşe, Yılmaz, ayse, 123456, 9, B"></textarea>
                         </div>
                         <div class="live-quiz-options-grid">
                             <div style="display:flex;gap:8px;align-items:center;">
-                                <button type="button" class="btn live-q-correct-mark" data-correct-option="A">✓</button>
+                                <button type="button" class="btn live-q-correct-mark" data-correct-option="A">📌</button>
                                 <input id="live-q-a" class="form-control live-quiz-option-input" placeholder="A seçeneği">
                             </div>
                             <div style="display:flex;gap:8px;align-items:center;">
-                                <button type="button" class="btn live-q-correct-mark" data-correct-option="B">✓</button>
+                                <button type="button" class="btn live-q-correct-mark" data-correct-option="B">📌</button>
                                 <input id="live-q-b" class="form-control live-quiz-option-input" placeholder="B seçeneği">
                             </div>
                             <div style="display:flex;gap:8px;align-items:center;">
-                                <button type="button" class="btn live-q-correct-mark" data-correct-option="C">✓</button>
+                                <button type="button" class="btn live-q-correct-mark" data-correct-option="C">📌</button>
                                 <input id="live-q-c" class="form-control live-quiz-option-input" placeholder="C seçeneği">
                             </div>
                             <div style="display:flex;gap:8px;align-items:center;">
-                                <button type="button" class="btn live-q-correct-mark" data-correct-option="D">✓</button>
+                                <button type="button" class="btn live-q-correct-mark" data-correct-option="D">📌</button>
                                 <input id="live-q-d" class="form-control live-quiz-option-input" placeholder="D seçeneği">
                             </div>
                         </div>
@@ -10960,7 +10994,7 @@ Ayşe, Yılmaz, ayse, 123456, 9, B"></textarea>
     <!-- Canlı Quiz Davet (Öğrenci) -->
     <div id="live-quiz-invite" class="modal-overlay" style="display:none;z-index:25000;">
         <div class="modal-content live-quiz-invite-card" style="max-width:460px;">
-            <h3 style="margin-top:0;color:#ea580c;">🟧 Canlı Quize Katıl</h3>
+            <h3 style="margin-top:0;color:#ea580c;">📌 Canlı Quize Katıl</h3>
             <p id="live-quiz-invite-text" style="margin:8px 0 14px;">Öğretmen canlı quiz başlattı.</p>
             <div style="display:flex;gap:8px;">
                 <button id="btn-join-live-quiz" class="btn btn-warning" style="flex:1;">Katıl</button>
@@ -11003,7 +11037,7 @@ Ayşe, Yılmaz, ayse, 123456, 9, B"></textarea>
     <div id="flowchart-modal" class="modal-overlay" style="display:none;">
         <div class="modal-content flowchart-shell">
             <div class="flowchart-toolbar">
-                <button id="flow-run" class="flowchart-btn run">▶ Çalıştır</button>
+                <button id="flow-run" class="flowchart-btn run">▶️ Çalıştır</button>
                 <button id="flow-stop" class="flowchart-btn stop">¦ Durdur</button>
                 <button id="flow-assign" class="flowchart-btn" style="display:none;">Ödev Ver</button>
                 <button id="flow-delete-assignment" class="flowchart-btn stop" style="display:none;">Ödevi Sil</button>
@@ -11012,7 +11046,7 @@ Ayşe, Yılmaz, ayse, 123456, 9, B"></textarea>
                 <button id="flow-delete" class="flowchart-btn">Sil</button>
                 <button id="flow-delete-edge" class="flowchart-btn">Bağlantı Sil</button>
                 <button id="flow-clear" class="flowchart-btn">Temizle</button>
-                <div id="flow-assignment-timer" class="flowchart-assignment-timer" style="display:none;">⏱️ 0 dk 0 sn</div>
+                <div id="flow-assignment-timer" class="flowchart-assignment-timer" style="display:none;">📌 0 dk 0 sn</div>
                 <button id="flow-close" class="flowchart-btn">Kapat</button>
             </div>
             <div class="flowchart-main">
@@ -11161,8 +11195,8 @@ Ayşe, Yılmaz, ayse, 123456, 9, B"></textarea>
                 </div>
             </div>
             <div id="student-certificate-card" class="student-certificate">
-                <img src="{{ asset('logo.png') }}" alt="Logo" class="certificate-logo">
-                <div class="certificate-badge">✦</div>
+                <img src="{{ url('public/logo.png') }}" alt="Logo" class="certificate-logo">
+                <div class="certificate-badge">📌</div>
                 <div class="certificate-title">BAŞARI SERTİFİKASI</div>
                 <div id="certificate-student-name" class="certificate-student-name">Öğrenci Adı Soyadı</div>
                 <p id="certificate-award-text" class="certificate-text">
@@ -11236,8 +11270,8 @@ Ayşe, Yılmaz, ayse, 123456, 9, B"></textarea>
                 <button id="btn-download-class-certificates" class="btn btn-success">Filtredeki Tümünü Önizle</button>
             </div>
             <div id="teacher-certificate-card" class="student-certificate">
-                <img src="{{ asset('logo.png') }}" alt="Logo" class="certificate-logo">
-                <div class="certificate-badge">✦</div>
+                <img src="{{ url('public/logo.png') }}" alt="Logo" class="certificate-logo">
+                <div class="certificate-badge">📌</div>
                 <div class="certificate-title">BAŞARI SERTİFİKASI</div>
                 <div id="teacher-certificate-student-name" class="certificate-student-name">Öğrenci Adı Soyadı</div>
                 <p id="teacher-certificate-award-text" class="certificate-text">
@@ -11283,7 +11317,11 @@ Ayşe, Yılmaz, ayse, 123456, 9, B"></textarea>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script src="{{ asset('pwa-init.js') }}?v={{ filemtime(public_path('pwa-init.js')) }}" defer></script>
-    <script type="module" src="{{ asset('script.js') }}?v={{ filemtime(public_path('script.js')) }}"></script>
+    <script src="{{ url('public/pwa-init.js') }}?v={{ filemtime(public_path('pwa-init.js')) }}" defer></script>
+    <script type="module" src="{{ url('public/script.js') }}?v={{ filemtime(public_path('script.js')) }}"></script>
 </body>
 </html>
+
+
+
+

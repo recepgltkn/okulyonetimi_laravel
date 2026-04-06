@@ -17,6 +17,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append(SecureHeaders::class);
         $middleware->validateCsrfTokens(except: [
             'login',
+            'api/race/*',
+            'public/api/race/*',
+            'index.php/api/race/*',
         ]);
         $middleware->alias([
             'client.auth' => AuthenticateClientApi::class,

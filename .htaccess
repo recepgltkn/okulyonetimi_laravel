@@ -7,9 +7,20 @@
     RewriteRule ^api/(.*)$ public/api/$1 [L,QSA]
 
     # Shared hosting compatibility:
-    # serve the Laravel app from the project root without hardcoded absolute paths.
+    # first serve real files from /public, then fallback to Laravel front controller.
     RewriteCond %{REQUEST_URI} !^/public/
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
-    RewriteRule ^(.*)$ public/$1 [L]
+    RewriteCond %{DOCUMENT_ROOT}/public/$1 -f [OR]
+    RewriteCond %{DOCUMENT_ROOT}/public/$1 -d
+    RewriteRule ^(.*)$ public/$1 [L,QSA]
+
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ public/index.php [L,QSA]
+</IfModule>
+
+<IfModule mod_mime.c>
+    AddDefaultCharset UTF-8
 </IfModule>

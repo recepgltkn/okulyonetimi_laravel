@@ -57,3 +57,51 @@ If you discover a security vulnerability within Laravel, please send an e-mail t
 ## License
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## Keyboard Race Realtime System
+
+### Laravel API + Redis Publisher
+- Migrate new tables:
+  - `php artisan migrate`
+- New endpoints:
+  - `POST /api/race/rooms`
+  - `GET /api/race/rooms/{roomCode}`
+  - `POST /api/race/rooms/{roomCode}/join`
+  - `POST /api/race/rooms/{roomCode}/start`
+  - `POST /api/race/rooms/{roomCode}/finish`
+  - `GET /api/race/rooms/{roomCode}/leaderboard`
+
+### Node Socket Server
+- Folder: `node-server/`
+- Setup:
+  - `cd node-server`
+  - `cp .env.example .env`
+  - `npm install`
+  - `npm run dev`
+- Health check:
+  - `GET http://localhost:3001/health`
+
+### Frontend
+- Page URL: `/keyboard-race`
+- Uses Tailwind + glassmorphism + neon dark UI.
+- Socket flow:
+  - Join room (`join_room`)
+  - Start race (`Laravel -> Redis -> Node -> clients`)
+  - Live progress (`typing_progress`)
+  - Finish + leaderboard (`race_finished`)
+
+### Redis bridge channel
+- Channel: `race_events`
+- Laravel publishes JSON events to this channel.
+- Node server subscribes and broadcasts Socket.IO room events.
+
+### Required env vars
+- Laravel `.env`
+  - `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`
+  - `SOCKET_SERVER_URL=http://localhost:3001`
+- Node `.env`
+  - `PORT=3001`
+  - `CORS_ORIGIN=http://localhost:8000`
+  - `REDIS_HOST=127.0.0.1`
+  - `REDIS_PORT=6379`
+  - `REDIS_PASSWORD=`
+  - `REDIS_CHANNEL=race_events`

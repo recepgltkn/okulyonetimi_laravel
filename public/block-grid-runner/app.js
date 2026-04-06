@@ -881,7 +881,7 @@ function getFirstIncompleteRangeIndex(){
 }
 
 function warnLockedLevel(customMessage){
-  const msg = customMessage || 'Bu seviye hen?z kilitli.';
+  const msg = customMessage || 'Bu seviye Henüz kilitli.';
   setStatus(msg);
   try{
     if(window.parent && window.parent !== window){
@@ -1626,4 +1626,5 @@ function bootBlocklyWithRetry(attempt = 0){
 }
 
 bootBlocklyWithRetry(0);
+
 

@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\ClientDataController;
 use App\Http\Controllers\ClientLiveQuizController;
+use App\Http\Controllers\RaceController;
+use App\Http\Controllers\RoomController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('client')->group(function () {
@@ -45,3 +47,16 @@ Route::prefix('client')->group(function () {
     });
 });
 
+Route::prefix('race')->group(function () {
+    Route::get('/rooms/active', [RaceController::class, 'active']);
+    Route::get('/my-runs', [RaceController::class, 'myRuns']);
+    Route::post('/rooms', [RoomController::class, 'store']);
+    Route::get('/rooms/{room:code}', [RoomController::class, 'show']);
+    Route::post('/rooms/{room:code}/join', [RoomController::class, 'join']);
+
+    Route::post('/rooms/{room:code}/start', [RaceController::class, 'start']);
+    Route::post('/rooms/{room:code}/end', [RaceController::class, 'end']);
+    Route::post('/rooms/{room:code}/finish', [RaceController::class, 'finish']);
+    Route::get('/rooms/{room:code}/leaderboard', [RaceController::class, 'leaderboard']);
+    Route::get('/rooms/{room:code}/report', [RaceController::class, 'report']);
+});

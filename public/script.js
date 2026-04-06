@@ -75,21 +75,21 @@ const BLOCK_XP_HARD = 21;
 const MANUAL_TASK_APPROVAL_XP = 5;
 const AVATAR_DEFAULT_ID = "3d-robot";
 const AVATAR_CATALOG = [
-  { id: "3d-robot", name: "Robo", cost: 0, image: "avatars/3d/robot.png", gradient: "linear-gradient(135deg,#e2e8f0,#94a3b8)" },
-  { id: "3d-ninja", name: "Ninja", cost: 120, image: "avatars/3d/ninja.png", gradient: "linear-gradient(135deg,#bbf7d0,#4ade80)" },
-  { id: "3d-ninja-light", name: "Ninja Işık", cost: 180, image: "avatars/3d/ninja-light.png", gradient: "linear-gradient(135deg,#fef3c7,#f59e0b)" },
-  { id: "3d-ninja-dark", name: "Ninja Gece", cost: 220, image: "avatars/3d/ninja-dark.png", gradient: "linear-gradient(135deg,#c7d2fe,#4338ca)" },
-  { id: "3d-astro", name: "Kozmo", cost: 260, image: "avatars/3d/astronaut.png", gradient: "linear-gradient(135deg,#bae6fd,#38bdf8)" },
-  { id: "3d-astro-light", name: "Kozmo Işık", cost: 300, image: "avatars/3d/astronaut-light.png", gradient: "linear-gradient(135deg,#fecdd3,#fb7185)" },
-  { id: "3d-astro-dark", name: "Kozmo Gece", cost: 340, image: "avatars/3d/astronaut-dark.png", gradient: "linear-gradient(135deg,#a7f3d0,#34d399)" },
-  { id: "3d-man-astro", name: "Yıldız", cost: 380, image: "avatars/3d/man-astronaut.png", gradient: "linear-gradient(135deg,#fcd34d,#f59e0b)" },
-  { id: "3d-nova", name: "Nova", cost: 420, image: "avatars/3d/woman-astronaut.png", gradient: "linear-gradient(135deg,#c4b5fd,#7c3aed)" },
-  { id: "3d-man-hero", name: "Kahraman", cost: 480, image: "avatars/3d/man-superhero.png", gradient: "linear-gradient(135deg,#fca5a5,#f97316)" },
-  { id: "3d-woman-hero", name: "Kahraman+", cost: 540, image: "avatars/3d/woman-superhero.png", gradient: "linear-gradient(135deg,#fbcfe8,#ec4899)" },
-  { id: "3d-hero-tech", name: "Tekno", cost: 600, image: "avatars/3d/man-superhero.png", gradient: "linear-gradient(135deg,#bae6fd,#22d3ee)" },
-  { id: "3d-hero-space", name: "Uzaycı", cost: 660, image: "avatars/3d/astronaut.png", gradient: "linear-gradient(135deg,#ddd6fe,#8b5cf6)" },
-  { id: "3d-hero-stealth", name: "Gölge", cost: 720, image: "avatars/3d/ninja-dark.png", gradient: "linear-gradient(135deg,#e2e8f0,#64748b)" },
-  { id: "3d-hero-cosmo", name: "Kozmik", cost: 780, image: "avatars/3d/astronaut-light.png", gradient: "linear-gradient(135deg,#fed7aa,#fb923c)" }
+  { id: "3d-robot", name: "Robo", cost: 0, image: "public/avatars/3d/robot.png", gradient: "linear-gradient(135deg,#e2e8f0,#94a3b8)" },
+  { id: "3d-ninja", name: "Ninja", cost: 120, image: "public/avatars/3d/ninja.png", gradient: "linear-gradient(135deg,#bbf7d0,#4ade80)" },
+  { id: "3d-ninja-light", name: "Ninja Işık", cost: 180, image: "public/avatars/3d/ninja-light.png", gradient: "linear-gradient(135deg,#fef3c7,#f59e0b)" },
+  { id: "3d-ninja-dark", name: "Ninja Gece", cost: 220, image: "public/avatars/3d/ninja-dark.png", gradient: "linear-gradient(135deg,#c7d2fe,#4338ca)" },
+  { id: "3d-astro", name: "Kozmo", cost: 260, image: "public/avatars/3d/astronaut.png", gradient: "linear-gradient(135deg,#bae6fd,#38bdf8)" },
+  { id: "3d-astro-light", name: "Kozmo Işık", cost: 300, image: "public/avatars/3d/astronaut-light.png", gradient: "linear-gradient(135deg,#fecdd3,#fb7185)" },
+  { id: "3d-astro-dark", name: "Kozmo Gece", cost: 340, image: "public/avatars/3d/astronaut-dark.png", gradient: "linear-gradient(135deg,#a7f3d0,#34d399)" },
+  { id: "3d-man-astro", name: "Yıldız", cost: 380, image: "public/avatars/3d/man-astronaut.png", gradient: "linear-gradient(135deg,#fcd34d,#f59e0b)" },
+  { id: "3d-nova", name: "Nova", cost: 420, image: "public/avatars/3d/woman-astronaut.png", gradient: "linear-gradient(135deg,#c4b5fd,#7c3aed)" },
+  { id: "3d-man-hero", name: "Kahraman", cost: 480, image: "public/avatars/3d/man-superhero.png", gradient: "linear-gradient(135deg,#fca5a5,#f97316)" },
+  { id: "3d-woman-hero", name: "Kahraman+", cost: 540, image: "public/avatars/3d/woman-superhero.png", gradient: "linear-gradient(135deg,#fbcfe8,#ec4899)" },
+  { id: "3d-hero-tech", name: "Tekno", cost: 600, image: "public/avatars/3d/man-superhero.png", gradient: "linear-gradient(135deg,#bae6fd,#22d3ee)" },
+  { id: "3d-hero-space", name: "Uzaycı", cost: 660, image: "public/avatars/3d/astronaut.png", gradient: "linear-gradient(135deg,#ddd6fe,#8b5cf6)" },
+  { id: "3d-hero-stealth", name: "Gölge", cost: 720, image: "public/avatars/3d/ninja-dark.png", gradient: "linear-gradient(135deg,#e2e8f0,#64748b)" },
+  { id: "3d-hero-cosmo", name: "Kozmik", cost: 780, image: "public/avatars/3d/astronaut-light.png", gradient: "linear-gradient(135deg,#fed7aa,#fb923c)" }
 ];
 
 function clampNumber(value, min, max) {
@@ -334,7 +334,7 @@ function computeRangeTotalXPFromLevels({
   return Math.max(0, sum);
 }
 
-/* ================= GLOBAL DEĞİŞKENLER ================= */
+/* ================= GLOBAL DEÄİÅKENLER ================= */
 let currentTaskId = null;
 let taskQuestions = [];
 let currentQuestions = [];
@@ -544,6 +544,9 @@ let notificationsModalUnsub = null;
 let notificationFeedUnsub = null;
 let notificationPollTimer = null;
 let notificationSessionStartedAt = Date.now();
+let keyboardRacePollTimer = null;
+let latestKeyboardRaceAnnouncement = null;
+const joinedKeyboardRaceRooms = new Set();
 let shownNotificationIds = new Set();
 const SYSTEM_NOTIFICATIONS_COLLECTION = "systemNotifications";
 let flowNodes = [];
@@ -677,8 +680,8 @@ function ensureLoginSceneRuntime() {
 
   // little robots / icons
   [
-    { t: "🤖", x: 12, y: 28 }, { t: "🤖", x: 83, y: 78 }, { t: "🤖", x: 45, y: 86 },
-    { t: "◇", x: 78, y: 18 }, { t: "◇", x: 56, y: 39 }, { t: "◻", x: 12, y: 60 }, { t: "◻", x: 91, y: 78 }
+    { t: "??", x: 12, y: 28 }, { t: "??", x: 83, y: 78 }, { t: "??", x: 45, y: 86 },
+    { t: "?", x: 78, y: 18 }, { t: "?", x: 56, y: 39 }, { t: "?", x: 12, y: 60 }, { t: "?", x: 91, y: 78 }
   ].forEach((k, i) => {
     const el = make("div", {
       position: "absolute",
@@ -686,7 +689,7 @@ function ensureLoginSceneRuntime() {
       top: `${k.y}%`,
       transform: "translate(-50%, -50%)",
       color: "rgba(255,255,255,0.7)",
-      fontSize: k.t === "🤖" ? "26px" : "24px",
+      fontSize: k.t === "??" ? "26px" : "24px",
       lineHeight: "1"
     });
     el.textContent = k.t;
@@ -798,7 +801,7 @@ function applyThemeMode(mode) {
   ];
   btns.forEach((btn) => {
     if (!btn) return;
-    btn.innerText = normalized === "dark" ? "☀️" : "🌙";
+    btn.textContent = normalized === "dark" ? "\u2600\uFE0F" : "\uD83C\uDF19";
     btn.title = normalized === "dark" ? "Açık Mod" : "Karanlık Mod";
   });
   try {
@@ -907,7 +910,7 @@ window.openBlockRunner = async function(userId, options = {}){
   document.getElementById('activity-title').innerText = options?.title || 'Blok Kodlama - Grid Runner';
   document.getElementById('activity-link').innerText = appUrl("block-grid-runner/index.html");
   const closeBtn = document.getElementById("btn-close-activity");
-  if (closeBtn) closeBtn.innerText = "×";
+  if (closeBtn) closeBtn.innerText = "Ã—";
   const topTitle = document.querySelector("#activity-modal .modal-header h2");
   if (topTitle) topTitle.innerText = "Blok Kodlama";
   let assignmentProgressData = null;
@@ -1928,7 +1931,179 @@ document.addEventListener('DOMContentLoaded', function(){
       openLiveQuizModal();
     });
   }
+  const hubKeyboardRaceBtn = document.getElementById('btn-apps-hub-open-keyboard-race');
+  if (hubKeyboardRaceBtn) {
+    hubKeyboardRaceBtn.addEventListener('click', () => {
+      if (userRole !== "teacher") return;
+      closeAppsHubModal();
+      window.open(appUrl("index.php/keyboard-race?role=teacher"), "_blank", "noopener,noreferrer");
+    });
+  }
+  const hubKeyboardRaceReportBtn = document.getElementById('btn-apps-hub-keyboard-race-report');
+  if (hubKeyboardRaceReportBtn) {
+    hubKeyboardRaceReportBtn.addEventListener('click', () => {
+      if (userRole !== "teacher") return;
+      openKeyboardRaceReportPrompt().catch((e) => alert(e?.message || "Rapor alınamadı."));
+    });
+  }
 });
+
+function buildKeyboardRaceReportHtml(report) {
+  const rows = Array.isArray(report?.participants) ? report.participants : [];
+  const body = rows.map((r, idx) => `
+    <tr>
+      <td>${idx + 1}</td>
+      <td>${r.userName || "-"}</td>
+      <td>${Number(r.progress || 0).toFixed(1)}%</td>
+      <td>${Number(r.wpm || 0).toFixed(1)}</td>
+      <td>${Number(r.accuracy || 0).toFixed(1)}%</td>
+      <td>${r.completionSeconds ?? "-"}</td>
+      <td>${r.elapsedSeconds ?? 0}</td>
+      <td>${r.xpEarned ?? 0}</td>
+    </tr>
+  `).join("");
+  return `<!doctype html>
+<html lang="tr"><head><meta charset="UTF-8"><title>Klavye Yarışı Raporu</title>
+<style>
+body{font-family:Arial,sans-serif;padding:16px}
+table{border-collapse:collapse;width:100%}
+th,td{border:1px solid #ddd;padding:8px;font-size:13px}
+th{background:#f3f4f6;text-align:left}
+</style></head><body>
+<h2>Klavye Yarışı Raporu</h2>
+<p><b>Oda:</b> ${report?.roomCode || "-"} | <b>Ad:</b> ${report?.roomName || "-"}</p>
+<p><b>Başlangıç:</b> ${report?.startedAt || "-"} | <b>Bitiş:</b> ${report?.finishedAt || "-"} | <b>Toplam Süre:</b> ${report?.durationSeconds ?? "-"} sn</p>
+<table><thead><tr><th>#</th><th>Öğrenci</th><th>İlerleme</th><th>WPM</th><th>Doğruluk</th><th>Bitiriş (sn)</th><th>Geçen Süre (sn)</th><th>XP</th></tr></thead><tbody>${body}</tbody></table>
+<script>window.onload=()=>window.print();</script>
+</body></html>`;
+}
+
+async function fetchKeyboardRaceReportByRoomCode(roomCode) {
+  const code = String(roomCode || "").trim().toUpperCase();
+  if (!code) throw new Error("Oda kodu girilmedi.");
+  const endpoints = [
+    appUrl(`public/api/race/rooms/${encodeURIComponent(code)}/report`),
+    appUrl(`index.php/api/race/rooms/${encodeURIComponent(code)}/report`),
+    appUrl(`api/race/rooms/${encodeURIComponent(code)}/report`)
+  ];
+  for (const endpoint of endpoints) {
+    try {
+      const res = await fetch(endpoint, { headers: { Accept: "application/json" } });
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (data?.report) return data.report;
+    } catch (_) {}
+  }
+  throw new Error("Rapor bulunamadı. Oda kodunu kontrol edin.");
+}
+
+async function openKeyboardRaceReportPrompt() {
+  const input = prompt("Klavye yarışı oda kodunu girin (örn: ABC123)");
+  const roomCode = String(input || "").trim().toUpperCase();
+  if (!roomCode) return;
+  const report = await fetchKeyboardRaceReportByRoomCode(roomCode);
+  const win = window.open("", "_blank", "noopener,noreferrer,width=1100,height=800");
+  if (!win) throw new Error("Rapor penceresi açılamadı. Tarayıcı pop-up engelini kapatın.");
+  win.document.open();
+  win.document.write(buildKeyboardRaceReportHtml(report));
+  win.document.close();
+}
+
+function stopKeyboardRaceAnnouncementPolling() {
+  if (keyboardRacePollTimer) {
+    clearInterval(keyboardRacePollTimer);
+    keyboardRacePollTimer = null;
+  }
+}
+
+function openKeyboardRaceAnnouncement(roomCode, roomStatus = "active") {
+  const modal = document.getElementById("keyboard-race-alert-modal");
+  const text = document.getElementById("keyboard-race-alert-text");
+  const joinBtn = document.getElementById("btn-keyboard-race-join");
+  const dismissBtn = document.getElementById("btn-keyboard-race-dismiss");
+  if (!modal || !joinBtn || !dismissBtn) return;
+
+  const name = String(userData?.firstName || userData?.username || "").trim();
+  if (text) {
+    text.textContent = roomStatus === "active"
+      ? `Öğretmen yarışı başlattı. Oda kodu: ${roomCode}`
+      : `Öğretmen klavye yarışı odası açtı. Oda kodu: ${roomCode}`;
+  }
+
+  joinBtn.onclick = () => {
+    joinedKeyboardRaceRooms.add(roomCode);
+    localStorage.setItem(`keyboard_race_joined_${roomCode}`, "1");
+    modal.style.display = "none";
+    const uid = String(currentUserId || "");
+    const url = appUrl(`index.php/keyboard-race?role=student&room=${encodeURIComponent(roomCode)}&name=${encodeURIComponent(name)}&uid=${encodeURIComponent(uid)}`);
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+  dismissBtn.onclick = () => {
+    modal.style.display = "none";
+  };
+  modal.onclick = (ev) => {
+    if (ev.target?.id === "keyboard-race-alert-modal") {
+      modal.style.display = "none";
+    }
+  };
+  modal.style.display = "flex";
+}
+
+async function pollKeyboardRaceAnnouncement() {
+  if (userRole !== "student") return;
+  try {
+    const res = await fetch(appUrl("public/api/race/rooms/active"), { headers: { Accept: "application/json" } });
+    if (!res.ok) return;
+    const data = await res.json();
+    const active = data?.active || null;
+    if (!active?.roomCode) return;
+    const joinedKey = `keyboard_race_joined_${active.roomCode}`;
+    const modal = document.getElementById("keyboard-race-alert-modal");
+    if (latestKeyboardRaceAnnouncement === active.roomCode && modal?.style.display === "flex") return;
+    if (joinedKeyboardRaceRooms.has(active.roomCode) || localStorage.getItem(joinedKey) === "1") return;
+    latestKeyboardRaceAnnouncement = active.roomCode;
+    openKeyboardRaceAnnouncement(active.roomCode, String(active.status || "active").toLowerCase());
+  } catch (_) {}
+}
+
+function startKeyboardRaceAnnouncementPolling() {
+  stopKeyboardRaceAnnouncementPolling();
+  if (userRole !== "student") return;
+  pollKeyboardRaceAnnouncement();
+  keyboardRacePollTimer = setInterval(pollKeyboardRaceAnnouncement, 12000);
+}
+
+async function fetchKeyboardRaceRuns(studentId) {
+  const uid = String(studentId || "").trim();
+  if (!uid) return [];
+  const endpoints = [
+    appUrl(`public/api/race/my-runs?user_id=${encodeURIComponent(uid)}`),
+    appUrl(`index.php/api/race/my-runs?user_id=${encodeURIComponent(uid)}`),
+    appUrl(`api/race/my-runs?user_id=${encodeURIComponent(uid)}`)
+  ];
+  for (const endpoint of endpoints) {
+    try {
+      const res = await fetch(endpoint, { headers: { Accept: "application/json" } });
+      if (!res.ok) continue;
+      const data = await res.json();
+      const runs = Array.isArray(data?.runs) ? data.runs : [];
+      return runs.map((run) => {
+        const completion = run?.completionSeconds;
+        const elapsed = run?.elapsedSeconds;
+        const seconds = Math.max(0, Number(completion ?? elapsed ?? 0));
+        const percent = Math.max(0, Math.min(100, Number(run?.progress || 0)));
+        return {
+          title: `Klavye Yarışı: ${run?.roomName || run?.roomCode || "Yarış"}`,
+          score: Math.round(percent),
+          duration: seconds,
+          date: run?.finishedAt ? new Date(run.finishedAt).toLocaleDateString("tr-TR") : "-",
+          xp: Math.max(0, Number(run?.xpEarned || 0))
+        };
+      });
+    } catch (_) {}
+  }
+  return [];
+}
 
 // Load aggregated reports for teacher and show modal
 async function loadBlockReportsForTeacher(){
@@ -2396,36 +2571,36 @@ let badgeQuizStatsCache = null;
 let badgeQuizStatsAt = 0;
 
 const BADGE_DEFS = [
-  { id: "quiz-5", name: "Soru Ustası", icon: "❓", metric: "quizCompleted", target: 5, desc: "5 canlı quiz tamamlayınca kazanılır." },
-  { id: "quiz-10", name: "Quiz Şampiyonu", icon: "🏆", metric: "quizCompleted", target: 10, desc: "10 canlı quiz tamamlayınca kazanılır." },
-  { id: "quiz-20", name: "Bilgi Avcısı", icon: "📚", metric: "quizCompleted", target: 20, desc: "20 canlı quiz tamamlayınca kazanılır." },
-  { id: "quiz-50", name: "Bilgi Efsanesi", icon: "👑", metric: "quizCompleted", target: 50, desc: "50 canlı quiz tamamlayınca kazanılır." },
-  { id: "task-3", name: "Görev Başlangıcı", icon: "✅", metric: "tasksCompleted", target: 3, desc: "3 ödevi tamamlayınca kazanılır." },
-  { id: "task-5", name: "Görev Ustası", icon: "🧭", metric: "tasksCompleted", target: 5, desc: "5 ödevi tamamlayınca kazanılır." },
-  { id: "task-10", name: "Görev Kaptanı", icon: "🚀", metric: "tasksCompleted", target: 10, desc: "10 ödevi tamamlayınca kazanılır." },
-  { id: "task-20", name: "Görev Efsanesi", icon: "🏅", metric: "tasksCompleted", target: 20, desc: "20 ödevi tamamlayınca kazanılır." },
-  { id: "act-3", name: "Etkinlik Kaşifi", icon: "🎯", metric: "activitiesCompleted", target: 3, desc: "3 etkinliği tamamlayınca kazanılır." },
-  { id: "act-5", name: "Etkinlik Ustası", icon: "🧠", metric: "activitiesCompleted", target: 5, desc: "5 etkinliği tamamlayınca kazanılır." },
-  { id: "act-10", name: "Etkinlik Maratonu", icon: "🏃", metric: "activitiesCompleted", target: 10, desc: "10 etkinliği tamamlayınca kazanılır." },
-  { id: "act-20", name: "Etkinlik Efsanesi", icon: "🌟", metric: "activitiesCompleted", target: 20, desc: "20 etkinliği tamamlayınca kazanılır." },
-  { id: "block-3", name: "Kodlama Ustası", icon: "💻", metric: "blockCompleted", target: 3, desc: "3 blok kodlama tamamlayınca kazanılır." },
-  { id: "block-5", name: "Kodlama Şefi", icon: "🧩", metric: "blockCompleted", target: 5, desc: "5 blok kodlama tamamlayınca kazanılır." },
-  { id: "block-10", name: "Kodlama Efsanesi", icon: "🛠️", metric: "blockCompleted", target: 10, desc: "10 blok kodlama tamamlayınca kazanılır." },
-  { id: "compute-3", name: "Mantık Ustası", icon: "🧮", metric: "computeCompleted", target: 3, desc: "3 Compute It görevi tamamlayınca kazanılır." },
-  { id: "compute-5", name: "Algoritma Şefi", icon: "📐", metric: "computeCompleted", target: 5, desc: "5 Compute It görevi tamamlayınca kazanılır." },
-  { id: "compute-10", name: "Algoritma Efsanesi", icon: "⚙️", metric: "computeCompleted", target: 10, desc: "10 Compute It görevi tamamlayınca kazanılır." },
-  { id: "lesson-3", name: "Ders Kaşifi", icon: "📘", metric: "lessonsCompleted", target: 3, desc: "3 dersi tamamlayınca kazanılır." },
-  { id: "lesson-5", name: "Ders Ustası", icon: "📗", metric: "lessonsCompleted", target: 5, desc: "5 dersi tamamlayınca kazanılır." },
-  { id: "lesson-10", name: "Ders Efsanesi", icon: "📙", metric: "lessonsCompleted", target: 10, desc: "10 dersi tamamlayınca kazanılır." },
-  { id: "total-10", name: "Bilişim Başlangıç", icon: "🧩", metric: "totalCompleted", target: 10, desc: "Toplam 10 görev/etkinlik tamamlayınca kazanılır." },
-  { id: "total-25", name: "Bilişim Ustası", icon: "🧠", metric: "totalCompleted", target: 25, desc: "Toplam 25 görev/etkinlik tamamlayınca kazanılır." },
-  { id: "total-50", name: "Bilişim Efsanesi", icon: "🚀", metric: "totalCompleted", target: 50, desc: "Toplam 50 görev/etkinlik tamamlayınca kazanılır." },
-  { id: "xp-100", name: "XP Toplayıcı", icon: "💎", metric: "xp", target: 100, desc: "Toplam 100 XP’ye ulaşınca kazanılır." },
-  { id: "xp-300", name: "XP Ustası", icon: "🏆", metric: "xp", target: 300, desc: "Toplam 300 XP’ye ulaşınca kazanılır." },
-  { id: "xp-600", name: "XP Efsanesi", icon: "👑", metric: "xp", target: 600, desc: "Toplam 600 XP’ye ulaşınca kazanılır." },
-  { id: "rate-40", name: "İstikrar", icon: "📈", metric: "completionRate", target: 40, desc: "Genel tamamlama oranı %40’ı geçince kazanılır." },
-  { id: "rate-70", name: "Azimli", icon: "🔥", metric: "completionRate", target: 70, desc: "Genel tamamlama oranı %70’i geçince kazanılır." },
-  { id: "rate-90", name: "Disiplinli", icon: "🏁", metric: "completionRate", target: 90, desc: "Genel tamamlama oranı %90’ı geçince kazanılır." }
+  { id: "quiz-5", name: "Soru Ustası", icon: "?", metric: "quizCompleted", target: 5, desc: "5 canlı quiz tamamlayınca kazanılır." },
+  { id: "quiz-10", name: "Quiz Åampiyonu", icon: "??", metric: "quizCompleted", target: 10, desc: "10 canlı quiz tamamlayınca kazanılır." },
+  { id: "quiz-20", name: "Bilgi Avcısı", icon: "??", metric: "quizCompleted", target: 20, desc: "20 canlı quiz tamamlayınca kazanılır." },
+  { id: "quiz-50", name: "Bilgi Efsanesi", icon: "??", metric: "quizCompleted", target: 50, desc: "50 canlı quiz tamamlayınca kazanılır." },
+  { id: "task-3", name: "Görev Başlangıcı", icon: "?", metric: "tasksCompleted", target: 3, desc: "3 ödevi tamamlayınca kazanılır." },
+  { id: "task-5", name: "Görev Ustası", icon: "??", metric: "tasksCompleted", target: 5, desc: "5 ödevi tamamlayınca kazanılır." },
+  { id: "task-10", name: "Görev Kaptanı", icon: "??", metric: "tasksCompleted", target: 10, desc: "10 ödevi tamamlayınca kazanılır." },
+  { id: "task-20", name: "Görev Efsanesi", icon: "??", metric: "tasksCompleted", target: 20, desc: "20 ödevi tamamlayınca kazanılır." },
+  { id: "act-3", name: "Etkinlik Kaşifi", icon: "??", metric: "activitiesCompleted", target: 3, desc: "3 etkinliği tamamlayınca kazanılır." },
+  { id: "act-5", name: "Etkinlik Ustası", icon: "??", metric: "activitiesCompleted", target: 5, desc: "5 etkinliği tamamlayınca kazanılır." },
+  { id: "act-10", name: "Etkinlik Maratonu", icon: "??", metric: "activitiesCompleted", target: 10, desc: "10 etkinliği tamamlayınca kazanılır." },
+  { id: "act-20", name: "Etkinlik Efsanesi", icon: "??", metric: "activitiesCompleted", target: 20, desc: "20 etkinliği tamamlayınca kazanılır." },
+  { id: "block-3", name: "Kodlama Ustası", icon: "??", metric: "blockCompleted", target: 3, desc: "3 blok kodlama tamamlayınca kazanılır." },
+  { id: "block-5", name: "Kodlama Åefi", icon: "??", metric: "blockCompleted", target: 5, desc: "5 blok kodlama tamamlayınca kazanılır." },
+  { id: "block-10", name: "Kodlama Efsanesi", icon: "???", metric: "blockCompleted", target: 10, desc: "10 blok kodlama tamamlayınca kazanılır." },
+  { id: "compute-3", name: "Mantık Ustası", icon: "??", metric: "computeCompleted", target: 3, desc: "3 Compute It görevi tamamlayınca kazanılır." },
+  { id: "compute-5", name: "Algoritma Åefi", icon: "??", metric: "computeCompleted", target: 5, desc: "5 Compute It görevi tamamlayınca kazanılır." },
+  { id: "compute-10", name: "Algoritma Efsanesi", icon: "??", metric: "computeCompleted", target: 10, desc: "10 Compute It görevi tamamlayınca kazanılır." },
+  { id: "lesson-3", name: "Ders Kaşifi", icon: "??", metric: "lessonsCompleted", target: 3, desc: "3 dersi tamamlayınca kazanılır." },
+  { id: "lesson-5", name: "Ders Ustası", icon: "??", metric: "lessonsCompleted", target: 5, desc: "5 dersi tamamlayınca kazanılır." },
+  { id: "lesson-10", name: "Ders Efsanesi", icon: "??", metric: "lessonsCompleted", target: 10, desc: "10 dersi tamamlayınca kazanılır." },
+  { id: "total-10", name: "Bilişim Başlangıç", icon: "??", metric: "totalCompleted", target: 10, desc: "Toplam 10 görev/etkinlik tamamlayınca kazanılır." },
+  { id: "total-25", name: "Bilişim Ustası", icon: "??", metric: "totalCompleted", target: 25, desc: "Toplam 25 görev/etkinlik tamamlayınca kazanılır." },
+  { id: "total-50", name: "Bilişim Efsanesi", icon: "??", metric: "totalCompleted", target: 50, desc: "Toplam 50 görev/etkinlik tamamlayınca kazanılır." },
+  { id: "xp-100", name: "XP Toplayıcı", icon: "??", metric: "xp", target: 100, desc: "Toplam 100 XPâ€™ye ulaşınca kazanılır." },
+  { id: "xp-300", name: "XP Ustası", icon: "??", metric: "xp", target: 300, desc: "Toplam 300 XPâ€™ye ulaşınca kazanılır." },
+  { id: "xp-600", name: "XP Efsanesi", icon: "??", metric: "xp", target: 600, desc: "Toplam 600 XPâ€™ye ulaşınca kazanılır." },
+  { id: "rate-40", name: "İstikrar", icon: "??", metric: "completionRate", target: 40, desc: "Genel tamamlama oranı %40â€™ı geçince kazanılır." },
+  { id: "rate-70", name: "Azimli", icon: "??", metric: "completionRate", target: 70, desc: "Genel tamamlama oranı %70â€™i geçince kazanılır." },
+  { id: "rate-90", name: "Disiplinli", icon: "??", metric: "completionRate", target: 90, desc: "Genel tamamlama oranı %90â€™ı geçince kazanılır." }
 ];
 function showCompletionCelebration({
   title = "Tebrikler!",
@@ -2789,9 +2964,43 @@ window.showPage = function(page) {
     btn.classList.remove("active");
     if (btn.dataset.page === page) btn.classList.add("active");
   });
+  const studentLessonsPage = document.getElementById("student-lessons-fullpage");
+  if (studentLessonsPage && page !== "student-lessons") {
+    studentLessonsPage.style.display = "none";
+  }
+  if (page === "student-lessons") {
+    const hideIds = [
+      "home-overview-strip",
+      "student-stats-bar",
+      "teacher-analytics",
+      "top-students-card",
+      "student-homework-shell",
+      "student-apps-shell",
+      "leaderboard-section",
+      "quiz-section",
+      "lessons-section"
+    ];
+    hideIds.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = "none";
+    });
+    if (studentLessonsPage) studentLessonsPage.style.display = "flex";
+    return;
+  }
   if (page === "home") {
     const app = document.getElementById("app-screen");
     if (app) app.style.display = "grid";
+    const isTeacher = getStrictUserRole(userRole) === "teacher" || isSystemAdminUser(userData);
+    const setDisp = (id, val) => { const el = document.getElementById(id); if (el) el.style.display = val; };
+    setDisp("home-overview-strip", isTeacher ? "grid" : "none");
+    setDisp("student-stats-bar", isTeacher ? "none" : "block");
+    setDisp("teacher-analytics", isTeacher ? "block" : "none");
+    setDisp("top-students-card", isTeacher ? "block" : "none");
+    setDisp("student-homework-shell", "block");
+    setDisp("student-apps-shell", isTeacher ? "" : "block");
+    setDisp("leaderboard-section", isTeacher ? "none" : "block");
+    setDisp("quiz-section", isTeacher ? "block" : "none");
+    setDisp("lessons-section", isTeacher ? "flex" : "none");
   }
 };
 
@@ -3020,8 +3229,8 @@ function renderLiveQuizBuilderPreview() {
   previewGrid.innerHTML = options.map((opt, i) => `
     <div class="live-quiz-preview-item">${
       qType === "truefalse"
-        ? `${opt}${normalizeTrueFalseValue(correctValue) === normalizeTrueFalseValue(opt) ? " ✅" : ""}`
-        : `${String.fromCharCode(65 + i)}) ${opt}${correctValue === String.fromCharCode(65 + i) ? " ✅" : ""}`
+        ? `${opt}${normalizeTrueFalseValue(correctValue) === normalizeTrueFalseValue(opt) ? " ?" : ""}`
+        : `${String.fromCharCode(65 + i)}) ${opt}${correctValue === String.fromCharCode(65 + i) ? " ?" : ""}`
     }</div>
   `).join("");
 }
@@ -3081,7 +3290,7 @@ function renderLiveQuizQuestionList() {
               : q?.type === "matching"
                 ? "Sürükle-Bırak Eşleştirme"
                 : "Çoktan Seçmeli"
-          }${q?.imageDataUrl ? " • Görselli" : ""} • ${questionDuration} sn • ${questionXP} XP${q?.doubleXp ? " (2x)" : ""} • Sürükle-bırak ile sırala</div>
+          }${q?.imageDataUrl ? " â€¢ Görselli" : ""} â€¢ ${questionDuration} sn â€¢ ${questionXP} XP${q?.doubleXp ? " (2x)" : ""} â€¢ Sürükle-bırak ile sırala</div>
         </div>
         <div style="display:flex;gap:4px;">
           <button class="btn" data-act="copy" style="padding:4px 7px;font-size:12px;background:#eef2ff;color:#1e3a8a;">Kopya</button>
@@ -3215,7 +3424,7 @@ async function loadTeacherLiveQuizList() {
       div.innerHTML = `
         <div>
           <div style="font-weight:700;">${qz.title || "Quiz"}</div>
-          <small>${(qz.questions || []).length} soru • ${qz.targetClass || "Tüm sınıflar"}${qz.targetSection ? "/" + qz.targetSection : ""}</small>
+          <small>${(qz.questions || []).length} soru â€¢ ${qz.targetClass || "Tüm sınıflar"}${qz.targetSection ? "/" + qz.targetSection : ""}</small>
         </div>
         <div style="display:flex;gap:6px;">
           <button class="btn btn-primary">Düzenle</button>
@@ -3276,7 +3485,7 @@ function setTeacherHomeResultsView(rows = [], metaText = "", sessionId = "") {
     <div class="list-item" style="cursor:default;padding:8px 10px;">
       <div>
         <strong>${i + 1}. ${r.studentName || r.name || r.userId || "-"}</strong><br>
-        <small>${r.correct || 0}D / ${r.wrong || 0}Y • ${formatQuizDurationText(r.durationMs, r.durationMinutes)}</small>
+        <small>${r.correct || 0}D / ${r.wrong || 0}Y â€¢ ${formatQuizDurationText(r.durationMs, r.durationMinutes)}</small>
       </div>
       <div style="text-align:right;">
         <div style="font-weight:700;color:#2563eb;">${r.xpEarned ?? r.xp ?? 0} XP</div>
@@ -3369,7 +3578,7 @@ function openTeacherQuizResultsReport() {
             <h2>Quiz Sonuç Raporu</h2>
           </div>
         </div>
-        <div class="meta">${teacherHomeLatestResultsMeta || "Quiz sonuçları"} • ${new Date().toLocaleString("tr-TR")}</div>
+        <div class="meta">${teacherHomeLatestResultsMeta || "Quiz sonuçları"} â€¢ ${new Date().toLocaleString("tr-TR")}</div>
         <table><thead><tr><th>#</th><th>Öğrenci</th><th>Doğru</th><th>Yanlış</th><th>XP</th><th>Başarı</th><th>Süre</th><th>Doğru Grafiği</th></tr></thead>
         <tbody>${rowsHtml}</tbody></table>
         <div class="actions"><button onclick="window.print()">PDF / Yazdır</button></div>
@@ -3414,7 +3623,7 @@ function startTeacherHomeQuizListener() {
       div.innerHTML = `
         <div>
           <div style="font-weight:700;">${qz.title || "Quiz"}</div>
-          <small>${(qz.questions || []).length} soru • ${qz.targetClass || "Tüm sınıflar"}${qz.targetSection ? "/" + qz.targetSection : ""}</small>
+          <small>${(qz.questions || []).length} soru â€¢ ${qz.targetClass || "Tüm sınıflar"}${qz.targetSection ? "/" + qz.targetSection : ""}</small>
           <div style="font-size:12px;color:#64748b;margin-top:3px;">Oluşturulma: ${created}</div>
         </div>
         <div style="display:flex;gap:6px;">
@@ -3522,7 +3731,7 @@ function startTeacherHomeQuizListener() {
         const firstItems = bySessionTmp.get(teacherSelectedQuizSessionId) || [];
         const ranking = getSortedQuizRanking(firstItems);
         const headerQuizTitle = ranking[0]?.quizTitle || "Quiz";
-        const metaText = `${headerQuizTitle} • ${ranking.length} öğrenci tamamladı • Sonuç listesi`;
+        const metaText = `${headerQuizTitle} â€¢ ${ranking.length} öğrenci tamamladı â€¢ Sonuç listesi`;
         setTeacherHomeResultsView(ranking, metaText, teacherSelectedQuizSessionId);
         renderTeacherQuizSessionSelector();
       } else {
@@ -4061,12 +4270,12 @@ function updateTeacherLiveMetaText(live) {
   const metaEl = document.getElementById("live-session-meta");
   if (titleEl) {
     titleEl.innerText = live
-      ? `${live.quizTitle || "Quiz"} • Soru ${Number(live.currentIndex || 0) + 1}/${(live.questions || []).length}`
+      ? `${live.quizTitle || "Quiz"} â€¢ Soru ${Number(live.currentIndex || 0) + 1}/${(live.questions || []).length}`
       : "Canlı oturum yok";
   }
   if (metaEl) {
     metaEl.innerText = live
-      ? `Kalan: ${Math.max(0, Math.floor((Number(live.endsAtMs || 0) - Date.now()) / 1000))} sn • ${live.isLocked ? "?? Soru kilitli" : "?? Soru açık"}`
+      ? `Kalan: ${Math.max(0, Math.floor((Number(live.endsAtMs || 0) - Date.now()) / 1000))} sn â€¢ ${live.isLocked ? "?? Soru kilitli" : "?? Soru açık"}`
       : "";
   }
   const lockBtn = document.getElementById("btn-live-session-lock");
@@ -4193,7 +4402,7 @@ function renderTeacherAnswerStats(live, answers = []) {
       `).join("")}
     </div>
     <div style="margin-top:8px;color:#334155;font-size:13px;">
-      Yanıtlayan: <strong>${totalAnswered}</strong> • Doğru: <strong>${correctCount}</strong>
+      Yanıtlayan: <strong>${totalAnswered}</strong> â€¢ Doğru: <strong>${correctCount}</strong>
     </div>
   `;
   }
@@ -4344,8 +4553,8 @@ function renderTeacherLiveMonitor(live = activeLiveSession) {
   const totalXP = rows.reduce((sum, row) => sum + Number(row.score?.xp || 0), 0);
   const classLabel = live.targetClass ? `${live.targetClass}${live.targetSection ? "/" + live.targetSection : ""}` : "Tüm Sınıflar";
 
-  titleEl.innerText = `${live.quizTitle || "Quiz"} • Canlı Takip`;
-  subEl.innerText = `Soru ${Math.min(qIndex + 1, Math.max(totalQuestions, 1))}/${Math.max(totalQuestions, 1)} • ${classLabel} • Kalan ${Math.max(0, Math.floor((Number(live.endsAtMs || 0) - Date.now()) / 1000))} sn`;
+  titleEl.innerText = `${live.quizTitle || "Quiz"} â€¢ Canlı Takip`;
+  subEl.innerText = `Soru ${Math.min(qIndex + 1, Math.max(totalQuestions, 1))}/${Math.max(totalQuestions, 1)} â€¢ ${classLabel} â€¢ Kalan ${Math.max(0, Math.floor((Number(live.endsAtMs || 0) - Date.now()) / 1000))} sn`;
   metricsEl.innerHTML = `
     <div class="teacher-live-metric"><div class="k">Öğrenci</div><div class="v">${rows.length}</div></div>
     <div class="teacher-live-metric"><div class="k">Yanıtlayan</div><div class="v">${answeredCount}</div></div>
@@ -4363,7 +4572,7 @@ function renderTeacherLiveMonitor(live = activeLiveSession) {
     const selectedLabel = options.find((opt) => opt.key === selectedKey)?.label || (row.answer?.selected || "-");
     const isCorrect = question && row.answer ? isLiveAnswerCorrect(question, selectedKey) : false;
     const statusClass = row.answer ? "answered" : "pending";
-    const statusText = row.answer ? (isCorrect ? "Cevaplandı • Doğru" : "Cevaplandı • Yanlış") : "Cevap bekleniyor";
+    const statusText = row.answer ? (isCorrect ? "Cevaplandı â€¢ Doğru" : "Cevaplandı â€¢ Yanlış") : "Cevap bekleniyor";
     const classText = row.className ? `${row.className}${row.section ? "/" + row.section : ""}` : "-";
     return `
       <div class="teacher-live-student-card ${statusClass}">
@@ -4374,7 +4583,7 @@ function renderTeacherLiveMonitor(live = activeLiveSession) {
         <div class="teacher-live-status ${statusClass}">${statusText}</div>
         <div class="teacher-live-student-meta">
           <div>Seçim: <strong>${selectedLabel || "-"}</strong></div>
-          <div>XP: <strong>${Number(row.score?.xp || 0)}</strong> • Doğru: <strong>${Number(row.score?.correct || 0)}</strong></div>
+          <div>XP: <strong>${Number(row.score?.xp || 0)}</strong> â€¢ Doğru: <strong>${Number(row.score?.correct || 0)}</strong></div>
           <div>Sınıf: <strong>${classText}</strong></div>
         </div>
       </div>
@@ -4636,7 +4845,7 @@ async function teacherEndLiveSession(reason = "manual") {
     const lb = await liveQuizClient.leaderboard(String(activeLiveSession.id));
     const rankingRows = getSortedQuizRanking(Array.isArray(lb?.rows) ? lb.rows : []);
     if (rankingRows.length) {
-      const meta = `${activeLiveSession.quizTitle || "Quiz"} • ${rankingRows.length} öğrenci tamamladı • Sonuç listesi`;
+      const meta = `${activeLiveSession.quizTitle || "Quiz"} â€¢ ${rankingRows.length} öğrenci tamamladı â€¢ Sonuç listesi`;
       setTeacherHomeResultsView(rankingRows, meta, String(activeLiveSession.id));
     }
     showNotice("Quiz bitti.", "#2ecc71");
@@ -4683,7 +4892,7 @@ function startStudentLiveQuizListener() {
       const inviteText = document.getElementById("live-quiz-invite-text");
       if (!invite || !inviteText) return;
       if (live) {
-        inviteText.innerText = `“${live.quizTitle || "Canlı Quiz"}” başladı. Katılmak için tıklayın.`;
+        inviteText.innerText = `â€œ${live.quizTitle || "Canlı Quiz"}â€ başladı. Katılmak için tıklayın.`;
         const playerOpen = document.getElementById("live-quiz-player")?.style.display === "flex";
         invite.style.display = playerOpen ? "none" : "flex";
         if (playerOpen) renderStudentLiveQuestion();
@@ -4756,7 +4965,7 @@ async function renderStudentLiveQuestion() {
   const now = Date.now();
   const leftSec = Math.max(0, Math.floor((effectiveEndsAtMs - now) / 1000));
   const isQuestionTimeOver = leftSec <= 0;
-  if (title) title.innerText = `${session.quizTitle || "Canlı Quiz"} • ${Number(session.currentIndex || 0) + 1}/${(session.questions || []).length}`;
+  if (title) title.innerText = `${session.quizTitle || "Canlı Quiz"} â€¢ ${Number(session.currentIndex || 0) + 1}/${(session.questions || []).length}`;
   if (!q) {
     if (qBox) qBox.innerText = "Soru bulunamadı.";
     if (oBox) oBox.innerHTML = "";
@@ -4767,7 +4976,7 @@ async function renderStudentLiveQuestion() {
     studentLiveDoubleXpIntroShown.add(introKey);
     if (qBox) {
       qBox.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;min-height:120px;">
-        <div id="live-doublexp-intro" style="font-size:1.35rem;font-weight:900;color:#f97316;text-shadow:0 6px 20px rgba(249,115,22,.35);">🔥 2 KAT PUAN SORUSU! 🔥</div>
+        <div id="live-doublexp-intro" style="font-size:1.35rem;font-weight:900;color:#f97316;text-shadow:0 6px 20px rgba(249,115,22,.35);">?? 2 KAT PUAN SORUSU! ??</div>
       </div>`;
       const introEl = document.getElementById("live-doublexp-intro");
       if (introEl) {
@@ -4854,7 +5063,7 @@ async function renderStudentLiveQuestion() {
       const isCorrectOption = q.type === "truefalse"
         ? normalizeTrueFalseValue(q?.correct) === normalizeTrueFalseValue(selectedKey)
         : String(q?.correct || "").trim().toUpperCase() === selectedKey;
-      const optText = existingAnswer && isCorrectOption ? `${optTextRaw} ✅` : optTextRaw;
+      const optText = existingAnswer && isCorrectOption ? `${optTextRaw} ?` : optTextRaw;
       btn.innerHTML = `<span class="opt-key">${keyText}</span><span class="opt-text">${optText}</span>`;
       btn.disabled = !!session.isLocked || isQuestionTimeOver || !!existingAnswer || studentLiveSubmittingAnswerKeys.has(`${session.id}_${qIndex}_${currentUserId}`);
       btn.onclick = () => submitStudentLiveAnswer(opt, i);
@@ -5351,7 +5560,7 @@ window.closeStudentDetail = function() {
   }
 };
 
-/* ================= ÇIKIŞ ================= */
+/* ================= ÇIKIÅ ================= */
 async function handleUserLogout({ closeSideMenu = true, closeDropdown = true } = {}) {
   if (logoutInProgress) return;
   logoutInProgress = true;
@@ -7015,7 +7224,7 @@ function getCallableErrorMessage(err) {
   if (code.includes("permission-denied")) return "Yetki hatası. Fonksiyon erişimi engellendi.";
   if (code.includes("unauthenticated")) return "Oturum doğrulanamadı. Lütfen tekrar giriş yapın.";
   if (code.includes("not-found")) return "Bulut fonksiyonu bulunamadı. Functions deploy gerekli olabilir.";
-  if (code.includes("unavailable")) return "Şu anda sunucuya ulaşılamıyor.";
+  if (code.includes("unavailable")) return "Åu anda sunucuya ulaşılamıyor.";
   if (normalized === "invalid credentials") return "Kullanıcı adı veya şifre hatalı.";
   if (normalized === "unauthenticated") return "Oturum doğrulanamadı. Lütfen tekrar giriş yapın.";
   if (normalized === "forbidden") return "Bu işlem için yetkiniz yok.";
@@ -7135,7 +7344,7 @@ async function deleteStudentAccountWithFallback(student, options = {}) {
 async function applyStudentPasswordUpdate(student, newPassword, options = {}) {
   const nextPass = String(newPassword || "").trim();
   if (!nextPass || nextPass.length < 6) {
-    throw new Error("Şifre en az 6 karakter olmalı.");
+    throw new Error("Åifre en az 6 karakter olmalı.");
   }
   const guessedEmail = String(student?.email || "").trim() || fixEmail(String(student?.username || "").trim());
   if (guessedEmail && !String(student?.email || "").trim()) {
@@ -7166,7 +7375,7 @@ async function applyStudentPasswordUpdate(student, newPassword, options = {}) {
   return nextPass;
 }
 
-/* ================= SEKME DEĞİŞTİRME ================= */
+/* ================= SEKME DEÄİÅTİRME ================= */
 window.switchTab = function(tabName) {
   document.querySelectorAll('#student-tabs .tab-btn').forEach(btn => {
     btn.classList.remove('active');
@@ -7204,7 +7413,7 @@ window.openComputeItRunner = async function(userId, options = {}){
   const topTitle = document.querySelector("#activity-modal .modal-header h2");
   if (topTitle) topTitle.innerText = "Compute It";
   const closeBtn = document.getElementById("btn-close-activity");
-  if (closeBtn) closeBtn.innerText = "×";
+  if (closeBtn) closeBtn.innerText = "Ã—";
   setBlockRunnerStartButton(false);
   if (userRole === "teacher") {
     setActivityPausedUI(false);
@@ -8197,7 +8406,7 @@ function setFlowchartMode(mode = "teacher", assignment = null) {
   if (timerEl) timerEl.style.display = editable ? "none" : "inline-flex";
   if (help) {
     if (editable) {
-      help.innerText = 'İpucu: Soldan şekli sürükleyip bırak. "Bağla Modu" ile iki düğümü seçip bağlantı kur. Şekle çift tıklayıp metin düzenle.';
+      help.innerText = 'İpucu: Soldan şekli sürükleyip bırak. "Bağla Modu" ile iki düğümü seçip bağlantı kur. Åekle çift tıklayıp metin düzenle.';
     } else {
       const q = String(assignment?.flowQuestion || assignment?.question || "Flowchart şablonunu doğru bağlantılarla oluştur.");
       help.innerText = `Soru: ${q}`;
@@ -8363,7 +8572,7 @@ function renderFlowchart() {
         if (!flowConnectSourceId) {
           flowConnectSourceId = node.id;
           flowSelectedNodeId = node.id;
-          appendFlowOutput("Bağla: 1. düğüm seçildi. Şimdi 2. düğümü tıklayın.");
+          appendFlowOutput("Bağla: 1. düğüm seçildi. Åimdi 2. düğümü tıklayın.");
         } else {
           if (flowConnectSourceId === node.id) {
             appendFlowOutput("Aynı düğüm seçildi. Farklı bir 2. düğüm seçin.");
@@ -8660,7 +8869,7 @@ async function submitFlowchartAssignmentAnswer() {
   const answer = exportFlowchartGraph(flowNodes, flowEdges);
   const correct = areFlowGraphsEquivalent(template, answer);
   if (!correct) {
-    showNotice("Şekil/bağlantı eşleşmedi. Tekrar deneyin.", "#e74c3c");
+    showNotice("Åekil/bağlantı eşleşmedi. Tekrar deneyin.", "#e74c3c");
     return;
   }
   const aid = String(assignment.id);
@@ -9030,7 +9239,7 @@ function setSidebarSubmenuState(menuId, toggleId, open) {
   if (!menu || !toggle) return;
   menu.classList.toggle("open", !!open);
   const arrow = toggle.querySelector(".arrow");
-  if (arrow) arrow.innerText = open ? "▾" : "▸";
+  if (arrow) arrow.textContent = open ? "\u25BE" : "\u25B8";
 }
 
 function closeOtherSidebarSubmenus(exceptMenuId = "") {
@@ -9229,14 +9438,14 @@ function renderProfileChangeApprovalRows(rows = []) {
         <div style="display:flex; justify-content:space-between; gap:8px; align-items:flex-start;">
           <div>
             <div style="font-weight:700;">${studentName}</div>
-            <div style="font-size:12px; color:#64748b;">Sınıf/Şube: ${classText}</div>
+            <div style="font-size:12px; color:#64748b;">Sınıf/Åube: ${classText}</div>
             <div style="font-size:12px; color:#64748b;">Talep: ${escapeHtmlBasic(whenText)}</div>
           </div>
           <div style="font-size:12px; color:#0f766e; font-weight:600;">Onay Bekliyor</div>
         </div>
         <div style="margin-top:8px; font-size:13px;">
           <div><strong>Yeni Ad Soyad:</strong> ${fullName}</div>
-          <div><strong>Şifre:</strong> ${hasPassword ? "Değişecek" : "Değişmeyecek"}</div>
+          <div><strong>Åifre:</strong> ${hasPassword ? "Değişecek" : "Değişmeyecek"}</div>
         </div>
         <div style="display:flex; gap:8px; margin-top:10px;">
           <button class="btn btn-success" data-profile-request-action="approve" data-request-id="${escapeHtmlBasic(row.id)}">Onayla</button>
@@ -9879,12 +10088,12 @@ function buildStudentAiReply(question) {
   if (/(ödev|odev|task)/i.test(ql) && !/(blok|compute|flow|3d)/i.test(ql)) {
     const pending = Math.max(0, ctx.tasks.length - ctx.taskCompleted);
     const titles = ctx.tasks.slice(0, 5).map((t) => `- ${t.title || "Ödev"}`).join("\n");
-    return `Ödevlerin: ${ctx.tasks.length} adet.\nTamamlanan: ${ctx.taskCompleted}\nBekleyen: ${pending}\n${titles || "- Şu an atanmış ödev görünmüyor."}`;
+    return `Ödevlerin: ${ctx.tasks.length} adet.\nTamamlanan: ${ctx.taskCompleted}\nBekleyen: ${pending}\n${titles || "- Åu an atanmış ödev görünmüyor."}`;
   }
   if (/(etkinlik|icerik|içerik|uygulama)/i.test(ql)) {
     const pending = Math.max(0, ctx.activities.length - ctx.activityCompleted);
     const titles = ctx.activities.slice(0, 5).map((a) => `- ${a.title || "Etkinlik"}`).join("\n");
-    return `Etkinliklerin: ${ctx.activities.length} adet.\nTamamlanan: ${ctx.activityCompleted}\nBekleyen: ${pending}\n${titles || "- Şu an atanmış etkinlik görünmüyor."}`;
+    return `Etkinliklerin: ${ctx.activities.length} adet.\nTamamlanan: ${ctx.activityCompleted}\nBekleyen: ${pending}\n${titles || "- Åu an atanmış etkinlik görünmüyor."}`;
   }
   if (/(blok|3d|flowchart|akis|akış)/i.test(ql)) {
     const block2D = ctx.blockItems.filter((a) => getBlockHomeworkType(a.assignmentType) === "block2d").length;
@@ -9895,7 +10104,7 @@ function buildStudentAiReply(question) {
   if (/(compute|compute it)/i.test(ql)) {
     const pending = Math.max(0, ctx.computeItems.length - ctx.computeCompleted);
     const titles = ctx.computeItems.slice(0, 5).map((a) => `- ${a.title || "Compute It Ödevi"}`).join("\n");
-    return `Compute It ödevlerin: ${ctx.computeItems.length} adet.\nTamamlanan: ${ctx.computeCompleted}\nBekleyen: ${pending}\n${titles || "- Şu an compute ödevi görünmüyor."}`;
+    return `Compute It ödevlerin: ${ctx.computeItems.length} adet.\nTamamlanan: ${ctx.computeCompleted}\nBekleyen: ${pending}\n${titles || "- Åu an compute ödevi görünmüyor."}`;
   }
   if (/(ders|konu|slayt)/i.test(ql)) {
     const titles = ctx.lessonItems.slice(0, 7).map((l) => `- ${l.title || "Ders"}`).join("\n");
@@ -10690,7 +10899,7 @@ function buildTeacherQuizSessionLabel(session = {}) {
   const dt = Number(session.latestFinishedAtMs || 0) > 0
     ? new Date(Number(session.latestFinishedAtMs || 0)).toLocaleString("tr-TR")
     : "-";
-  return `${title} • ${count} öğrenci • ${dt}`;
+  return `${title} â€¢ ${count} öğrenci â€¢ ${dt}`;
 }
 
 function renderTeacherQuizSessionSelector() {
@@ -10728,7 +10937,7 @@ function bindTeacherQuizSessionSelectorHandlers(sessionMap = new Map()) {
     const items = sessionMap.get(active) || [];
     const ranking = getSortedQuizRanking(items);
     const headerQuizTitle = ranking[0]?.quizTitle || "Quiz";
-    const metaText = `${headerQuizTitle} • ${ranking.length} öğrenci tamamladı • Sonuç listesi`;
+    const metaText = `${headerQuizTitle} â€¢ ${ranking.length} öğrenci tamamladı â€¢ Sonuç listesi`;
     setTeacherHomeResultsView(ranking, metaText, active);
     renderTeacherQuizSessionSelector();
   };
@@ -11150,10 +11359,110 @@ function openTeacherLessonsModalUI() {
   document.getElementById("side-menu").style.width = "0";
 }
 
+function renderStudentLessonsMenuCards() {
+  const grid = document.getElementById("student-lessons-grid");
+  const empty = document.getElementById("student-lessons-empty");
+  const subtitle = document.getElementById("student-lessons-subtitle");
+  if (!grid || !empty) return;
+
+  const items = (Array.isArray(lessons) ? lessons : [])
+    .filter((l) => !l?.isDeleted)
+    .filter((l) => lessonMatchesStudent(l));
+
+  if (!items.length) {
+    grid.innerHTML = "";
+    empty.style.display = "block";
+    if (subtitle) subtitle.textContent = "Henüz yayınlanan ders bulunmuyor";
+    return;
+  }
+
+  empty.style.display = "none";
+  if (subtitle) subtitle.textContent = `${items.length} ders kartı hazır. İstediğin dersten devam edebilirsin.`;
+  const getLessonPreviewImage = (lesson) => {
+    const slides = Array.isArray(lesson?.slides) ? lesson.slides : [];
+    const fromSlide = slides.find((s) => String(s?.imageUrl || "").trim().length > 0)?.imageUrl || "";
+    return String(lesson?.coverImage || lesson?.thumbnailUrl || lesson?.bgImage || fromSlide || "").trim();
+  };
+
+  grid.innerHTML = "";
+  items.forEach((lesson) => {
+    const slides = Array.isArray(lesson?.slides) ? lesson.slides : [];
+    const firstTitle = String(slides[0]?.title || "Yeni Slide");
+    const prog = lessonProgressMap.get(String(lesson.id)) || {};
+    const isCompleted = !!prog.completed;
+    const percent = Math.max(0, Math.min(100, Number(prog.percent || 0)));
+    const done = Math.max(0, Math.round((percent / 100) * Math.max(1, slides.length)));
+    const total = Math.max(1, slides.length);
+    const previewImage = getLessonPreviewImage(lesson);
+
+    const card = document.createElement("article");
+    card.style.cssText = "background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%);border:1px solid #dbeafe;border-radius:22px;overflow:hidden;box-shadow:0 14px 30px rgba(15,23,42,.10);display:flex;flex-direction:column;transition:transform .2s ease, box-shadow .2s ease;";
+    card.innerHTML = `
+      <div style="position:relative;height:210px;background:#eef2ff;display:flex;align-items:center;justify-content:center;">
+        ${previewImage
+          ? `<img src="${previewImage}" alt="Ders görseli" style="width:100%;height:100%;object-fit:cover;">`
+          : `<div style="font-size:48px;opacity:.85;">📘</div>`
+        }
+        <div style="position:absolute;inset:0;background:linear-gradient(180deg,transparent 10%,rgba(15,23,42,.55) 100%);"></div>
+        <span style="position:absolute;left:12px;top:12px;padding:6px 10px;border-radius:999px;background:rgba(15,23,42,.72);color:#e2e8f0;font-size:12px;font-weight:700;">${percent}% tamamlandı</span>
+        <span style="position:absolute;right:12px;bottom:12px;padding:8px 12px;border-radius:999px;background:#fbbf24;color:#422006;font-weight:800;">${Math.min(done, total)}/${total}</span>
+      </div>
+      <div style="padding:14px 14px 16px;display:flex;flex-direction:column;gap:8px;min-height:170px;">
+        <div style="font-size:28px;font-weight:900;color:#1e293b;line-height:1.08;">${escapeHtmlBasic(String(lesson.title || "Ders"))}</div>
+        <div style="font-size:15px;color:#64748b;line-height:1.25;min-height:38px;">${escapeHtmlBasic(firstTitle)}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <span style="display:inline-flex;align-items:center;padding:5px 10px;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-weight:700;font-size:12px;">📑 ${total} slide</span>
+          <span style="display:inline-flex;align-items:center;padding:5px 10px;border-radius:999px;background:#ecfeff;color:#0e7490;font-weight:700;font-size:12px;">⭐ ${Math.round((done / total) * 100)}%</span>
+        </div>
+        <div style="margin-top:auto;display:flex;justify-content:flex-start;align-items:center;gap:8px;flex-wrap:wrap;">
+          ${isCompleted
+            ? `<span style="display:inline-flex;align-items:center;gap:6px;padding:10px 16px;border-radius:999px;background:#ede9fe;color:#5b21b6;font-weight:800;">✓ Tamamlandı</span>`
+            : `<button type="button" class="btn btn-primary btn-student-lesson-open" style="border-radius:14px;padding:10px 16px;background:linear-gradient(135deg,#2563eb,#1d4ed8);border:none;">Derse Başla</button>`
+          }
+        </div>
+      </div>
+    `;
+    card.addEventListener("mouseenter", () => {
+      card.style.transform = "translateY(-3px)";
+      card.style.boxShadow = "0 20px 34px rgba(15,23,42,.16)";
+    });
+    card.addEventListener("mouseleave", () => {
+      card.style.transform = "translateY(0)";
+      card.style.boxShadow = "0 14px 30px rgba(15,23,42,.10)";
+    });
+    card.addEventListener("click", (ev) => {
+      if (ev.target?.closest?.(".btn-student-lesson-open")) return;
+      openLessonPlayerModal(lesson);
+    });
+    card.querySelector(".btn-student-lesson-open")?.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      openLessonPlayerModal(lesson);
+    });
+    grid.appendChild(card);
+  });
+}
+
+function openStudentLessonsModalUI() {
+  const fullPage = document.getElementById("student-lessons-fullpage");
+  if (!fullPage) return;
+  renderStudentLessonsMenuCards();
+  showPage("student-lessons");
+  const sideMenu = document.getElementById("side-menu");
+  if (sideMenu) sideMenu.style.width = "0";
+}
+
+function openLessonsFromSidebar() {
+  if (userRole === "teacher") {
+    openTeacherLessonsModalUI();
+    return;
+  }
+  openStudentLessonsModalUI();
+}
+
 const openLessonsMenuBtn = document.getElementById("btn-open-lessons");
 if (openLessonsMenuBtn) {
   openLessonsMenuBtn.onclick = function () {
-    openTeacherLessonsModalUI();
+    openLessonsFromSidebar();
   };
 }
 
@@ -11162,7 +11471,7 @@ document.addEventListener("click", (e) => {
   if (!trigger) return;
   e.preventDefault();
   e.stopPropagation();
-  openTeacherLessonsModalUI();
+  openLessonsFromSidebar();
 }, true);
 
 const closeTeacherLessonsModalBtn = document.getElementById("btn-close-teacher-lessons-modal");
@@ -11174,6 +11483,15 @@ if (closeTeacherLessonsModalBtn) {
       modal.classList.remove("fullscreen");
     }
     document.body?.classList?.remove("teacher-lessons-modal-open");
+  };
+}
+
+const studentLessonsBackBtn = document.getElementById("btn-student-lessons-back");
+if (studentLessonsBackBtn) {
+  studentLessonsBackBtn.onclick = function () {
+    const fullPage = document.getElementById("student-lessons-fullpage");
+    if (fullPage) fullPage.style.display = "none";
+    showPage("home");
   };
 }
 
@@ -11682,7 +12000,7 @@ document.getElementById("btn-profile-save").onclick = async function() {
       return;
     }
     if (newPassword && newPassword.length < 6) {
-      showNotice("Şifre en az 6 karakter olmalı!", "#e74c3c");
+      showNotice("Åifre en az 6 karakter olmalı!", "#e74c3c");
       return;
     }
     if (userRole === "student") {
@@ -11809,7 +12127,7 @@ document.getElementById("btn-password-save").onclick = async function() {
   const newPassword = document.getElementById("password-new").value;
   if (!passwordChangeUserId) return;
   if (!newPassword || newPassword.length < 6) {
-    showNotice("Şifre en az 6 karakter olmalı!", "#e74c3c");
+    showNotice("Åifre en az 6 karakter olmalı!", "#e74c3c");
     return;
   }
   try {
@@ -11825,12 +12143,12 @@ document.getElementById("btn-password-save").onclick = async function() {
       newPassword,
       { currentPasswordHints: [String(studentData.loginCardPassword || "")] }
     );
-    showNotice("Şifre güncellendi!", "#2ecc71");
+    showNotice("Åifre güncellendi!", "#2ecc71");
     document.getElementById("password-new").value = "";
     if (passwordModal) passwordModal.style.display = "none";
     passwordChangeUserId = null;
   } catch (e) {
-    showNotice("Şifre güncellenemedi: " + getCallableErrorMessage(e), "#e74c3c");
+    showNotice("Åifre güncellenemedi: " + getCallableErrorMessage(e), "#e74c3c");
   }
 };
 
@@ -11925,7 +12243,7 @@ document.getElementById("btn-add-student-save").onclick = async function () {
     return;
   }
   if (password.length < 6) {
-    showNotice("Şifre en az 6 karakter olmalı!", "#e74c3c");
+    showNotice("Åifre en az 6 karakter olmalı!", "#e74c3c");
     return;
   }
   try {
@@ -12039,7 +12357,7 @@ document.getElementById("btn-add-teacher-save").onclick = async function () {
     return;
   }
   if (password.length < 6) {
-    showNotice("Şifre en az 6 karakter olmalı!", "#e74c3c");
+    showNotice("Åifre en az 6 karakter olmalı!", "#e74c3c");
     return;
   }
   try {
@@ -12069,7 +12387,7 @@ if (bulkTeacherDefaultPass) bulkTeacherDefaultPass.style.display = "none";
 
 if (bulkTeacherTemplateBtn) bulkTeacherTemplateBtn.onclick = function () {
   const csv = [
-    "Ad,Soyad,Kullanıcı Adı,Şifre,Branş,Sınıf/Şube",
+    "Ad,Soyad,Kullanıcı Adı,Åifre,Branş,Sınıf/Åube",
     "Ali,Veli,ogretmen.ali,123456,Matematik,5/A|6/B",
     "Ayşe,Yılmaz,ogretmen.ayse,123456,Fen,7/C"
   ].join("\n");
@@ -12086,7 +12404,7 @@ if (bulkTeacherTemplateBtn) bulkTeacherTemplateBtn.onclick = function () {
 
 document.getElementById("btn-download-student-template").onclick = function () {
   const csv = [
-    "Ad,Soyad,Kullanıcı Adı,Şifre,Sınıf,Şube",
+    "Ad,Soyad,Kullanıcı Adı,Åifre,Sınıf,Åube",
     "Ali,Veli,ali,123456,9,A",
     "Ayşe,Yılmaz,ayse,123456,9,B"
   ].join("\n");
@@ -12265,12 +12583,12 @@ window.debugStudentXPBreakdown = async function(labelOrId) {
     return null;
   }
   try {
-    console.group(`XP Audit • ${report.student.name} (${report.student.id})`);
+    console.group(`XP Audit â€¢ ${report.student.name} (${report.student.id})`);
     console.table(report.breakdown);
     console.groupEnd();
   } catch {}
   const userXp = report.breakdown.find((x) => x.source.startsWith("users.xp"))?.xp || 0;
-  showNotice(`XP denetimi hazır: ${report.student.name} • users.xp=${userXp}`, "#2ecc71");
+  showNotice(`XP denetimi hazır: ${report.student.name} â€¢ users.xp=${userXp}`, "#2ecc71");
   return report;
 };
 
@@ -12362,7 +12680,7 @@ window.repairComputeXPData = async function(targetUserId = "") {
     return null;
   }
   const report = await repairComputeXPData(targetUserId);
-  const msg = `Compute XP onarıldı • kayıt: ${report.repairedRows}, öğrenci: ${report.affectedUsers}, toplam düzeltme: ${report.totalUserDelta}`;
+  const msg = `Compute XP onarıldı â€¢ kayıt: ${report.repairedRows}, öğrenci: ${report.affectedUsers}, toplam düzeltme: ${report.totalUserDelta}`;
   showNotice(msg, "#2ecc71");
   try {
     console.log("repairComputeXPData", report);
@@ -12882,6 +13200,7 @@ onAuthStateChanged(auth, (user) => {
     stopProfileChangeApprovalsListener();
     stopNotificationsFeedListener();
     stopNotificationPolling();
+    stopKeyboardRaceAnnouncementPolling();
     if (userProfileUnsub) {
       try { userProfileUnsub(); } catch (e) {}
       userProfileUnsub = null;
@@ -13146,6 +13465,11 @@ onAuthStateChanged(auth, (user) => {
     loadSeenNotificationIds();
     updateNotificationsPermissionLabel();
     startNotificationPolling();
+    if (userRole === "student") {
+      startKeyboardRaceAnnouncementPolling();
+    } else {
+      stopKeyboardRaceAnnouncementPolling();
+    }
     
     loginScreen.classList.add("hidden");
     appScreen.style.display = "grid";
@@ -13171,6 +13495,8 @@ onAuthStateChanged(auth, (user) => {
     document.getElementById("teacher-panel").style.display = isTeacher ? "block" : "none";
     const studentHomeworkShell = document.getElementById("student-homework-shell");
     if (studentHomeworkShell) studentHomeworkShell.style.display = "block";
+    const lessonsSectionCard = document.getElementById("lessons-section");
+    if (lessonsSectionCard) lessonsSectionCard.style.display = isTeacher ? "flex" : "none";
     const studentAppsShell = document.getElementById("student-apps-shell");
     if (studentAppsShell) studentAppsShell.style.display = isTeacher ? "" : "block";
     const teacherHomeTabs = document.getElementById("teacher-home-tabs");
@@ -13273,7 +13599,7 @@ onAuthStateChanged(auth, (user) => {
     const contentBtn = document.getElementById("btn-open-content");
     if (contentBtn) {
       contentBtn.style.display = isTeacher ? "block" : "none";
-      contentBtn.innerText = "🧩 Etkinlik Ekle";
+      contentBtn.innerText = "ğŸ¯ Etkinlik Ekle";
     }
     const addMenuToggleBtn = document.getElementById("btn-toggle-add-menu");
     if (addMenuToggleBtn) {
@@ -13301,8 +13627,10 @@ onAuthStateChanged(auth, (user) => {
     if (appsMenuToggleBtn) appsMenuToggleBtn.style.display = isTeacher ? "block" : "none";
     const appsHubLiveQuizCard = document.getElementById("apps-hub-card-live-quiz");
     if (appsHubLiveQuizCard) appsHubLiveQuizCard.style.display = isTeacher ? "flex" : "none";
+    const appsHubKeyboardRaceCard = document.getElementById("apps-hub-card-keyboard-race");
+    if (appsHubKeyboardRaceCard) appsHubKeyboardRaceCard.style.display = isTeacher ? "flex" : "none";
     const lessonsListMenuBtn = document.getElementById("btn-open-lessons");
-    if (lessonsListMenuBtn) lessonsListMenuBtn.style.display = isTeacher ? "block" : "none";
+    if (lessonsListMenuBtn) lessonsListMenuBtn.style.display = "block";
     const liveQuizMenuBtn = document.getElementById("btn-open-live-quiz");
     if (liveQuizMenuBtn) liveQuizMenuBtn.style.display = isTeacher ? "block" : "none";
     const liveQuizStartMenuBtn = document.getElementById("btn-open-live-quiz-start");
@@ -13475,7 +13803,7 @@ onAuthStateChanged(auth, (user) => {
   });
 });
 
-/* ================= ÖĞRENCİ TAMAMLANAN ÖDEVLERİ ================= */
+/* ================= ÖÄRENCİ TAMAMLANAN ÖDEVLERİ ================= */
 function loadStudentCompletions(userId) {
   console.log("Öğrenci completions dinleniyor:", userId);
   
@@ -13730,7 +14058,7 @@ function createTaskElement(task, isCompleted, completionData, manualProgress) {
       if (completionData.duration) {
         const mins = Math.floor(completionData.duration / 60);
         const secs = completionData.duration % 60;
-        timeInfo = `<small style="color:#666;display:block;margin-top:4px;">? ${mins}dk ${secs}sn</small>`;
+        timeInfo = `<small style="color:#666;display:block;margin-top:4px;">⏱️ ${mins}dk ${secs}sn</small>`;
       }
     } else {
       if (isExpired) {
@@ -13742,9 +14070,9 @@ function createTaskElement(task, isCompleted, completionData, manualProgress) {
       if (deadline) {
         const daysLeft = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
         if (daysLeft > 0) {
-          deadlineInfo = `<small style="color:${daysLeft <= 2 ? '#e74c3c' : '#f39c12'};display:block;margin-top:4px;">? ${daysLeft} gün kaldı</small>`;
+          deadlineInfo = `<small style="color:${daysLeft <= 2 ? '#e74c3c' : '#f39c12'};display:block;margin-top:4px;">📅 ${daysLeft} gün kaldı</small>`;
         } else if (daysLeft === 0) {
-          deadlineInfo = `<small style="color:#e74c3c;display:block;margin-top:4px;">?? Bugün son gün!</small>`;
+          deadlineInfo = `<small style="color:#e74c3c;display:block;margin-top:4px;">⚠️ Bugün son gün!</small>`;
         }
       }
     }
@@ -13761,13 +14089,13 @@ function createTaskElement(task, isCompleted, completionData, manualProgress) {
     const totalStudents = studentIdSet.size || allStudents.length || 0;
     const suffix = totalStudents ? `/${totalStudents}` : "";
     const controlBadge = requiresTeacherApprovalTask(task)
-      ? `<span class="badge badge-danger">?? Kontrol Gerekli</span> `
+      ? `<span class="badge badge-danger">🧭 Kontrol Gerekli</span> `
       : "";
     const rewardXP = getTaskRewardXP(task);
-    const dateInline = deadline ? ` • ?? ${deadline.toLocaleDateString('tr-TR')}` : "";
+    const dateInline = deadline ? ` • 📅 ${deadline.toLocaleDateString('tr-TR')}` : "";
     const xpInfo = requiresTeacherApprovalTask(task)
-      ? `<small style="color:#7c2d12;display:block;margin-top:4px;">? Onaylanınca +${rewardXP} XP${dateInline}</small>`
-      : `<small style="color:#1e40af;display:block;margin-top:4px;">? Tamamlayınca +${rewardXP} XP${dateInline}</small>`;
+      ? `<small style="color:#7c2d12;display:block;margin-top:4px;">🪙 Onaylanınca +${rewardXP} XP${dateInline}</small>`
+      : `<small style="color:#1e40af;display:block;margin-top:4px;">🪙 Tamamlayınca +${rewardXP} XP${dateInline}</small>`;
     badge = `${controlBadge}<span class="badge badge-info" style="font-size:1.02rem; padding:8px 14px;">${uniqueCount}${suffix} tamamlama</span>`;
     deadlineInfo = "";
     timeInfo = xpInfo;
@@ -13805,7 +14133,7 @@ function createTaskElement(task, isCompleted, completionData, manualProgress) {
   return li;
 }
 
-/* ================= ÖĞRETMEN İSTATİSTİKLERİ ================= */
+/* ================= ÖÄRETMEN İSTATİSTİKLERİ ================= */
 function loadTeacherStats(teacherId) {
   const q = query(collection(db, "completions"));
   
@@ -13898,7 +14226,7 @@ function updateModalStats(taskId) {
   document.getElementById("modal-best-time").innerText = stats.bestTime > 0 ? stats.bestTime + " dk" : "-";
 }
 
-/* ================= GİRİŞ / KAYIT ================= */
+/* ================= GİRİÅ / KAYIT ================= */
 async function loginWithResolvedCredentials(identifier, pass) {
   const emailCandidates = await resolveLoginEmails(String(identifier || "").trim());
   const attempts = Array.from(new Set([
@@ -14074,7 +14402,7 @@ async function doPasswordlessLoginAfterWin() {
     const overlay = document.createElement("div");
     overlay.id = "mini-game-login-overlay";
     overlay.style.cssText = "position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,0.45);backdrop-filter:blur(2px);z-index:32000;";
-    overlay.innerHTML = '<div style="background:#fff;border:1px solid #dbe5f4;border-radius:14px;padding:16px 20px;font-weight:700;color:#0f172a;box-shadow:0 12px 26px rgba(0,0,0,0.2);">✅ Oyun tamamlandı. Giriş yapılıyor...</div>';
+    overlay.innerHTML = '<div style="background:#fff;border:1px solid #dbe5f4;border-radius:14px;padding:16px 20px;font-weight:700;color:#0f172a;box-shadow:0 12px 26px rgba(0,0,0,0.2);">? Oyun tamamlandı. Giriş yapılıyor...</div>';
     document.body.appendChild(overlay);
     await new Promise((r) => setTimeout(r, 2000));
     overlay.remove();
@@ -14105,7 +14433,7 @@ async function doPasswordlessLoginAfterWin() {
     const ready = await waitForAuthReady(12000);
     if (!ready) restoreLoginButtonState();
   } catch (err) {
-    showNotice("Şifresiz giriş başarısız: " + (err?.message || "Giriş hatası"), "#e74c3c");
+    showNotice("Åifresiz giriş başarısız: " + (err?.message || "Giriş hatası"), "#e74c3c");
   } finally {
     const stillOnLogin = !!loginScreen && !loginScreen.classList.contains("hidden");
     if (loginBtn && stillOnLogin) {
@@ -14283,7 +14611,7 @@ function initLoginMiniGame() {
       if (s.taken) return;
       ctx.fillStyle = "#f59e0b";
       ctx.font = "bold 22px Arial";
-      ctx.fillText("★", s.x, s.y + 16);
+      ctx.fillText("?", s.x, s.y + 16);
       const hit = collides(hero, { x: s.x - 2, y: s.y - 2, w: s.w + 4, h: s.h + 4 });
       if (hit) {
         s.taken = true;
@@ -14304,10 +14632,10 @@ function initLoginMiniGame() {
     };
     if (collides(hero, goalHitbox) && !miniGameWon) {
       if (starCount < 3) {
-        if (miniGameStatus) miniGameStatus.textContent = `Yıldız: ${starCount}/3 • Önce tüm yıldızları topla`;
+        if (miniGameStatus) miniGameStatus.textContent = `Yıldız: ${starCount}/3 â€¢ Önce tüm yıldızları topla`;
       } else {
         miniGameWon = true;
-        if (miniGameStatus) miniGameStatus.textContent = "Başarılı! Şifresiz giriş yapılıyor...";
+        if (miniGameStatus) miniGameStatus.textContent = "Başarılı! Åifresiz giriş yapılıyor...";
         stopMiniGameLoop();
         if (miniGameModal) miniGameModal.style.display = "none";
         doPasswordlessLoginAfterWin();
@@ -14928,7 +15256,7 @@ document.getElementById("btn-delete-task").onclick = async function () {
   });
 });
 
-/* ================= AKTİVİTE BAŞLATMA ================= */
+/* ================= AKTİVİTE BAÅLATMA ================= */
 document.getElementById("btn-start-activity").onclick = async function () {
   if (!currentTaskId) return;
   
@@ -15198,7 +15526,7 @@ async function saveGameResults(xp, duration) {
   }
 }
 
-/* ================= GERİ DÖNÜŞ ================= */
+/* ================= GERİ DÖNÜÅ ================= */
 document.getElementById("btn-back").onclick = backToMain;
 
 function backToMain() {
@@ -15392,7 +15720,7 @@ function populateLeaderboardFilters(rows = []) {
     opt.textContent = c;
     classSelect.appendChild(opt);
   });
-  sectionSelect.innerHTML = `<option value="">Tüm Şubeler</option>`;
+  sectionSelect.innerHTML = `<option value="">Tüm Åubeler</option>`;
   Array.from(sectionSet).sort((a, b) => String(a).localeCompare(String(b), "tr")).forEach((s) => {
     const opt = document.createElement("option");
     opt.value = s;
@@ -15415,7 +15743,7 @@ function updateLeaderboardSectionFilterOptions() {
     if (selectedClass && String(r.className || "") !== selectedClass) return;
     if (r.section) sectionSet.add(String(r.section));
   });
-  sectionSelect.innerHTML = `<option value="">Tüm Şubeler</option>`;
+  sectionSelect.innerHTML = `<option value="">Tüm Åubeler</option>`;
   Array.from(sectionSet).sort((a, b) => a.localeCompare(b, "tr")).forEach((s) => {
     const opt = document.createElement("option");
     opt.value = s;
@@ -15493,7 +15821,7 @@ function loadLeaderboard() {
   });
 }
 
-/* ================= ÖĞRENCİLERİM MODALI ================= */
+/* ================= ÖÄRENCİLERİM MODALI ================= */
 function getTeacherManagedStudents(students = []) {
   if (userRole !== "teacher") return [];
   if (!currentUserId && !userData?.username && !userData?.email) return [];
@@ -15656,7 +15984,7 @@ function applyClassSectionDropdownBindings() {
       const sections = Array.from(classMap.get(selectedClass) || []).sort((a, b) => a.localeCompare(b, "tr"));
       if (sectionIsSelect) {
         const currentSection = normalizeClassSectionText(sectionEl.value || "");
-        sectionEl.innerHTML = `<option value="">Şube seçin</option>`;
+        sectionEl.innerHTML = `<option value="">Åube seçin</option>`;
         sections.forEach((sec) => {
           const opt = document.createElement("option");
           opt.value = sec;
@@ -15958,7 +16286,7 @@ function renderLoginCardsModal() {
             <span class="val">${escapeHtmlBasic(username)}</span>
           </div>
           <div class="login-card-field password-field">
-            <span class="icon">Şifre</span>
+            <span class="icon">Åifre</span>
             <span class="val">${escapeHtmlBasic(pass)}</span>
           </div>
         </div>
@@ -16021,14 +16349,14 @@ function openLoginCardsPrintPreview() {
             <div class="print-val">${username}</div>
           </div>
           <div class="print-row password-row">
-            <div class="print-icon">Şifre</div>
+            <div class="print-icon">Åifre</div>
             <div class="print-val">${pass}</div>
           </div>
           <div class="print-foot">Öğrenci Giriş Kartı</div>
         </article>
       `;
     }).join("");
-    return `<section class="print-sheet">${cards}</section>`;
+    return `<section class="print-sheet"><div class="print-header"><img src="${appUrl("logo.png")}" alt="Logo" class="center-logo"></div>${cards}</section>`;
   }).join("");
 
   const w = window.open("", "_blank");
@@ -16045,8 +16373,8 @@ function openLoginCardsPrintPreview() {
   .actions { position: sticky; top: 0; z-index: 3; display:flex; gap:8px; justify-content:flex-end; padding:8px 10px; background:#fff; border-bottom:1px solid #d1d5db; }
   .actions button { border:1px solid #cbd5e1; background:#fff; padding:8px 12px; border-radius:8px; font-weight:700; cursor:pointer; }
   .actions .primary { background:#2563eb; color:#fff; border-color:#1d4ed8; }
-  .print-sheet { width: 100%; height: 281mm; max-height: 281mm; display:grid; grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(5, minmax(0, 1fr)); gap: 3mm; page-break-after: always; padding: 0; overflow: hidden; }
-  .print-sheet:last-of-type { page-break-after: auto; }
+  .print-sheet { width: 100%; display:grid; grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(5, minmax(0, 1fr)); gap: 3mm; page-break-after: always; padding: 0; overflow: visible; break-inside: avoid; }
+  .print-sheet:last-of-type { page-break-after: avoid; break-after: avoid; }
   .print-login-card {
     position: relative;
     border: 0.35mm solid #a78bfa;
@@ -16105,6 +16433,8 @@ function openLoginCardsPrintPreview() {
     transform: rotate(-12deg);
     background: linear-gradient(90deg, rgba(147,51,234,0.18), rgba(167,139,250,0.1));
   }
+  .print-header { text-align: center; padding: 4mm 0 2mm 0; }
+  .center-logo { width: 12mm; height: auto; display: inline-block; }
   @media print {
     body { background:#fff; }
     .actions { display:none; }
@@ -16170,7 +16500,7 @@ function populateStudentFilters(students) {
     classSelect.appendChild(opt);
   });
   
-  sectionSelect.innerHTML = "<option value=\"\">Şube</option>";
+  sectionSelect.innerHTML = "<option value=\"\">Åube</option>";
   Array.from(sections).sort((a, b) => String(a).localeCompare(String(b), "tr")).forEach(s => {
     const opt = document.createElement("option");
     opt.value = s;
@@ -16577,7 +16907,7 @@ function renderStudentsList(students) {
           <button class="btn btn-warning btn-edit">Düzenle</button>
           <button class="btn btn-success btn-save" style="display:none;">Kaydet</button>
           <button class="btn btn-cancel" style="display:none; background:#eee;">İptal</button>
-          <button class="btn btn-primary btn-temp-pass">Şifre Sıfırla</button>
+          <button class="btn btn-primary btn-temp-pass">Åifre Sıfırla</button>
           <button class="btn btn-danger btn-delete">Sil</button>
         </div>
       </div>
@@ -16597,7 +16927,7 @@ function renderStudentsList(students) {
       userInput.disabled = true;
       passInput.disabled = false;
       passInput.value = "";
-      passInput.placeholder = "Yeni Şifre (opsiyonel)";
+      passInput.placeholder = "Yeni Åifre (opsiyonel)";
       classInput.disabled = false;
       sectionInput.disabled = false;
       saveBtn.style.display = "inline-block";
@@ -16610,7 +16940,7 @@ function renderStudentsList(students) {
       lastInput.value = fallbackLast;
       userInput.value = username;
       passInput.value = String(student.loginCardPassword || "");
-      passInput.placeholder = "Şifre";
+      passInput.placeholder = "Åifre";
       classInput.value = className;
       sectionInput.value = section;
       inputs.forEach(i => i.disabled = true);
@@ -16641,20 +16971,20 @@ function renderStudentsList(students) {
         showNotice("Öğrenci bilgileri güncellendi!", "#2ecc71");
         inputs.forEach(i => i.disabled = true);
         passInput.value = String(student.loginCardPassword || "");
-        passInput.placeholder = "Şifre";
+        passInput.placeholder = "Åifre";
         saveBtn.style.display = "none";
         cancelBtn.style.display = "none";
         editBtn.style.display = "inline-block";
       } catch (e) {
         passInput.value = String(student.loginCardPassword || "");
-        passInput.placeholder = "Şifre";
+        passInput.placeholder = "Åifre";
         showNotice("Güncelleme hatası: " + getCallableErrorMessage(e), "#e74c3c");
       }
     };
 
     if (tempPassBtn) {
       tempPassBtn.onclick = async () => {
-        const ok = await confirmDialog("Şifre sıfırlansın mı? Yeni şifre: 123456");
+        const ok = await confirmDialog("Åifre sıfırlansın mı? Yeni şifre: 123456");
         if (!ok) return;
         try {
           const resetPassword = "123456";
@@ -16662,11 +16992,11 @@ function renderStudentsList(students) {
             currentPasswordHints: [shownPassword, passInput.value]
           });
           passInput.value = resetPassword;
-          await infoDialog(`Şifre sıfırlandı.\nYeni şifre: ${resetPassword}`, {
+          await infoDialog(`Åifre sıfırlandı.\nYeni şifre: ${resetPassword}`, {
             okText: "Tamam"
           });
         } catch (e) {
-          showNotice("Şifre sıfırlanamadı: " + getCallableErrorMessage(e), "#e74c3c");
+          showNotice("Åifre sıfırlanamadı: " + getCallableErrorMessage(e), "#e74c3c");
         }
       };
     }
@@ -16762,7 +17092,7 @@ function getHeroRankFallbacks() {
   const schoolNode = document.getElementById("student-hero-school-rank");
   const clean = (value) => {
     const v = String(value || "").trim();
-    if (!v || v === "-" || v === "—") return null;
+    if (!v || v === "-" || v === "â€”") return null;
     return v;
   };
   const classRank = clean(classNode?.textContent);
@@ -16794,7 +17124,7 @@ function getRankFallbacksFromCache(detail) {
 
 function isBlankRank(value) {
   const v = String(value ?? "").trim();
-  return !v || v === "-" || v === "—" || v === "null" || v === "undefined";
+  return !v || v === "-" || v === "â€”" || v === "null" || v === "undefined";
 }
 
 function normalizeClassValue(value) {
@@ -17359,7 +17689,7 @@ async function openStudentReportWindow(detail) {
           <div style="flex:1;">
             <img src="${appUrl("logo.png")}" alt="Logo" class="logo" />
             <div class="title">Öğrenci Performans Raporu</div>
-            <div class="subtitle">${new Date().toLocaleDateString("tr-TR")} • Kurumsal Öğrenci Takip Sistemi</div>
+            <div class="subtitle">${new Date().toLocaleDateString("tr-TR")} â€¢ Kurumsal Öğrenci Takip Sistemi</div>
           </div>
         </div>
           <div class="card grid">
@@ -17382,7 +17712,7 @@ async function openStudentReportWindow(detail) {
           <div class="kpi"><div class="value">${totalXPCombined}</div><div class="label">Toplam XP</div></div>
         </div>
         <div class="kpi-alt-grid">
-          <div class="kpi-alt a">Sınıf Sırası: ${classRank}<small>Sınıf/Şube içi</small></div>
+          <div class="kpi-alt a">Sınıf Sırası: ${classRank}<small>Sınıf/Åube içi</small></div>
           <div class="kpi-alt b">Okul Sırası: ${schoolRank}<small>Genel sıralama</small></div>
           <div class="kpi-alt c">Sistem Süresi<small>${systemTimeText}</small></div>
           <div class="kpi-alt d">Genel İlerleme<small>%${combinedCompletionRate}</small></div>
@@ -17394,13 +17724,13 @@ async function openStudentReportWindow(detail) {
             <div style="display:grid; grid-template-columns: repeat(2, minmax(200px, 1fr)); gap:14px; align-items:start;">
               <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
                 ${group1Chart}
-                <div style="font-size:11px; color:#475569; text-align:center;">Ödev • Etkinlik • Ders</div>
-                <div style="font-size:11px; color:#475569;">Toplam: ${group1Total} • Tamamlandı: ${group1Completed}</div>
+                <div style="font-size:11px; color:#475569; text-align:center;">Ödev â€¢ Etkinlik â€¢ Ders</div>
+                <div style="font-size:11px; color:#475569;">Toplam: ${group1Total} â€¢ Tamamlandı: ${group1Completed}</div>
               </div>
               <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
                 ${group2Chart}
                 <div style="font-size:11px; color:#475569; text-align:center;">Kodlama Uygulamaları</div>
-                <div style="font-size:11px; color:#475569;">Toplam: ${group2Total} • Tamamlandı: ${group2Completed}</div>
+                <div style="font-size:11px; color:#475569;">Toplam: ${group2Total} â€¢ Tamamlandı: ${group2Completed}</div>
               </div>
             </div>
           </div>
@@ -17412,7 +17742,7 @@ async function openStudentReportWindow(detail) {
           </div>
           <div class="report-two-col">
             <div class="card">
-              <div class="section-title">Dersler • Etkinlik • Ödevler</div>
+              <div class="section-title">Dersler â€¢ Etkinlik â€¢ Ödevler</div>
               <div class="kpi-grid" style="margin-bottom:8px; grid-template-columns: repeat(3, minmax(0, 1fr));">
                 <div class="kpi"><div class="value">${taskCompletedCount}/${taskTotalCount}</div><div class="label">Ödevler</div></div>
                 <div class="kpi"><div class="value">${activityCompletedCount}/${activityTotalCount}</div><div class="label">Etkinlikler</div></div>
@@ -17461,7 +17791,7 @@ async function openStudentReportWindow(detail) {
         <div class="card header">
           <div style="flex:1;">
             <img src="${appUrl("logo.png")}" alt="Logo" class="logo" />
-            <div class="title">Öğrenci Gelişim Raporu • Sayfa 2</div>
+            <div class="title">Öğrenci Gelişim Raporu â€¢ Sayfa 2</div>
             <div class="subtitle">Güçlü Yönler ve Odak Alanları</div>
           </div>
         </div>
@@ -17971,7 +18301,7 @@ async function buildStudentReportHtml(detail) {
           <div style="flex:1;">
             <img src="${appUrl("logo.png")}" alt="Logo" class="logo" />
             <div class="title">Öğrenci Performans Raporu</div>
-            <div class="subtitle">${new Date().toLocaleDateString("tr-TR")} • Kurumsal Öğrenci Takip Sistemi</div>
+            <div class="subtitle">${new Date().toLocaleDateString("tr-TR")} â€¢ Kurumsal Öğrenci Takip Sistemi</div>
           </div>
         </div>
           <div class="card grid">
@@ -17994,7 +18324,7 @@ async function buildStudentReportHtml(detail) {
           <div class="kpi"><div class="value">${totalXPCombined}</div><div class="label">Toplam XP</div></div>
         </div>
         <div class="kpi-alt-grid">
-          <div class="kpi-alt a">Sınıf Sırası: ${classRank}<small>Sınıf/Şube içi</small></div>
+          <div class="kpi-alt a">Sınıf Sırası: ${classRank}<small>Sınıf/Åube içi</small></div>
           <div class="kpi-alt b">Okul Sırası: ${schoolRank}<small>Genel sıralama</small></div>
           <div class="kpi-alt c">Toplam Süre<small>${systemTimeText}</small></div>
           <div class="kpi-alt d">Genel İlerleme<small>%${combinedCompletionRate}</small></div>
@@ -18006,19 +18336,19 @@ async function buildStudentReportHtml(detail) {
             <div style="display:grid; grid-template-columns: repeat(2, minmax(200px, 1fr)); gap:14px; align-items:start;">
               <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
                 ${group1Chart}
-                <div style="font-size:11px; color:#475569; text-align:center;">Ödev • Etkinlik • Ders</div>
-                <div style="font-size:11px; color:#475569;">Toplam: ${group1Total} • Tamamlandı: ${group1Completed}</div>
+                <div style="font-size:11px; color:#475569; text-align:center;">Ödev â€¢ Etkinlik â€¢ Ders</div>
+                <div style="font-size:11px; color:#475569;">Toplam: ${group1Total} â€¢ Tamamlandı: ${group1Completed}</div>
               </div>
               <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
                 ${group2Chart}
                 <div style="font-size:11px; color:#475569; text-align:center;">Kodlama Uygulamaları</div>
-                <div style="font-size:11px; color:#475569;">Toplam: ${group2Total} • Tamamlandı: ${group2Completed}</div>
+                <div style="font-size:11px; color:#475569;">Toplam: ${group2Total} â€¢ Tamamlandı: ${group2Completed}</div>
               </div>
             </div>
           </div>
           <div class="report-two-col">
             <div class="card">
-              <div class="section-title">Dersler • Etkinlik • Ödevler</div>
+              <div class="section-title">Dersler â€¢ Etkinlik â€¢ Ödevler</div>
               <div class="kpi-grid" style="margin-bottom:8px; grid-template-columns: repeat(3, minmax(0, 1fr));">
                 <div class="kpi"><div class="value">${taskCompletedCount}/${taskTotalCount}</div><div class="label">Ödevler</div></div>
                 <div class="kpi"><div class="value">${activityCompletedCount}/${activityTotalCount}</div><div class="label">Etkinlikler</div></div>
@@ -18067,7 +18397,7 @@ async function buildStudentReportHtml(detail) {
         <div class="card header">
           <div style="flex:1;">
             <img src="${appUrl("logo.png")}" alt="Logo" class="logo" />
-            <div class="title">Öğrenci Gelişim Raporu • Sayfa 2</div>
+            <div class="title">Öğrenci Gelişim Raporu â€¢ Sayfa 2</div>
             <div class="subtitle">Ders, Ödev ve Kodlama Detayı</div>
           </div>
         </div>
@@ -18394,10 +18724,10 @@ function renderBlockHomeworkList() {
   if (!pendingList || !completedList) return;
   const activeBlockLabel = getBlockHomeworkTypeLabel(currentBlockAssignType || "block2d");
   if (noPending) {
-    noPending.innerHTML = `<div class="empty-state-icon">🧩</div>Bekleyen ${activeBlockLabel} ödevi yok.`;
+    noPending.innerHTML = `<div class="empty-state-icon">ğŸ§©</div>Bekleyen ${activeBlockLabel} ödevi yok.`;
   }
   if (noCompleted) {
-    noCompleted.innerHTML = `<div class="empty-state-icon">✅</div>Tamamlanan ${activeBlockLabel} ödevi yok.`;
+    noCompleted.innerHTML = `<div class="empty-state-icon">âœ…</div>Tamamlanan ${activeBlockLabel} ödevi yok.`;
   }
 
   pendingList.innerHTML = "";
@@ -18532,7 +18862,7 @@ function renderBlockHomeworkList() {
         <div>
           <div style="font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${a.title || `${appLabel} Ödevi`} ${appBadge}</div>
           <small style="color:#666;">📅 ${a.deadline || "-"} • ${isFlowchart ? "Flowchart Soru" : (isSilentTeacher || isLightbot) ? `Bölüm ${rangeText}` : `Seviye ${rangeText}`}</small>
-          ${isFlowchart ? `<small style="color:#666;display:block;">🧩 ${a.flowQuestion || "Flowchart şemasını kur"}</small>` : ""}
+          ${isFlowchart ? `<small style="color:#666;display:block;">?? ${a.flowQuestion || "Flowchart şemasını kur"}</small>` : ""}
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
           <span class="completion-badge">%${percent}</span>
@@ -19009,8 +19339,24 @@ window.switchTeacherQuizTab = function(tabName) {
 
 function lessonMatchesStudent(lesson) {
   if (lesson?.isPublished === false) return false;
-  const ownerTeacherId = userData?.ownerTeacherId || userData?.createdBy || "";
-  if (ownerTeacherId && lesson?.userId && String(lesson.userId) !== String(ownerTeacherId)) return false;
+  const ownerTeacherId = String(userData?.ownerTeacherId || userData?.createdBy || "").trim();
+  if (ownerTeacherId) {
+    const ownerMarkers = [
+      lesson?.ownerTeacherId,
+      lesson?.createdBy,
+      lesson?.teacherId,
+      lesson?.ownerId,
+      lesson?.userId,
+      lesson?.teacherEmail,
+      lesson?.ownerEmail
+    ]
+      .map((v) => String(v || "").trim())
+      .filter(Boolean);
+
+    if (ownerMarkers.length > 0 && !ownerMarkers.includes(ownerTeacherId)) {
+      return false;
+    }
+  }
   const targetClass = lesson?.targetClass || "";
   const targetSection = lesson?.targetSection || "";
   if (!targetClass) return true;
@@ -19062,7 +19408,7 @@ function renderTeacherLessonsModalList() {
   if (metaEl) {
     const draftCount = items.filter((l) => l?.isPublished === false).length;
     const publishedCount = items.filter((l) => l?.isPublished !== false).length;
-    metaEl.innerText = `Toplam: ${items.length} • Taslak: ${draftCount} • Yayında: ${publishedCount}`;
+    metaEl.innerText = `Toplam: ${items.length} â€¢ Taslak: ${draftCount} â€¢ Yayında: ${publishedCount}`;
   }
 
   if (!items.length) {
@@ -19086,7 +19432,7 @@ function renderTeacherLessonsModalList() {
     li.innerHTML = `
       <div>
         <div style="font-weight:700;">${lesson.title || "Ders"}</div>
-        <small style="color:#64748b;">🧩 ${slides.length} slide • Hedef: ${lesson.targetClass || "Seçilmedi"}${lesson.targetSection ? "/" + lesson.targetSection : ""}</small>
+        <small style="color:#64748b;">📘 ${slides.length} slayt • Hedef: ${lesson.targetClass || "Seçilmedi"}${lesson.targetSection ? "/" + lesson.targetSection : ""}</small>
       </div>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
         <span class="completion-badge" style="background:${isPublished ? "#dcfce7" : "#fff7ed"};color:${isPublished ? "#166534" : "#9a3412"};border-color:${isPublished ? "#86efac" : "#fdba74"};">${isPublished ? "Yayında" : "Taslak"}</span>
@@ -19138,6 +19484,9 @@ function loadLessons() {
       .sort((a, b) => b.createdAtDate - a.createdAtDate);
     if (userRole === "teacher") await ensureStudentsCache();
     renderLessonsList();
+    if (userRole === "student" && document.getElementById("student-lessons-fullpage")?.style.display === "flex") {
+      renderStudentLessonsMenuCards();
+    }
   });
 
   const pq = userRole === "student"
@@ -19158,6 +19507,9 @@ function loadLessons() {
       lessonProgressMap.set(key, v);
     });
     renderLessonsList();
+    if (userRole === "student" && document.getElementById("student-lessons-fullpage")?.style.display === "flex") {
+      renderStudentLessonsMenuCards();
+    }
     if (userRole === "student") updateUserXPDisplay();
   });
 }
@@ -19186,6 +19538,12 @@ function renderLessonsList() {
   let lessonDoneTotal = 0;
   let lessonXpTotal = 0;
 
+  const getLessonPreviewImage = (lesson) => {
+    const slides = Array.isArray(lesson?.slides) ? lesson.slides : [];
+    const fromSlide = slides.find((s) => String(s?.imageUrl || "").trim().length > 0)?.imageUrl || "";
+    return String(lesson?.coverImage || lesson?.thumbnailUrl || lesson?.bgImage || fromSlide || "").trim();
+  };
+
   items.forEach((lesson) => {
     const li = document.createElement("li");
     li.className = "list-item";
@@ -19208,7 +19566,7 @@ function renderLessonsList() {
       li.innerHTML = `
         <div>
           <div style="font-weight:600;">${lesson.title || "Ders"}</div>
-          <small style="color:#666;">🧩 ${slides.length} slide • Hedef: ${lesson.targetClass || "Seçilmedi"}${lesson.targetSection ? "/" + lesson.targetSection : ""}</small>
+          <small style="color:#666;">📘 ${slides.length} slayt • Hedef: ${lesson.targetClass || "Seçilmedi"}${lesson.targetSection ? "/" + lesson.targetSection : ""}</small>
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
           <span class="completion-badge" style="background:${isPublished ? "#dcfce7" : "#fff7ed"};color:${isPublished ? "#166534" : "#9a3412"};border-color:${isPublished ? "#86efac" : "#fdba74"};">${isPublished ? "Yayında" : "Taslak"}</span>
@@ -19237,31 +19595,36 @@ function renderLessonsList() {
       const percent = Number(prog.percent || 0);
       const xp = Number(prog.totalXP || 0);
       const isCompleted = !!prog.completed;
+      const previewImage = getLessonPreviewImage(lesson);
       li.classList.toggle("completed", isCompleted);
       li.innerHTML = `
-        <div>
-          <div style="font-weight:600;">${lesson.title || "Ders"}</div>
-          <small style="color:#666;">🧩 ${slides.length} slide</small>
+        <div style="display:flex; gap:10px; align-items:center; min-width:0;">
+          <div style="width:84px; height:56px; border-radius:8px; overflow:hidden; background:#e2e8f0; flex:0 0 auto;">
+            ${previewImage
+              ? `<img src="${previewImage}" alt="Ders görseli" style="width:100%;height:100%;object-fit:cover;">`
+              : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:11px;color:#475569;">Ders</div>`
+            }
+          </div>
+          <div style="min-width:0;">
+            <div style="font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${lesson.title || "Ders"}</div>
+            <small style="color:#666;">📘 ${slides.length} slayt • %${percent} • ${xp} XP</small>
+          </div>
         </div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <span class="completion-badge">%${percent}</span>
-          <span class="completion-badge">${xp} XP</span>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
+          <button type="button" class="btn btn-primary btn-lesson-start" style="padding:6px 10px;">${isCompleted ? "Tekrar Başla" : "Derse Başla"}</button>
         </div>
       `;
-      li.onclick = () => {
-        if (isCompleted) {
-          showCompletionInfoPopup({
-            category: "Ders",
-            title: lesson.title || "Ders",
-            xp,
-            seconds: 0,
-            percent,
-            message: "Bu dersi tamamladınız."
-          });
-          return;
-        }
+      const openLesson = () => {
         openLessonPlayerModal(lesson);
       };
+      li.onclick = openLesson;
+      const startBtn = li.querySelector(".btn-lesson-start");
+      if (startBtn) {
+        startBtn.onclick = (ev) => {
+          ev.stopPropagation();
+          openLesson();
+        };
+      }
       if (isCompleted) {
         completedRows.push(li);
         completedCount++;
@@ -19417,7 +19780,7 @@ function renderLessonSlideList() {
     row.dataset.slideIndex = String(i);
     row.innerHTML = `
       <div class="lesson-frame-title">${i + 1}. ${s.title || "Başlıksız Slide"}</div>
-      <div class="lesson-frame-meta">${typeLabel} • ${s.layout || "text"}</div>
+      <div class="lesson-frame-meta">${typeLabel} â€¢ ${s.layout || "text"}</div>
     `;
     row.addEventListener("dragstart", (ev) => {
       lessonSlideDragIndex = i;
@@ -19677,7 +20040,7 @@ function updateLessonSlidePreview() {
     box.innerHTML = `
       <div style="font-weight:700;margin-bottom:6px;">Soru Önizleme</div>
       <div style="margin-bottom:6px;padding:8px;border-radius:8px;background:${cardBg};color:${cardText};border:1px solid ${cardBorder};">${draft.question || "-"}</div>
-      <div style="font-size:12px;color:#475569;">Tür: ${draftQType}${draftQType === "fill" || draftQType === "dragdrop" ? ` • Alan: ${(draft.fillAnswers || []).length}` : ` • Doğru: ${correctLabel || "-"}`} • XP: ${questionXP}</div>
+      <div style="font-size:12px;color:#475569;">Tür: ${draftQType}${draftQType === "fill" || draftQType === "dragdrop" ? ` â€¢ Alan: ${(draft.fillAnswers || []).length}` : ` â€¢ Doğru: ${correctLabel || "-"}`} â€¢ XP: ${questionXP}</div>
       ${(draft.type || "content") === "mixed" ? `<hr style="border:none;border-top:1px solid #e5e7eb;margin:8px 0;"><div>${draft.content || "<span style='color:#94a3b8;'>İçerik yok</span>"}</div>` : ""}
     `;
     return;
@@ -20060,7 +20423,7 @@ function renderLessonPlayer() {
       ? `<button id="btn-save-question-answer" class="btn btn-primary" style="margin-top:10px;" ${isLockedByTime ? "disabled" : ""}>Cevabı Kaydet</button>`
       : "";
     const statusHtml = hasAnswered
-      ? `<div class="lesson-answer-status ${answeredCorrect ? "is-correct" : "is-wrong"}">${answeredCorrect ? "✔ Doğru cevap" : "✖ Yanlış cevap"}</div>`
+      ? `<div class="lesson-answer-status ${answeredCorrect ? "is-correct" : "is-wrong"}">${answeredCorrect ? "? Doğru cevap" : "? Yanlış cevap"}</div>`
       : (isLockedByTime ? `<div class="lesson-answer-status is-wrong">Süre doldu.</div>` : "");
     const hasChoiceGrid = qType === "multiple" || qType === "boolean";
     const questionBody = hasChoiceGrid
@@ -21190,11 +21553,11 @@ function buildCertificatePageHtml(page) {
         <div class="cert-frame">
           <img src="${appUrl("logo.png")}" alt="Logo" class="cert-logo" />
           <div class="cert-badge">?</div>
-          <h1 class="cert-title">BAŞARI SERTİFİKASI</h1>
+          <h1 class="cert-title">BAÅARI SERTİFİKASI</h1>
           <div class="cert-name">${fullName}</div>
           <p class="cert-text">${awardText}</p>
           <div class="cert-meta">
-            <div class="cert-meta-item"><span class="k">Sınıf / Şube</span><span class="v">${cls} / ${sec}</span></div>
+            <div class="cert-meta-item"><span class="k">Sınıf / Åube</span><span class="v">${cls} / ${sec}</span></div>
             <div class="cert-meta-item"><span class="k">Toplam XP</span><span class="v">${xp} XP</span></div>
             <div class="cert-meta-item"><span class="k">Tamamlama</span><span class="v">%${completionRate} (${completed}/${total})</span></div>
             <div class="cert-meta-item"><span class="k">Veriliş Tarihi</span><span class="v">${issuedAt}</span></div>
@@ -21878,7 +22241,7 @@ function renderTeacherWorkspaceHero() {
     setWidth("teacher-info-support-bar", classLow.activeRate);
     setText(
       "teacher-info-support-text",
-      `%${classLow.activeRate} aktiflik • ${classLow.total} öğrenci`
+      `%${classLow.activeRate} aktiflik â€¢ ${classLow.total} öğrenci`
     );
   } else {
     setText(
@@ -22294,7 +22657,7 @@ function updateActivityLists() {
       li.innerHTML = `
         <div style="flex:1;">
           <div style="font-weight:600;">${assignment.title || "Etkinlik"}</div>
-          <small style="color:#666;">?? ${assignment.createdAtDate.toLocaleDateString("tr-TR")}${deadlineDate ? ` • Son: ${deadlineDate.toLocaleDateString("tr-TR")}` : ""}</small>
+          <small style="color:#666;">?? ${assignment.createdAtDate.toLocaleDateString("tr-TR")}${deadlineDate ? ` â€¢ Son: ${deadlineDate.toLocaleDateString("tr-TR")}` : ""}</small>
         </div>
         <div style="display:flex; gap:6px; align-items:center;">${rightBadges}</div>
       `;
@@ -22413,7 +22776,7 @@ async function showCompletionInfoPopup({ category = "İçerik", title = "", xp =
   await infoDialog(html, {
     allowHtml: true,
     title: "Tamamlandı Bilgisi",
-    iconText: "✓",
+    iconText: "?",
     iconBg: "#dcfce7",
     iconColor: "#15803d",
     showContinue: false,
@@ -22672,7 +23035,7 @@ async function populateClassSectionFilters(classSelect, sectionSelect) {
   const prevClass = String(classSelect.value || "");
   const prevSection = String(sectionSelect.value || "");
   classSelect.innerHTML = `<option value="">Sınıf</option>`;
-  sectionSelect.innerHTML = `<option value="">Şube</option>`;
+  sectionSelect.innerHTML = `<option value="">Åube</option>`;
   const classMap = new Map();
 
   if (userRole === "teacher" && (!Array.isArray(classSectionCatalog) || classSectionCatalog.length === 0)) {
@@ -22711,7 +23074,7 @@ async function populateClassSectionFilters(classSelect, sectionSelect) {
   });
 
   const syncSections = () => {
-    sectionSelect.innerHTML = `<option value="">Şube</option>`;
+    sectionSelect.innerHTML = `<option value="">Åube</option>`;
     const cls = classSelect.value;
     if (!cls) return;
     const sections = classMap.get(cls) || new Set();
@@ -23675,7 +24038,7 @@ function renderContentList() {
         <div style="font-size:12px;color:#666;">${content.description || ""}</div>
         <div class="content-tag">${tag}</div>
         ${userRole === "student" ? `<div class="progress-mini"><div style="width:${progress.percent}%"></div></div>
-        <div style="font-size:11px;color:#666;margin-top:4px;">%${progress.percent} • ${progress.completed}/${progress.total} • ${progress.totalXP} XP</div>` : ""}
+        <div style="font-size:11px;color:#666;margin-top:4px;">%${progress.percent} â€¢ ${progress.completed}/${progress.total} â€¢ ${progress.totalXP} XP</div>` : ""}
       </div>
       <div style="font-size:12px;color:#999;">${(content.items || []).length} öğe</div>
     `;
@@ -23749,7 +24112,7 @@ function selectContentForView(content, options = {}) {
     <div style="color:#666;font-size:12px;">${content.description || ""}</div>
     <div style="margin-top:8px;">
       <div class="progress-mini"><div style="width:${progress.percent}%"></div></div>
-      <div style="font-size:12px;color:#666;margin-top:4px;">%${progress.percent} • ${progress.completed}/${progress.total} • ${progress.totalXP} XP</div>
+      <div style="font-size:12px;color:#666;margin-top:4px;">%${progress.percent} â€¢ ${progress.completed}/${progress.total} â€¢ ${progress.totalXP} XP</div>
     </div>
   `;
 
@@ -24867,7 +25230,7 @@ async function downloadClassPdf(className, section, students, completionRate) {
       <span style="font-size:12px;color:#6b7280;">${new Date().toLocaleDateString("tr-TR")}</span>
     </div>
     <div style="margin-bottom:10px;">
-      <strong>Sınıf/Şube:</strong> ${className}/${section} | <strong>Öğrenci:</strong> ${rows.length}
+      <strong>Sınıf/Åube:</strong> ${className}/${section} | <strong>Öğrenci:</strong> ${rows.length}
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-bottom:10px;">
       <div style="padding:10px;background:#f0f7ff;border-radius:8px;">
@@ -25565,11 +25928,11 @@ function renderClassChart(completedCount, totalPossible) {
     summaryEl.innerHTML = `
       <div class="pie-summary-item completed">
         <div class="pie-summary-val">${completed}</div>
-        <div class="pie-summary-label">Tamamlanan • %${completedPct}</div>
+        <div class="pie-summary-label">Tamamlanan â€¢ %${completedPct}</div>
       </div>
       <div class="pie-summary-item pending">
         <div class="pie-summary-val">${pending}</div>
-        <div class="pie-summary-label">Bekleyen • %${pendingPct}</div>
+        <div class="pie-summary-label">Bekleyen â€¢ %${pendingPct}</div>
       </div>
       <div class="pie-summary-item total">
         <div class="pie-summary-val">${total}</div>
@@ -25752,6 +26115,7 @@ async function showStudentDetail(student, completions, rank) {
   const quizStats = await fetchStudentQuizStats(student.id);
   const computeStats = await fetchComputeRunStats(student.id);
   const blockStats = await fetchBlockRunStats(student.id);
+  const keyboardRaceHistory = await fetchKeyboardRaceRuns(student.id);
   const computeHistory = (Array.isArray(computeStats?.runs) ? computeStats.runs : []).map((run) => {
     const durationSec = Math.max(0, Number(run.durationSeconds || 0));
     const percent = Math.max(0, Math.min(100, Number(run.percent || 0)));
@@ -25766,6 +26130,9 @@ async function showStudentDetail(student, completions, rank) {
   });
   if (computeHistory.length) {
     taskHistory.push(...computeHistory);
+  }
+  if (keyboardRaceHistory.length) {
+    taskHistory.push(...keyboardRaceHistory);
   }
   const quizHistory = quizStats.items.map((q) => ({
     title: q.quizTitle || "Quiz",
@@ -25919,7 +26286,7 @@ async function showStudentDetail(student, completions, rank) {
             <span class="badge ${qz.successRate >= 80 ? 'badge-success' : qz.successRate >= 60 ? 'badge-info' : 'badge-pending'}">%${qz.successRate}</span>
           </div>
           <small style="color: #666; display: block; margin-top: 5px;">
-            Tarih: ${qz.date} | Süre: ${qz.durationText} | Doğru: ${qz.correct} • Yanlış: ${qz.wrong} | XP: +${qz.xp}
+            Tarih: ${qz.date} | Süre: ${qz.durationText} | Doğru: ${qz.correct} â€¢ Yanlış: ${qz.wrong} | XP: +${qz.xp}
           </small>
         `;
         quizHistoryContainer.appendChild(div);
@@ -25983,7 +26350,8 @@ async function showStudentDetail(student, completions, rank) {
     quizHistory,
     quizStats,
     blockStats,
-    computeStats
+    computeStats,
+    keyboardRaceHistory
   };
   if (classRank) currentStudentDetail.classRank = classRank;
   if (schoolRank) currentStudentDetail.schoolRank = schoolRank;
@@ -27012,3 +27380,6 @@ async function loadMyStatsModal() {
     showNotice("İstatistikler yüklenemedi. Lütfen tekrar deneyin.", "#e74c3c");
   }
 }
+
+
+

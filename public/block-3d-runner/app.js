@@ -1068,7 +1068,7 @@ function renderDesignerBoard() {
       cell.dataset.y = String(y);
       if (isDraftGoal(x, y)) {
         cell.classList.add("goal");
-        cell.textContent = "â­";
+        cell.textContent = "⭐";
       } else if (isDraftStart(x, y)) {
         cell.classList.add("start");
         cell.textContent = "ğŸ¤–";
