@@ -111,6 +111,44 @@
         #app-screen.teacher-view #top-students-card {
             order: 99;
         }
+        #teacher-home-top-row {
+            display: contents !important;
+        }
+        #app-screen.teacher-view #teacher-hero-panel {
+            min-height: 100%;
+            width: 100% !important;
+            max-width: 100% !important;
+            grid-column: 1 / 8 !important;
+            margin: 0 !important;
+            display: block !important;
+        }
+        #app-screen.teacher-view #teacher-hero-panel .teacher-hero-main {
+            width: 100% !important;
+            max-width: 100% !important;
+            grid-column: 1 / -1 !important;
+        }
+        #app-screen.teacher-view #top-students-card {
+            order: 0 !important;
+            align-self: stretch;
+            width: 100% !important;
+            max-width: 100% !important;
+            grid-column: 8 / 11 !important;
+            margin-left: 0 !important;
+            margin-right: 0 !important;
+            margin-bottom: 0 !important;
+        }
+        #app-screen.teacher-view #teacher-home-top-row #top-students-list {
+            max-height: 520px;
+            overflow: auto;
+            padding-right: 2px;
+        }
+        @media (max-width: 1180px) {
+            #app-screen.teacher-view #teacher-hero-panel,
+            #app-screen.teacher-view #top-students-card { grid-column: 1 / -1 !important; }
+            #app-screen.teacher-view #teacher-home-top-row #top-students-list {
+                max-height: 300px;
+            }
+        }
         .card, .list-item, .student-list-item, .tabs, .filter-bar, .tab-content { min-width: 0; max-width: 100%; }
         .home-overview-strip {
             display: grid;
@@ -993,6 +1031,48 @@
             border: 1px solid rgba(59, 130, 246, 0.22);
             box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
         }
+        #app-screen.teacher-view .teacher-hero-main {
+            background:
+                radial-gradient(circle at 12% 14%, rgba(255,255,255,0.58), transparent 30%),
+                radial-gradient(circle at 85% 18%, rgba(56, 189, 248, 0.16), transparent 34%),
+                linear-gradient(140deg, #eff6ff 0%, #dbeafe 40%, #e0f2fe 100%);
+            border: 1px solid rgba(96, 165, 250, 0.38);
+            box-shadow: 0 18px 34px rgba(30, 64, 175, 0.16);
+        }
+        #app-screen.teacher-view .teacher-hero-main .teacher-hero-kicker {
+            background: rgba(15, 23, 42, 0.08);
+            color: #1e3a8a;
+            border: 1px solid rgba(96, 165, 250, 0.35);
+        }
+        #app-screen.teacher-view .teacher-hero-main .teacher-hero-metric {
+            background: linear-gradient(180deg, rgba(255,255,255,0.90), rgba(255,255,255,0.72));
+            border-color: rgba(147, 197, 253, 0.55);
+        }
+        #app-screen.teacher-view .teacher-hero-main .teacher-hero-rail-track {
+            background: rgba(148, 163, 184, 0.22);
+            border-color: rgba(147, 197, 253, 0.45);
+        }
+        #app-screen.teacher-view .teacher-hero-main .teacher-hero-title {
+            color: #0f172a;
+        }
+        #app-screen.teacher-view .teacher-hero-main .teacher-hero-text {
+            color: #334155;
+        }
+        #app-screen.teacher-view .teacher-hero-main .teacher-hero-metric-label {
+            color: #475569;
+        }
+        #app-screen.teacher-view .teacher-hero-main .teacher-hero-metric-value {
+            color: #0f172a;
+        }
+        #app-screen.teacher-view .teacher-hero-main .teacher-hero-summary-title {
+            color: #0f172a;
+        }
+        #app-screen.teacher-view .teacher-hero-main .teacher-hero-summary-sub {
+            color: #475569;
+        }
+        #app-screen.teacher-view .teacher-hero-main .teacher-hero-rail-item {
+            color: #334155;
+        }
         #app-screen.teacher-view {
             background:
                 radial-gradient(circle at 12% 8%, rgba(59, 130, 246, 0.08), transparent 32%),
@@ -1272,6 +1352,84 @@
             margin: 0;
             color: #475569;
             line-height: 1.55;
+        }
+        /* Teacher view vivid light theme */
+        #app-screen.teacher-view {
+            background:
+                radial-gradient(900px 420px at -10% -20%, rgba(14, 165, 233, 0.22), transparent 60%),
+                radial-gradient(820px 420px at 110% -10%, rgba(245, 158, 11, 0.20), transparent 58%),
+                radial-gradient(780px 420px at 50% 120%, rgba(99, 102, 241, 0.14), transparent 60%),
+                linear-gradient(180deg, #f8fbff 0%, #f1f7ff 48%, #eef6ff 100%);
+        }
+        #app-screen.teacher-view > .app-header {
+            background: linear-gradient(135deg, rgba(255,255,255,0.96), rgba(237, 247, 255, 0.92));
+            border-color: rgba(56, 189, 248, 0.26);
+            box-shadow: 0 14px 30px rgba(14, 116, 144, 0.14);
+        }
+        #app-screen.teacher-view #teacher-analytics,
+        #app-screen.teacher-view #top-students-card,
+        #app-screen.teacher-view #student-homework-shell,
+        #app-screen.teacher-view #block-homework-section {
+            background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(248, 252, 255, 0.92));
+            border: 1px solid rgba(125, 211, 252, 0.38);
+            box-shadow: 0 18px 36px rgba(30, 64, 175, 0.10);
+        }
+        #app-screen.teacher-view #teacher-home-tabs,
+        #app-screen.teacher-view #block-homework-assign-tabs,
+        #app-screen.teacher-view #student-tabs,
+        #app-screen.teacher-view #activities-tabs,
+        #app-screen.teacher-view #lessons-tabs,
+        #app-screen.teacher-view #quiz-tabs,
+        #app-screen.teacher-view #block-homework-tabs,
+        #app-screen.teacher-view #compute-homework-tabs {
+            background: linear-gradient(135deg, #dbeafe, #e0f2fe);
+            border: 1px solid rgba(96, 165, 250, 0.45);
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.45);
+        }
+        #app-screen.teacher-view .tab-btn {
+            color: #1e3a8a;
+            font-weight: 700;
+        }
+        #app-screen.teacher-view .tab-btn.active {
+            color: #ffffff;
+            background: linear-gradient(135deg, #2563eb, #0ea5e9);
+            border-color: #2563eb;
+            box-shadow: 0 10px 22px rgba(37, 99, 235, 0.32);
+        }
+        #app-screen.teacher-view .teacher-app-stats {
+            background: linear-gradient(180deg, #ffffff, #f8fbff);
+            border: 1px solid rgba(191, 219, 254, 0.9);
+            box-shadow: 0 10px 24px rgba(37, 99, 235, 0.12);
+        }
+        #app-screen.teacher-view .teacher-app-stats-title {
+            color: #0f172a;
+        }
+        #app-screen.teacher-view .teacher-app-stats-tile,
+        #app-screen.teacher-view .teacher-app-stats-btn-tile {
+            background: linear-gradient(135deg, #f8fbff, #eef6ff);
+            border: 1px solid rgba(147, 197, 253, 0.75);
+            box-shadow: 0 8px 18px rgba(14, 116, 144, 0.08);
+        }
+        #app-screen.teacher-view #teacher-analytics .stats-summary-grid .stat-card:nth-child(1) {
+            background: linear-gradient(135deg, #e0f2fe, #dbeafe);
+            border-color: rgba(56, 189, 248, 0.45);
+        }
+        #app-screen.teacher-view #teacher-analytics .stats-summary-grid .stat-card:nth-child(2) {
+            background: linear-gradient(135deg, #dcfce7, #ecfeff);
+            border-color: rgba(34, 197, 94, 0.40);
+        }
+        #app-screen.teacher-view #teacher-analytics .stats-summary-grid .stat-card:nth-child(3) {
+            background: linear-gradient(135deg, #fef3c7, #ffedd5);
+            border-color: rgba(245, 158, 11, 0.40);
+        }
+        #app-screen.teacher-view #teacher-analytics .stats-summary-grid .stat-card:nth-child(4) {
+            background: linear-gradient(135deg, #ede9fe, #e0e7ff);
+            border-color: rgba(139, 92, 246, 0.40);
+        }
+        #app-screen.teacher-view .list-item {
+            background: linear-gradient(180deg, #ffffff, #f8fbff);
+            border: 1px solid rgba(191, 219, 254, 0.75);
+            box-shadow: 0 6px 16px rgba(30, 64, 175, 0.08);
         }
         .teacher-quick-grid {
             display: grid;
@@ -2787,6 +2945,9 @@
         }
         #side-menu.student-minimal #btn-open-home,
         #side-menu.student-minimal #btn-open-lessons,
+        #side-menu.student-minimal #btn-open-friends,
+        #side-menu.student-minimal #btn-open-class-board,
+        #side-menu.student-minimal #btn-open-support,
         #side-menu.student-minimal #btn-open-my-stats,
         #side-menu.student-minimal #btn-open-certificates,
         #side-menu.student-minimal #btn-logout-side {
@@ -3358,6 +3519,49 @@
             .completion-info-grid { grid-template-columns: 1fr; }
         }
         .list-item { background: white; padding: 10px 12px; margin-bottom: 8px; border-radius: 10px; border-left: 4px solid var(--primary); cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; transition: 0.3s; }
+        .teacher-task-card {
+            border-left: none !important;
+            border: 1px solid #dbe7fb;
+            border-radius: 14px;
+            background: linear-gradient(180deg, #ffffff, #f8fbff);
+            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: stretch !important;
+        }
+        .teacher-task-card .task-title { font-size: 1rem; font-weight: 700; color: #0f172a; }
+        .teacher-task-card .task-meta { font-size: 12px; color: #64748b; }
+        .teacher-task-card .task-actions {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+        }
+        .teacher-task-card .task-actions .btn {
+            width: 100%;
+            min-height: 36px;
+            font-weight: 700;
+            padding: 8px 10px;
+        }
+        #teacher-lessons-modal-list {
+            display: grid !important;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 16px !important;
+            align-content: start;
+        }
+        .teacher-lesson-hero {
+            position: relative;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 14px;
+            padding: 18px 20px;
+            border-radius: 24px;
+            background: linear-gradient(135deg,#0f172a,#1d4ed8 45%,#22d3ee);
+            box-shadow: 0 14px 40px rgba(30,64,175,.28);
+        }
         #reports-list .list-item:hover { transform: none; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
         #reports-list .list-item { padding: 6px 8px; font-size: 0.9rem; }
         #reports-list .list-item small { font-size: 0.75rem; }
@@ -8612,6 +8816,251 @@
         body.teacher-lessons-modal-open #app-screen.teacher-view #lessons-section {
             display: none !important;
         }
+        .support-modal-shell {
+            width: min(940px, 95vw);
+            max-height: 88vh;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .support-top-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+        #support-student-compose,
+        #support-teacher-filter {
+            border: 1px solid #dbe4f0;
+            border-radius: 14px;
+            background: linear-gradient(180deg, #ffffff, #f8fbff);
+            padding: 12px;
+        }
+        #support-student-compose label,
+        #support-teacher-filter label {
+            display: block;
+            font-size: 12px;
+            font-weight: 700;
+            color: #475569;
+            margin: 2px 0 6px;
+        }
+        #support-title,
+        #support-message,
+        #support-student-search,
+        #support-student-select {
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            background: #ffffff;
+            color: #0f172a;
+            transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
+        }
+        #support-title:focus,
+        #support-message:focus,
+        #support-student-search:focus,
+        #support-student-select:focus {
+            border-color: #64748b;
+            box-shadow: 0 0 0 3px rgba(148, 163, 184, .2);
+            outline: none;
+        }
+        #support-message {
+            min-height: 120px;
+            resize: vertical;
+            line-height: 1.45;
+        }
+        #btn-send-support {
+            min-width: 150px;
+            border: 1px solid #4b5563;
+            border-radius: 10px;
+            background: linear-gradient(180deg, #6b7280, #4b5563);
+            color: #ffffff;
+            font-weight: 800;
+            letter-spacing: .01em;
+            box-shadow: 0 8px 18px rgba(75, 85, 99, .28);
+            transition: transform .12s ease, box-shadow .12s ease, filter .12s ease;
+        }
+        #btn-send-support:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 20px rgba(75, 85, 99, .32);
+            filter: brightness(1.03);
+        }
+        #btn-send-support:active {
+            transform: translateY(0);
+            box-shadow: 0 6px 14px rgba(75, 85, 99, .24);
+        }
+        .support-thread-list {
+            border: 1px solid #dbe4f0;
+            border-radius: 14px;
+            background: #f8fbff;
+            padding: 12px;
+            min-height: 220px;
+            max-height: 48vh;
+            overflow: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .support-msg {
+            border: 1px solid #dbe4f0;
+            background: #fff;
+            border-radius: 12px;
+            padding: 10px;
+        }
+        .support-msg.mine {
+            border-color: #bfdbfe;
+            background: #eff6ff;
+        }
+        .support-msg-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            font-size: 12px;
+            color: #475569;
+            margin-bottom: 6px;
+        }
+        .support-msg-title {
+            font-size: 14px;
+            font-weight: 800;
+            color: #0f172a;
+            margin-bottom: 4px;
+        }
+        .support-empty {
+            color: #64748b;
+            text-align: center;
+            padding: 28px 8px;
+        }
+        body.dark-mode #support-student-compose,
+        body.dark-mode #support-teacher-filter {
+            background: #f3f4f6 !important;
+            border-color: #cbd5e1 !important;
+        }
+        body.dark-mode #support-title,
+        body.dark-mode #support-message,
+        body.dark-mode #support-student-search,
+        body.dark-mode #support-student-select {
+            background: #ffffff !important;
+            color: #111827 !important;
+            border-color: #cbd5e1 !important;
+        }
+        body.dark-mode #btn-send-support {
+            background: linear-gradient(180deg, #6b7280, #4b5563) !important;
+            border-color: #4b5563 !important;
+            color: #ffffff !important;
+            filter: none !important;
+        }
+        @media (min-width: 980px) {
+            .support-top-grid {
+                grid-template-columns: 1.2fr .8fr;
+                align-items: start;
+            }
+        }
+        .student-friends-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+            align-content: start;
+            overflow: auto;
+            padding: 2px 4px 10px;
+        }
+        .student-friend-card {
+            border: 1px solid #dbe7fb;
+            border-radius: 16px;
+            background: linear-gradient(180deg, #ffffff, #f8fbff);
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            text-align: center;
+        }
+        .student-friend-avatar {
+            width: 72px;
+            height: 72px;
+            border-radius: 999px;
+            overflow: hidden;
+            border: 2px solid #bfdbfe;
+            background: #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .student-friend-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        @media (max-width: 1200px) {
+            .student-friends-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        }
+        @media (max-width: 860px) {
+            .student-friends-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+        @media (max-width: 540px) {
+            .student-friends-grid { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 900px) {
+            #home-overview-strip {
+                display: none !important;
+            }
+        }
+        .class-board-grid {
+            display:grid;
+            grid-template-columns:repeat(4,minmax(0,1fr));
+            gap:14px;
+            align-content:start;
+            overflow:auto;
+            padding:2px 4px 10px;
+        }
+        .teacher-boards-fullscreen {
+            width: 100vw !important;
+            height: 100vh !important;
+            max-width: 100vw !important;
+            max-height: 100vh !important;
+            margin: 0 !important;
+            border-radius: 0 !important;
+            border: none !important;
+            box-shadow: none !important;
+            padding: 18px !important;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        #teacher-student-boards-grid {
+            flex: 1 1 auto;
+            max-height: none !important;
+            overflow: auto;
+        }
+        .class-board-card {
+            border:1px solid #dbe7fb;
+            border-radius:16px;
+            background:linear-gradient(180deg,#ffffff,#f8fbff);
+            box-shadow:0 10px 24px rgba(15,23,42,.08);
+            padding:14px;
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            gap:8px;
+            text-align:center;
+        }
+        #teacher-statistics-grid .list-item {
+            margin: 0;
+        }
+        @media (max-width: 1180px) {
+            #teacher-statistics-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            }
+        }
+        @media (max-width: 760px) {
+            #teacher-statistics-grid {
+                grid-template-columns: 1fr !important;
+            }
+            #teacher-statistics-grid .card {
+                grid-column: auto !important;
+            }
+        }
+        @media (max-width: 1200px) { .class-board-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+        @media (max-width: 860px) { .class-board-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+        @media (max-width: 540px) { .class-board-grid { grid-template-columns:1fr; } }
     </style>
 </head>
 <body class="{{ !empty($studentPanelMode) ? 'student-panel-mode' : '' }}">
@@ -8634,6 +9083,8 @@
         </div>
         <button id="btn-open-home" onclick="showPage('home')" class="nav-btn active" data-page="home">🏠 Anasayfa</button>
         <button id="btn-open-lessons" class="nav-btn" style="display: none;">📚 Derslerim</button>
+        <button id="btn-open-friends" class="nav-btn" style="display: none;">👥 Arkadaşlarım</button>
+        <button id="btn-open-class-board" class="nav-btn" style="display: none;">📌 Sınıf Panosu</button>
         <button id="btn-toggle-apps-menu" class="nav-btn sidebar-group-toggle" style="display: none;">🧪 Uygulamalarım</button>
         <div id="submenu-apps" class="sidebar-submenu" style="display:none;"></div>
         <button id="btn-toggle-tasks-menu" class="nav-btn sidebar-group-toggle" style="display: none;">🧩 Ödevler <span class="arrow">▸</span></button>
@@ -8653,12 +9104,14 @@
         <div id="submenu-student-data" class="sidebar-submenu">
             <button id="btn-open-students" class="nav-btn submenu-item" style="display: none;">👥 Öğrencilerim</button>
             <button id="btn-open-classes" class="nav-btn submenu-item" style="display: none;">🏫 Sınıflarım</button>
-            <button id="btn-open-reports" class="nav-btn submenu-item" style="display: none;">📈 Raporlar</button>
+            <button id="btn-open-reports" class="nav-btn submenu-item" style="display: none;">📈 İstatistikler</button>
             <button id="btn-open-login-cards" class="nav-btn submenu-item" style="display: none;">🪪 Giriş Kartları</button>
             <button id="btn-open-teacher-certificates" class="nav-btn submenu-item" style="display: none;">🎓 Sertifika Yönetimi</button>
+            <button id="btn-open-student-boards" class="nav-btn submenu-item" style="display: none;">📌 Öğrenci Panoları</button>
             <button id="btn-open-notifications" class="nav-btn submenu-item" style="display: none;">🔔 Bildirimler</button>
         </div>
         <button id="btn-open-my-stats" class="nav-btn" style="display: none;">📊 İstatistiklerim</button>
+        <button id="btn-open-support" class="nav-btn" style="display: none;">💬 Destek</button>
         <button id="btn-open-badges" class="nav-btn" style="display: none;">🏅 Rozetlerim</button>
         <button id="btn-open-certificates" class="nav-btn" style="display: none;">📜 Sertifikalarım</button>
         <button id="btn-open-avatar-shop" class="nav-btn" style="display: none;">🧩 Avatar Al</button>
@@ -8897,33 +9350,7 @@
                     </div>
                 </div>
             </div>
-            <div id="home-overview-strip" class="home-overview-strip">
-                <div class="home-overview-card">
-                    <div class="home-overview-title">Ödev</div>
-                    <div id="home-overview-tasks" class="home-overview-value">0</div>
-                    <div id="home-overview-tasks-meta" class="home-overview-meta">Yükleniyor...</div>
-                </div>
-                <div class="home-overview-card">
-                    <div class="home-overview-title">Etkinlik</div>
-                    <div id="home-overview-activities" class="home-overview-value">0</div>
-                    <div id="home-overview-activities-meta" class="home-overview-meta">Yükleniyor...</div>
-                </div>
-                <div class="home-overview-card">
-                    <div class="home-overview-title">Blok Kodlama</div>
-                    <div id="home-overview-block" class="home-overview-value">0</div>
-                    <div id="home-overview-block-meta" class="home-overview-meta">Yükleniyor...</div>
-                </div>
-                <div class="home-overview-card">
-                    <div class="home-overview-title">Compute It</div>
-                    <div id="home-overview-compute" class="home-overview-value">0</div>
-                    <div id="home-overview-compute-meta" class="home-overview-meta">Yükleniyor...</div>
-                </div>
-                <div class="home-overview-card">
-                    <div class="home-overview-title">Ders</div>
-                    <div id="home-overview-lessons" class="home-overview-value">0</div>
-                    <div id="home-overview-lessons-meta" class="home-overview-meta">Yükleniyor...</div>
-                </div>
-            </div>
+            
             <div id="student-hero-panel">
                 <div class="student-hero-main">
                     <div class="student-hero-kicker">Seviye haritan hazır</div>
@@ -9059,6 +9486,7 @@
                     <!-- central student open button removed per UI change -->
                 </div>
             </div>
+            <div id="teacher-home-top-row">
             <div id="teacher-hero-panel">
                 <div class="teacher-hero-main">
                     <div class="teacher-hero-kicker">Öğretmen kontrol merkezi</div>
@@ -9126,61 +9554,27 @@
                         <span id="stats-compute-completions">0</span>
                     </div>
                 </div>
-                <div class="teacher-hero-side">
-                    <div class="teacher-hero-quick">
-                        <h3>Sınıf sinyalleri</h3>
-                        <div class="teacher-quick-grid">
-                            <div class="teacher-info-card">
-                                <div class="teacher-info-kicker">Destek</div>
-                                <div id="teacher-info-support-title" class="teacher-info-title">Takip önerisi hazırlanıyor</div>
-                                <div class="teacher-info-bar"><span id="teacher-info-support-bar"></span></div>
-                                <div id="teacher-info-support-text" class="teacher-info-text">Destek sinyali.</div>
-                            </div>
-                            <div class="teacher-info-card">
-                                <div class="teacher-info-kicker">Motivasyon</div>
-                                <div id="teacher-info-motivation-title" class="teacher-info-title">Başarı özeti hazırlanıyor</div>
-                                <div class="teacher-info-bar"><span id="teacher-info-motivation-bar"></span></div>
-                                <div id="teacher-info-motivation-text" class="teacher-info-text">Üretim ve başarı.</div>
-                            </div>
-                            <div class="teacher-info-card">
-                                <div class="teacher-info-kicker">Günün Odağı</div>
-                                <div id="teacher-info-focus-title" class="teacher-info-title">Kısa plan önerisi</div>
-                                <div class="teacher-info-bar"><span id="teacher-info-focus-bar"></span></div>
-                                <div id="teacher-info-focus-text" class="teacher-info-text">3 kısa görev + 1 derin çalışma önerisi.</div>
-                            </div>
-                            <div class="teacher-info-card">
-                                <div class="teacher-info-kicker">Durum Notu</div>
-                                <div id="teacher-info-status-title" class="teacher-info-title">Sınıf akışı</div>
-                                <div class="teacher-info-bar"><span id="teacher-info-status-bar"></span></div>
-                                <div id="teacher-hero-status-note" class="teacher-info-text">Akış özeti hazırlanıyor.</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="panel-accent">
-                        <h4>Haftalık özet</h4>
-                        <div class="mini-grid">
-                            <div class="mini-card">
-                                <div class="k">En Aktif</div>
-                                <div id="teacher-mini-top-active" class="v">-</div>
-                                <div id="teacher-mini-top-active-sub" class="s">Aktiflik oranı</div>
-                            </div>
-                            <div class="mini-card">
-                                <div class="k">En İyi Tamamlama</div>
-                                <div id="teacher-mini-top-completion" class="v">-</div>
-                                <div id="teacher-mini-top-completion-sub" class="s">Ortalama tamamlama</div>
-                            </div>
-                            <div class="mini-card">
-                                <div class="k">XP Lideri</div>
-                                <div id="teacher-mini-top-xp" class="v">-</div>
-                                <div id="teacher-mini-top-xp-sub" class="s">Ort. XP/öğrenci</div>
-                            </div>
-                            <div class="mini-card">
-                                <div class="k">Düşük Aktiflik</div>
-                                <div id="teacher-mini-low-active" class="v">-</div>
-                                <div id="teacher-mini-low-active-sub" class="s">Öncelik önerisi</div>
-                            </div>
-                        </div>
-                    </div>
+                <div style="display:none;">
+                    <div id="teacher-info-support-title"></div>
+                    <div id="teacher-info-support-bar"></div>
+                    <div id="teacher-info-support-text"></div>
+                    <div id="teacher-info-motivation-title"></div>
+                    <div id="teacher-info-motivation-bar"></div>
+                    <div id="teacher-info-motivation-text"></div>
+                    <div id="teacher-info-focus-title"></div>
+                    <div id="teacher-info-focus-bar"></div>
+                    <div id="teacher-info-focus-text"></div>
+                    <div id="teacher-info-status-title"></div>
+                    <div id="teacher-info-status-bar"></div>
+                    <div id="teacher-hero-status-note"></div>
+                    <div id="teacher-mini-top-active"></div>
+                    <div id="teacher-mini-top-active-sub"></div>
+                    <div id="teacher-mini-top-completion"></div>
+                    <div id="teacher-mini-top-completion-sub"></div>
+                    <div id="teacher-mini-top-xp"></div>
+                    <div id="teacher-mini-top-xp-sub"></div>
+                    <div id="teacher-mini-low-active"></div>
+                    <div id="teacher-mini-low-active-sub"></div>
                 </div>
             </div>
 
@@ -9241,6 +9635,7 @@
             <div class="card" id="top-students-card" style="display: none;">
                 <h4>Öğrenci Başarı Listesi (İlk 7)</h4>
                 <div id="top-students-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
+            </div>
             </div>
 
             <div class="card" id="student-homework-shell">
@@ -9598,11 +9993,15 @@
 
             <div id="teacher-lessons-modal" class="modal-overlay" style="display:none; z-index:23000;">
                 <div class="modal-content modal-large" style="width:min(96vw,1400px); height:92vh; max-width:none; display:flex; flex-direction:column;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px; margin-bottom:10px;">
-                        <h2 style="margin:0;">📌 Derslerim</h2>
+                    <div class="teacher-lesson-hero">
+                        <div>
+                            <div style="font-size:12px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#bae6fd;">Öğretmen Akademi</div>
+                            <h2 style="margin:6px 0 4px; font-size:44px; line-height:1; color:#fff;">Derslerim</h2>
+                            <div id="teacher-lessons-modal-meta" style="font-size:14px; color:#dbeafe;">Ders kartları hazırlanıyor...</div>
+                        </div>
                         <div style="display:flex; gap:8px; align-items:center;">
                             <button id="btn-open-lesson-builder-from-modal" class="btn btn-primary">Ders Oluştur</button>
-                            <button id="btn-close-teacher-lessons-modal" class="btn" style="background:#e2e8f0;">Kapat</button>
+                            <button id="btn-close-teacher-lessons-modal" class="btn" style="background:#fff; color:#0f172a; font-weight:700; border-radius:12px;">Anasayfaya Dön</button>
                         </div>
                     </div>
                     <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
@@ -9610,7 +10009,6 @@
                         <button id="btn-teacher-lessons-filter-draft" class="btn" type="button" style="background:#fff7ed;color:#9a3412;">Taslak</button>
                         <button id="btn-teacher-lessons-filter-published" class="btn" type="button" style="background:#dcfce7;color:#166534;">Yayında</button>
                     </div>
-                    <div id="teacher-lessons-modal-meta" style="font-size:13px;color:#64748b;margin-bottom:8px;"></div>
                     <div style="flex:1;min-height:0;overflow:auto;">
                         <ul id="teacher-lessons-modal-list" style="padding:0; margin:0; list-style:none; display:flex; flex-direction:column; gap:8px;"></ul>
                         <div id="teacher-lessons-modal-empty" class="empty-state" style="display:none;">
@@ -9634,6 +10032,95 @@
                 <div id="student-lessons-empty" class="empty-state" style="display:none; margin-top:10px; border:1px dashed #cbd5e1; border-radius:16px; background:#fff; padding:30px;">
                     <div class="empty-state-icon">📚</div>
                     Henüz yayınlanan ders bulunmuyor.
+                </div>
+            </div>
+            <div id="student-friends-fullpage" class="card" style="display:none; position:fixed; inset:0; width:100vw; height:100vh; z-index:24000; margin:0; border-radius:0; box-shadow:none; flex-direction:column; background:radial-gradient(circle at 15% 10%, #dbeafe 0%, #eef2ff 35%, #f8fafc 70%, #f8fafc 100%); padding:18px 18px 14px; overflow:hidden;">
+                <div style="position:relative; display:flex;justify-content:space-between;align-items:flex-start;gap:12px; margin-bottom:14px; padding:18px 20px; border-radius:24px; background:linear-gradient(135deg,#0f172a,#1d4ed8 45%,#22d3ee); box-shadow:0 14px 40px rgba(30,64,175,.28);">
+                    <div>
+                        <div style="font-size:12px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#bae6fd;">Öğrenci Akademi</div>
+                        <h2 style="margin:6px 0 4px; font-size:44px; line-height:1; color:#fff;">Arkadaşlarım</h2>
+                        <div id="student-friends-subtitle" style="font-size:14px; color:#dbeafe;">Sınıf arkadaşlarının kart görünümü</div>
+                    </div>
+                    <button id="btn-student-friends-back" class="btn" style="background:#fff; color:#0f172a; font-weight:700; border-radius:12px;">Anasayfaya Dön</button>
+                </div>
+                <div id="student-friends-grid" class="student-friends-grid"></div>
+                <div id="student-friends-empty" class="empty-state" style="display:none; margin-top:10px; border:1px dashed #cbd5e1; border-radius:16px; background:#fff; padding:30px;">
+                    <div class="empty-state-icon">👥</div>
+                    Bu sınıfta gösterilecek öğrenci bulunamadı.
+                </div>
+            </div>
+            <div id="student-class-board-fullpage" class="card" style="display:none; position:fixed; inset:0; width:100vw; height:100vh; z-index:24000; margin:0; border-radius:0; box-shadow:none; flex-direction:column; background:radial-gradient(circle at 15% 10%, #dbeafe 0%, #eef2ff 35%, #f8fafc 70%, #f8fafc 100%); padding:18px 18px 14px; overflow:hidden;">
+                <div style="position:relative; display:flex;justify-content:space-between;align-items:flex-start;gap:12px; margin-bottom:14px; padding:18px 20px; border-radius:24px; background:linear-gradient(135deg,#0f172a,#1d4ed8 45%,#22d3ee); box-shadow:0 14px 40px rgba(30,64,175,.28);">
+                    <div>
+                        <div style="font-size:12px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#bae6fd;">Öğrenci Akademi</div>
+                        <h2 style="margin:6px 0 4px; font-size:44px; line-height:1; color:#fff;">Sınıf Panosu</h2>
+                        <div id="student-class-board-subtitle" style="font-size:14px; color:#dbeafe;">Sınıfında görünmesini istediğin kartını yayınla</div>
+                    </div>
+                    <button id="btn-student-class-board-back" class="btn" style="background:#fff; color:#0f172a; font-weight:700; border-radius:12px;">Anasayfaya Dön</button>
+                </div>
+                <div style="display:flex; gap:8px; align-items:center; background:#fff; border:1px solid #dbe7fb; border-radius:14px; padding:10px 12px; margin-bottom:10px;">
+                    <select id="class-board-note-select" class="form-control" style="max-width:460px;"></select>
+                    <button id="btn-save-class-board" class="btn btn-primary">Panoda Yayınla</button>
+                </div>
+                <div id="student-class-board-grid" class="class-board-grid"></div>
+                <div id="student-class-board-empty" class="empty-state" style="display:none; margin-top:10px; border:1px dashed #cbd5e1; border-radius:16px; background:#fff; padding:30px;">
+                    <div class="empty-state-icon">📌</div>
+                    Bu sınıfta yayınlanmış pano kartı yok.
+                </div>
+            </div>
+
+            <div id="teacher-statistics-fullpage" class="card" style="display:none; position:fixed; inset:0; width:100vw; height:100vh; z-index:24010; margin:0; border-radius:0; box-shadow:none; flex-direction:column; background:radial-gradient(circle at 15% 10%, #dbeafe 0%, #eef2ff 35%, #f8fafc 70%, #f8fafc 100%); padding:18px 18px 14px; overflow:hidden;">
+                <div style="position:relative; display:flex;justify-content:space-between;align-items:flex-start;gap:12px; margin-bottom:14px; padding:18px 20px; border-radius:24px; background:linear-gradient(135deg,#0f172a,#1d4ed8 45%,#22d3ee); box-shadow:0 14px 40px rgba(30,64,175,.28);">
+                    <div>
+                        <div style="font-size:12px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#bae6fd;">Öğrenci Verileri</div>
+                        <h2 style="margin:6px 0 4px; font-size:42px; line-height:1; color:#fff;">İstatistikler</h2>
+                        <div style="font-size:14px; color:#dbeafe;">Sınıf performansı, başarı sıraları ve risk analizi</div>
+                    </div>
+                    <button id="btn-teacher-statistics-back" class="btn" style="background:#fff; color:#0f172a; font-weight:700; border-radius:12px;">Anasayfaya Dön</button>
+                </div>
+                <div id="teacher-statistics-summary" class="stats-grid stats-summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap:10px; margin-bottom:12px;">
+                    <div class="stat-card"><div class="stat-number" id="tstats-total-students">0</div><div class="stat-label">Toplam Öğrenci</div></div>
+                    <div class="stat-card"><div class="stat-number" id="tstats-active-students">0</div><div class="stat-label">Aktif Öğrenci</div></div>
+                    <div class="stat-card"><div class="stat-number" id="tstats-avg-completion">0%</div><div class="stat-label">Ort. Tamamlama</div></div>
+                    <div class="stat-card"><div class="stat-number" id="tstats-total-xp">0</div><div class="stat-label">Toplam XP</div></div>
+                    <div class="stat-card"><div class="stat-number" id="tstats-risk-count">0</div><div class="stat-label">Riskli Öğrenci</div></div>
+                </div>
+                <div id="teacher-statistics-grid" style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; align-content:start; overflow:auto; padding-bottom:8px;">
+                    <div class="card" style="margin:0;">
+                        <h4 style="margin:0 0 8px 0;">En Başarılı 5</h4>
+                        <div id="tstats-top-success" style="display:flex; flex-direction:column; gap:8px;"></div>
+                    </div>
+                    <div class="card" style="margin:0;">
+                        <h4 style="margin:0 0 8px 0;">En Az Başarılı 5</h4>
+                        <div id="tstats-low-success" style="display:flex; flex-direction:column; gap:8px;"></div>
+                    </div>
+                    <div class="card" style="margin:0;">
+                        <h4 style="margin:0 0 8px 0;">En Yüksek XP 5</h4>
+                        <div id="tstats-top-xp" style="display:flex; flex-direction:column; gap:8px;"></div>
+                    </div>
+                    <div class="card" style="margin:0;">
+                        <h4 style="margin:0 0 8px 0;">En Düşük Aktiflik 5</h4>
+                        <div id="tstats-low-active" style="display:flex; flex-direction:column; gap:8px;"></div>
+                    </div>
+                    <div class="card" style="margin:0; grid-column: span 2;">
+                        <h4 style="margin:0 0 8px 0;">Sınıf/Şube Performans Listesi</h4>
+                        <div id="tstats-class-summary" style="display:flex; flex-direction:column; gap:8px;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="teacher-student-boards-modal" class="modal-overlay" style="display:none; position:fixed; inset:0; width:100vw; height:100vh; background:rgba(0,0,0,.55); z-index:24020; align-items:stretch; justify-content:stretch;">
+                <div class="modal-content teacher-boards-fullscreen">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px; margin-bottom:10px;">
+                        <h2 style="margin:0;">📌 Öğrenci Panoları</h2>
+                        <button id="btn-close-student-boards-modal" class="btn" style="background:#e2e8f0;">Kapat</button>
+                    </div>
+                    <div id="teacher-student-boards-meta" style="font-size:13px;color:#64748b;margin-bottom:8px;"></div>
+                    <div id="teacher-student-boards-grid" class="class-board-grid" style="max-height:68vh;"></div>
+                    <div id="teacher-student-boards-empty" class="empty-state" style="display:none;">
+                        <div class="empty-state-icon">📌</div>
+                        Yayınlanmış öğrenci panosu bulunamadı.
+                    </div>
                 </div>
             </div>
 
@@ -10610,6 +11097,33 @@ Ayşe, Yılmaz, ayse, 123456, 9, B"></textarea>
                     <div id="my-badges-grid" class="badges-grid"></div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <div id="support-modal" class="modal-overlay" style="display:none; z-index:23030;">
+        <div class="modal-content support-modal-shell">
+            <div class="modal-header" style="margin-bottom:0;">
+                <h2 style="margin:0;">Destek Paneli</h2>
+                <button id="btn-close-support-modal" class="close-btn">✕</button>
+            </div>
+            <div class="support-top-grid">
+                <div id="support-student-compose" style="display:none;">
+                    <label for="support-title" style="font-size:13px;color:#475569;">Başlık</label>
+                    <input id="support-title" class="form-control" maxlength="120" placeholder="Kısa başlık yazın">
+                    <label for="support-message" style="font-size:13px;color:#475569;margin-top:8px;">Mesaj</label>
+                    <textarea id="support-message" class="form-control" rows="4" maxlength="2500" placeholder="Gördüğünüz eksik veya sorunu detaylı yazın"></textarea>
+                    <div style="display:flex;justify-content:flex-end;margin-top:8px;">
+                        <button id="btn-send-support" class="btn btn-primary">Gönder</button>
+                    </div>
+                </div>
+                <div id="support-teacher-filter" style="display:none;">
+                    <label for="support-student-search" style="font-size:13px;color:#475569;">Öğrenci ara (Ad Soyad)</label>
+                    <input id="support-student-search" class="form-control" placeholder="Örn: Ali Yılmaz">
+                    <label for="support-student-select" style="font-size:13px;color:#475569;">Öğrenci seçin</label>
+                    <select id="support-student-select" class="form-control"></select>
+                </div>
+            </div>
+            <div id="support-thread-list" class="support-thread-list"></div>
         </div>
     </div>
 

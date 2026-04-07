@@ -573,6 +573,10 @@ let studentAiMessages = [];
 let studentAiOpen = false;
 let studentAiMsgSeq = 1;
 let studentAiAssistantCallable = null;
+let supportThreadUnsub = null;
+let supportResolvedTeacher = null;
+let supportTeacherStudents = [];
+let classBoardUnsub = null;
 const THEME_KEY = "uiThemeMode";
 const LESSON_THEME_TEMPLATES = [
   {
@@ -773,9 +777,83 @@ function installZoomLock() {
   }, { passive: false });
 }
 
+function maybeRepairMojibakeText(input) {
+  const text = String(input ?? "");
+  if (!text) return text;
+  const hasSuspicious = /[ÃÅâğÄÂ]/.test(text) || text.includes("\u009f");
+  if (!hasSuspicious) return text;
+  try {
+    const bytes = new Uint8Array(Array.from(text, (ch) => ch.charCodeAt(0) & 0xff));
+    const decoded = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+    const score = (s) => {
+      if (!s) return -999;
+      let bad = 0;
+      bad += (s.match(/[ÃÅâğÄÂ]/g) || []).length * 3;
+      bad += (s.match(/\uFFFD/g) || []).length * 4;
+      bad += (s.match(/[\u0080-\u009f]/g) || []).length * 5;
+      const good = (s.match(/[çğıöşüÇĞİÖŞÜ]/g) || []).length * 2;
+      return good - bad;
+    };
+    return score(decoded) > score(text) ? decoded : text;
+  } catch {
+    return text;
+  }
+}
+
+function repairMojibakeInSubtree(rootNode) {
+  const root = rootNode || document.body;
+  if (!root) return;
+  const attrNames = ["title", "placeholder", "aria-label"];
+  const fixAttrs = (el) => {
+    attrNames.forEach((name) => {
+      const oldVal = el.getAttribute?.(name);
+      if (!oldVal) return;
+      const next = maybeRepairMojibakeText(oldVal);
+      if (next !== oldVal) el.setAttribute(name, next);
+    });
+  };
+  if (root.nodeType === Node.ELEMENT_NODE) fixAttrs(root);
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, null);
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    if (node.nodeType === Node.TEXT_NODE) {
+      const oldText = node.nodeValue || "";
+      const nextText = maybeRepairMojibakeText(oldText);
+      if (nextText !== oldText) node.nodeValue = nextText;
+      continue;
+    }
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      fixAttrs(node);
+    }
+  }
+}
+
+function installGlobalMojibakeRepair() {
+  repairMojibakeInSubtree(document.body);
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((m) => {
+      if (m.type === "characterData" && m.target) {
+        const oldVal = m.target.nodeValue || "";
+        const nextVal = maybeRepairMojibakeText(oldVal);
+        if (nextVal !== oldVal) m.target.nodeValue = nextVal;
+      }
+      m.addedNodes?.forEach?.((node) => {
+        if (!node) return;
+        repairMojibakeInSubtree(node);
+      });
+    });
+  });
+  observer.observe(document.documentElement || document.body, {
+    subtree: true,
+    childList: true,
+    characterData: true
+  });
+}
+
 window.addEventListener("DOMContentLoaded", () => {
   installZoomLock();
   installImageFallbacks();
+  installGlobalMojibakeRepair();
   applyClassSectionDropdownBindings();
   if (!auth?.currentUser) ensureLoggedOutView();
 });
@@ -2566,6 +2644,53 @@ function hideReportLoadingOverlay() {
   reportLoadingOverlayEl = null;
 }
 
+function createFixedProgressToast(docRef = document, options = {}) {
+  const host = docRef?.body;
+  if (!host) return { set: () => {}, remove: () => {} };
+  const title = String(options.title || "İşlem sürüyor...");
+  const el = docRef.createElement("div");
+  el.style.cssText = [
+    "position:fixed",
+    "right:16px",
+    "bottom:16px",
+    "width:min(320px, calc(100vw - 32px))",
+    "background:#0f172a",
+    "color:#e2e8f0",
+    "border:1px solid #334155",
+    "border-radius:12px",
+    "padding:10px 12px",
+    "box-shadow:0 12px 30px rgba(2,6,23,.45)",
+    "z-index:999999",
+    "font-size:12px",
+    "font-weight:700"
+  ].join(";");
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+      <span data-k="title">${escapeHtmlBasic(title)}</span>
+      <span data-k="pct">%0</span>
+    </div>
+    <div style="height:8px;margin-top:8px;border-radius:999px;background:#1e293b;overflow:hidden;">
+      <div data-k="bar" style="height:100%;width:0%;background:linear-gradient(90deg,#22d3ee,#2563eb,#22c55e);transition:width .18s ease;"></div>
+    </div>
+    <div data-k="msg" style="margin-top:6px;font-weight:600;color:#94a3b8;">Hazırlanıyor...</div>
+  `;
+  host.appendChild(el);
+  const pctEl = el.querySelector('[data-k="pct"]');
+  const barEl = el.querySelector('[data-k="bar"]');
+  const msgEl = el.querySelector('[data-k="msg"]');
+  return {
+    set(percent = 0, msg = "") {
+      const safe = Math.max(0, Math.min(100, Math.round(Number(percent || 0))));
+      if (pctEl) pctEl.textContent = `%${safe}`;
+      if (barEl) barEl.style.width = `${safe}%`;
+      if (msgEl && msg) msgEl.textContent = String(msg);
+    },
+    remove() {
+      try { el.remove(); } catch (e) {}
+    }
+  };
+}
+
 let completionCelebrationCleanup = null;
 let badgeQuizStatsCache = null;
 let badgeQuizStatsAt = 0;
@@ -2894,7 +3019,6 @@ async function requestRunnerExitWithPromptPolicy() {
 function getHomeTabsByRole(role) {
   if (role === "teacher") {
     return [
-      { id: "teacher-analytics", label: "Özet Bilgiler" },
       { id: "tasks-section", label: "Ödevler" },
       { id: "activities-section", label: "Etkinlikler" },
       { id: "quiz-section", label: "Quizler" },
@@ -2965,8 +3089,24 @@ window.showPage = function(page) {
     if (btn.dataset.page === page) btn.classList.add("active");
   });
   const studentLessonsPage = document.getElementById("student-lessons-fullpage");
+  const studentFriendsPage = document.getElementById("student-friends-fullpage");
+  const studentClassBoardPage = document.getElementById("student-class-board-fullpage");
+  const teacherStatisticsPage = document.getElementById("teacher-statistics-fullpage");
+  const teacherBoardsModal = document.getElementById("teacher-student-boards-modal");
   if (studentLessonsPage && page !== "student-lessons") {
     studentLessonsPage.style.display = "none";
+  }
+  if (studentFriendsPage && page !== "student-friends") {
+    studentFriendsPage.style.display = "none";
+  }
+  if (studentClassBoardPage && page !== "student-class-board") {
+    studentClassBoardPage.style.display = "none";
+  }
+  if (teacherStatisticsPage && page !== "teacher-statistics") {
+    teacherStatisticsPage.style.display = "none";
+  }
+  if (teacherBoardsModal) {
+    teacherBoardsModal.style.display = "none";
   }
   if (page === "student-lessons") {
     const hideIds = [
@@ -2987,14 +3127,71 @@ window.showPage = function(page) {
     if (studentLessonsPage) studentLessonsPage.style.display = "flex";
     return;
   }
+  if (page === "student-friends") {
+    const hideIds = [
+      "home-overview-strip",
+      "student-stats-bar",
+      "teacher-analytics",
+      "top-students-card",
+      "student-homework-shell",
+      "student-apps-shell",
+      "leaderboard-section",
+      "quiz-section",
+      "lessons-section"
+    ];
+    hideIds.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = "none";
+    });
+    if (studentFriendsPage) studentFriendsPage.style.display = "flex";
+    return;
+  }
+  if (page === "student-class-board") {
+    const hideIds = [
+      "home-overview-strip",
+      "student-stats-bar",
+      "teacher-analytics",
+      "top-students-card",
+      "student-homework-shell",
+      "student-apps-shell",
+      "leaderboard-section",
+      "quiz-section",
+      "lessons-section"
+    ];
+    hideIds.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = "none";
+    });
+    if (studentClassBoardPage) studentClassBoardPage.style.display = "flex";
+    return;
+  }
+  if (page === "teacher-statistics") {
+    const hideIds = [
+      "home-overview-strip",
+      "student-stats-bar",
+      "teacher-analytics",
+      "top-students-card",
+      "student-homework-shell",
+      "student-apps-shell",
+      "leaderboard-section",
+      "quiz-section",
+      "lessons-section"
+    ];
+    hideIds.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = "none";
+    });
+    if (teacherStatisticsPage) teacherStatisticsPage.style.display = "flex";
+    return;
+  }
   if (page === "home") {
     const app = document.getElementById("app-screen");
     if (app) app.style.display = "grid";
     const isTeacher = getStrictUserRole(userRole) === "teacher" || isSystemAdminUser(userData);
     const setDisp = (id, val) => { const el = document.getElementById(id); if (el) el.style.display = val; };
-    setDisp("home-overview-strip", isTeacher ? "grid" : "none");
+    setDisp("home-overview-strip", "none");
     setDisp("student-stats-bar", isTeacher ? "none" : "block");
-    setDisp("teacher-analytics", isTeacher ? "block" : "none");
+    setDisp("teacher-analytics", "none");
     setDisp("top-students-card", isTeacher ? "block" : "none");
     setDisp("student-homework-shell", "block");
     setDisp("student-apps-shell", isTeacher ? "" : "block");
@@ -5632,6 +5829,7 @@ if (logoutSideBtn) logoutSideBtn.onclick = async function () {
   if (teacherCertificatesModalEl) teacherCertificatesModalEl.style.display = "none";
   const notificationsModalEl = document.getElementById("notifications-modal");
   if (notificationsModalEl) notificationsModalEl.style.display = "none";
+  closeSupportModal();
   await handleUserLogout({ closeSideMenu: true, closeDropdown: true });
 };
 
@@ -9282,6 +9480,167 @@ function closeAppsHubModal() {
   modal.style.display = "none";
 }
 
+function closeSupportThreadListener() {
+  if (supportThreadUnsub) {
+    try { supportThreadUnsub(); } catch (e) {}
+    supportThreadUnsub = null;
+  }
+}
+
+function closeSupportModal() {
+  const modal = document.getElementById("support-modal");
+  if (modal) modal.style.display = "none";
+  closeSupportThreadListener();
+}
+
+function getTeacherAssignedClassesFromProfile(profile = {}) {
+  const directRows = normalizeClassSectionRows(profile?.assignedClassSections || profile?.assignedClasses || []);
+  if (directRows.length) return directRows;
+  return parseTeacherClassSectionInput(profile?.assignedClassSectionsText || "");
+}
+
+function doesTeacherManageStudentByClass(teacher = {}, student = {}) {
+  const rows = getTeacherAssignedClassesFromProfile(teacher);
+  if (!rows.length) return false;
+  const studentClass = normalizeClassSectionText(student?.className || student?.class || "");
+  const studentSection = normalizeClassSectionText(student?.section || "");
+  if (!studentClass || !studentSection) return false;
+  return rows.some((row) => normalizeClassSectionText(row.className) === studentClass && normalizeClassSectionText(row.section) === studentSection);
+}
+
+async function resolveSupportTeacherForStudent(student = {}) {
+  const uid = String(student?.id || currentUserId || "").trim();
+  if (!uid) return null;
+  const className = normalizeClassSectionText(student?.className || student?.class || "");
+  const section = normalizeClassSectionText(student?.section || "");
+  const teachersSnap = await getDocs(query(collection(db, "users"), where("role", "==", "teacher")));
+  const teachers = [];
+  teachersSnap.forEach((docSnap) => teachers.push({ id: docSnap.id, ...docSnap.data() }));
+  const classMatched = teachers.filter((t) => doesTeacherManageStudentByClass(t, { className, section }));
+  if (classMatched.length) return classMatched[0];
+  const legacy = teachers.find((t) => {
+    const tId = String(t?.id || "").trim();
+    const tMail = normalizeOwnerToken(t?.email || t?.username || "");
+    const owners = [student?.ownerTeacherId, student?.teacherId, student?.createdBy, student?.teacherEmail, student?.ownerEmail].map((v) => normalizeOwnerToken(v));
+    return owners.includes(tId) || (tMail && owners.includes(tMail));
+  });
+  return legacy || null;
+}
+
+function renderSupportThread(messages = []) {
+  const list = document.getElementById("support-thread-list");
+  if (!list) return;
+  const rows = Array.isArray(messages) ? messages.slice() : [];
+  rows.sort((a, b) => Number(a?.createdAtMs || 0) - Number(b?.createdAtMs || 0));
+  if (!rows.length) {
+    list.innerHTML = `<div class="support-empty">Henüz destek mesajı yok.</div>`;
+    return;
+  }
+  list.innerHTML = rows.map((item) => {
+    const fromMe = String(item?.fromUserId || "") === String(currentUserId || "");
+    const author = escapeHtmlBasic(String(item?.fromName || (fromMe ? "Sen" : "Karşı taraf")));
+    const title = escapeHtmlBasic(String(item?.title || "Mesaj"));
+    const body = escapeHtmlBasic(String(item?.message || "")).replace(/\n/g, "<br>");
+    const dateTxt = item?.createdAtMs ? new Date(Number(item.createdAtMs)).toLocaleString("tr-TR") : "-";
+    return `
+      <div class="support-msg ${fromMe ? "mine" : ""}">
+        <div class="support-msg-head">
+          <strong>${author}</strong>
+          <span>${dateTxt}</span>
+        </div>
+        <div class="support-msg-title">${title}</div>
+        <div>${body}</div>
+      </div>
+    `;
+  }).join("");
+  list.scrollTop = list.scrollHeight;
+}
+
+function bindSupportThreadListener({ teacherId = "", studentId = "" } = {}) {
+  closeSupportThreadListener();
+  const safeTeacherId = String(teacherId || "").trim();
+  const safeStudentId = String(studentId || "").trim();
+  if (!safeTeacherId || !safeStudentId) {
+    renderSupportThread([]);
+    return;
+  }
+  const qx = query(collection(db, "supportMessages"), where("teacherId", "==", safeTeacherId), where("studentId", "==", safeStudentId), limit(400));
+  supportThreadUnsub = onSnapshot(qx, (snap) => {
+    const rows = [];
+    snap.forEach((docSnap) => rows.push({ id: docSnap.id, ...docSnap.data() }));
+    renderSupportThread(rows);
+  }, (err) => {
+    console.error("support thread listen failed", err);
+    showNotice("Destek mesajları yüklenemedi.", "#e74c3c");
+  });
+}
+
+async function loadTeacherSupportStudents() {
+  const studentsSnap = await getDocs(query(collection(db, "users"), where("role", "==", "student")));
+  const rows = [];
+  studentsSnap.forEach((docSnap) => rows.push({ id: docSnap.id, ...docSnap.data() }));
+  supportTeacherStudents = getUniqueStudents(getTeacherManagedStudents(rows)).sort((a, b) => getUserDisplayName(a).localeCompare(getUserDisplayName(b), "tr"));
+  renderTeacherSupportStudentOptions("");
+}
+
+function renderTeacherSupportStudentOptions(searchText = "") {
+  const select = document.getElementById("support-student-select");
+  if (!select) return;
+  const normalizedSearch = normalizeClassSectionText(searchText || "");
+  const prevSelected = String(select.value || "").trim();
+  const filteredStudents = !normalizedSearch
+    ? supportTeacherStudents.slice()
+    : supportTeacherStudents.filter((s) => normalizeClassSectionText(getUserDisplayName(s) || "").includes(normalizedSearch));
+  select.innerHTML = "";
+  if (!supportTeacherStudents.length) {
+    select.innerHTML = `<option value="">Öğrenci bulunamadı</option>`;
+    return;
+  }
+  select.innerHTML = `<option value="">Öğrenci seçin</option>`;
+  if (!filteredStudents.length) {
+    select.innerHTML = `<option value="">Sonuç bulunamadı</option>`;
+    return;
+  }
+  filteredStudents.forEach((s) => {
+    const opt = document.createElement("option");
+    opt.value = String(s.id || "");
+    opt.textContent = `${getUserDisplayName(s)} • ${s.className || "-"}${s.section ? "/" + s.section : ""}`;
+    select.appendChild(opt);
+  });
+  if (prevSelected && filteredStudents.some((s) => String(s.id || "") === prevSelected)) {
+    select.value = prevSelected;
+  } else {
+    select.value = "";
+  }
+}
+
+async function openSupportModal() {
+  if (!currentUserId || !userData) return;
+  const modal = document.getElementById("support-modal");
+  const studentCompose = document.getElementById("support-student-compose");
+  const teacherFilter = document.getElementById("support-teacher-filter");
+  const select = document.getElementById("support-student-select");
+  if (!modal || !studentCompose || !teacherFilter) return;
+  const isTeacher = getStrictUserRole(userRole) === "teacher" || isSystemAdminUser(userData);
+  studentCompose.style.display = "block";
+  teacherFilter.style.display = isTeacher ? "block" : "none";
+  modal.style.display = "flex";
+  if (isTeacher) {
+    await loadTeacherSupportStudents();
+    const searchInput = document.getElementById("support-student-search");
+    if (searchInput) searchInput.value = "";
+    renderSupportThread([]);
+  } else {
+    supportResolvedTeacher = await resolveSupportTeacherForStudent({ ...userData, id: currentUserId });
+    if (!supportResolvedTeacher?.id) {
+      renderSupportThread([]);
+      showNotice("Sınıfınıza atanmış öğretmen bulunamadı.", "#f39c12");
+      return;
+    }
+    bindSupportThreadListener({ teacherId: String(supportResolvedTeacher.id), studentId: String(currentUserId) });
+  }
+}
+
 document.getElementById("btn-toggle-add-menu")?.addEventListener("click", () => {
   toggleSidebarSubmenu("submenu-add", "btn-toggle-add-menu");
 });
@@ -9311,7 +9670,7 @@ function applyStudentSidebarMinimalMode() {
   sideMenu.querySelectorAll(".nav-btn").forEach((btn) => {
     btn.style.display = "none";
   });
-  ["btn-open-home", "btn-open-my-stats", "btn-open-badges", "btn-open-certificates", "btn-open-avatar-shop", "btn-logout-side"].forEach((id) => {
+  ["btn-open-home", "btn-open-lessons", "btn-open-friends", "btn-open-class-board", "btn-open-my-stats", "btn-open-support", "btn-open-badges", "btn-open-certificates", "btn-open-avatar-shop", "btn-logout-side"].forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.style.display = "block";
   });
@@ -9750,10 +10109,156 @@ document.getElementById("btn-close-all-tasks").onclick = function() {
   if (allTasksModal) allTasksModal.style.display = "none";
 };
 
-document.getElementById("btn-open-reports").onclick = function() {
+function renderTeacherStatsList(targetId, rows = [], formatter) {
+  const box = document.getElementById(targetId);
+  if (!box) return;
+  if (!Array.isArray(rows) || !rows.length) {
+    box.innerHTML = `<div class="empty-state" style="padding:10px;">Veri bulunamadı.</div>`;
+    return;
+  }
+  box.innerHTML = rows.map((row, i) => `
+    <div class="list-item" style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+      <div>
+        <div style="font-weight:700;">${i + 1}. ${escapeHtmlBasic(String(row?.name || "-"))}</div>
+        <small style="color:#64748b;">${formatter(row)}</small>
+      </div>
+      <span class="badge badge-info">${Math.round(Number(row?.score || 0))}</span>
+    </div>
+  `).join("");
+}
+
+async function loadTeacherStatisticsPage() {
+  const isTeacher = getStrictUserRole(userRole) === "teacher" || isSystemAdminUser(userData);
+  if (!isTeacher) return;
+  const studentsSnap = await getDocs(query(collection(db, "users"), where("role", "==", "student")));
+  const students = [];
+  studentsSnap.forEach((docSnap) => students.push({ id: docSnap.id, ...docSnap.data() }));
+  const displayStudents = getUniqueStudents(getTeacherManagedStudents(students));
+
+  const userIds = displayStudents.map((s) => String(s.id || "")).filter(Boolean);
+  const idChunks = chunkArray(userIds, 10);
+  const completionByUser = new Map();
+  const progressByUser = new Map();
+  const push = (map, key, value) => {
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(value);
+  };
+
+  await Promise.all(idChunks.map(async (ch) => {
+    const [compSnap, progSnap] = await Promise.all([
+      getDocs(query(collection(db, "completions"), where("userId", "in", ch))),
+      getDocs(query(collection(db, "contentProgress"), where("userId", "in", ch)))
+    ]);
+    compSnap.forEach((d) => {
+      const data = d.data() || {};
+      const uid = String(data.userId || "");
+      if (!uid) return;
+      push(completionByUser, uid, String(data.taskId || ""));
+    });
+    progSnap.forEach((d) => {
+      const p = d.data() || {};
+      const uid = String(p.userId || "");
+      if (!uid) return;
+      const totalItems = Math.max(0, Number(p.totalItems || 0));
+      const completedItems = Array.isArray(p.completedItemIds) ? p.completedItemIds.length : 0;
+      let best = 0;
+      Object.values(p.appUsage || {}).forEach((u) => {
+        best = Math.max(best, Math.max(0, Math.min(100, Number(u?.percent || 0))));
+      });
+      push(progressByUser, uid, { contentId: String(p.contentId || ""), hasDone: best > 0 || completedItems > 0 || totalItems > 0 });
+    });
+  }));
+
+  const statRows = displayStudents.map((student) => {
+    const uid = String(student?.id || "");
+    const className = normalizeClassSectionText(student?.className || student?.class || "");
+    const section = normalizeClassSectionText(student?.section || "");
+    const tasksForStudent = allTasks.filter((t) => !t?.isDeleted && taskMatchesStudentFor(t, { className, section, id: uid }));
+    const taskIdSet = new Set(tasksForStudent.map((t) => String(t.id || "")));
+    const assignmentsForStudent = contentAssignments.filter((a) => assignmentMatchesStudentFor(a, student));
+    const assignmentSet = new Set(assignmentsForStudent.map((a) => String(a.contentId || "")));
+    const completionTaskIds = completionByUser.get(uid) || [];
+    let completedTasks = 0;
+    completionTaskIds.forEach((taskId) => {
+      if (!taskIdSet.size || taskIdSet.has(taskId)) completedTasks++;
+    });
+    let completedActivities = 0;
+    const progressRows = progressByUser.get(uid) || [];
+    progressRows.forEach((p) => {
+      if (p?.hasDone && assignmentSet.has(String(p.contentId || ""))) completedActivities++;
+    });
+    const expected = Math.max(1, tasksForStudent.length + assignmentsForStudent.length);
+    const done = completedTasks + completedActivities;
+    const completionRate = Math.max(0, Math.min(100, Math.round((done / expected) * 100)));
+    const xp = Math.max(0, Number(getStudentXPValue(student) || 0));
+    const activeScore = done > 0 ? completionRate : 0;
+    return {
+      id: uid,
+      name: getUserDisplayName(student),
+      className: student?.className || "-",
+      section: student?.section || "-",
+      completionRate,
+      xp,
+      activeScore,
+      score: completionRate
+    };
+  });
+
+  const totalStudents = statRows.length;
+  const activeStudents = statRows.filter((r) => r.activeScore > 0).length;
+  const avgCompletion = totalStudents ? Math.round(statRows.reduce((acc, r) => acc + r.completionRate, 0) / totalStudents) : 0;
+  const totalXP = statRows.reduce((acc, r) => acc + r.xp, 0);
+  const riskCount = statRows.filter((r) => r.completionRate < 35).length;
+
+  const setText = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = String(value);
+  };
+  setText("tstats-total-students", totalStudents);
+  setText("tstats-active-students", activeStudents);
+  setText("tstats-avg-completion", `%${avgCompletion}`);
+  setText("tstats-total-xp", totalXP);
+  setText("tstats-risk-count", riskCount);
+
+  const topSuccess = statRows.slice().sort((a, b) => b.completionRate - a.completionRate).slice(0, 5).map((r) => ({ ...r, score: r.completionRate }));
+  const lowSuccess = statRows.slice().sort((a, b) => a.completionRate - b.completionRate).slice(0, 5).map((r) => ({ ...r, score: r.completionRate }));
+  const topXp = statRows.slice().sort((a, b) => b.xp - a.xp).slice(0, 5).map((r) => ({ ...r, score: r.xp }));
+  const lowActive = statRows.slice().sort((a, b) => a.activeScore - b.activeScore).slice(0, 5).map((r) => ({ ...r, score: r.activeScore }));
+
+  renderTeacherStatsList("tstats-top-success", topSuccess, (r) => `%${r.completionRate} tamamlama · ${r.className}/${r.section}`);
+  renderTeacherStatsList("tstats-low-success", lowSuccess, (r) => `%${r.completionRate} tamamlama · ${r.className}/${r.section}`);
+  renderTeacherStatsList("tstats-top-xp", topXp, (r) => `${r.xp} XP · ${r.className}/${r.section}`);
+  renderTeacherStatsList("tstats-low-active", lowActive, (r) => `Aktiflik skoru ${r.activeScore} · ${r.className}/${r.section}`);
+
+  const classSummaryBox = document.getElementById("tstats-class-summary");
+  if (classSummaryBox) {
+    const groupMap = new Map();
+    statRows.forEach((r) => {
+      const key = `${r.className}/${r.section}`;
+      if (!groupMap.has(key)) groupMap.set(key, []);
+      groupMap.get(key).push(r);
+    });
+    const classRows = Array.from(groupMap.entries()).map(([key, rows]) => {
+      const avg = rows.length ? Math.round(rows.reduce((acc, r) => acc + r.completionRate, 0) / rows.length) : 0;
+      const avgXp = rows.length ? Math.round(rows.reduce((acc, r) => acc + r.xp, 0) / rows.length) : 0;
+      return { key, avg, avgXp, count: rows.length, score: avg };
+    }).sort((a, b) => b.avg - a.avg);
+    classSummaryBox.innerHTML = classRows.length ? classRows.map((row) => `
+      <div class="list-item" style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+        <div>
+          <div style="font-weight:700;">${escapeHtmlBasic(row.key)}</div>
+          <small style="color:#64748b;">${row.count} öğrenci · Ort XP ${row.avgXp}</small>
+        </div>
+        <span class="badge ${row.avg >= 70 ? "badge-success" : row.avg >= 40 ? "badge-info" : "badge-pending"}">%${row.avg}</span>
+      </div>
+    `).join("") : `<div class="empty-state" style="padding:10px;">Sınıf verisi bulunamadı.</div>`;
+  }
+}
+
+document.getElementById("btn-open-reports").onclick = async function() {
   if (userRole !== "teacher") return;
-  if (reportsModal) reportsModal.style.display = "flex";
-  loadReportsModal();
+  await loadTeacherStatisticsPage();
+  showPage("teacher-statistics");
   document.getElementById("side-menu").style.width = "0";
 };
 
@@ -9765,9 +10270,111 @@ document.getElementById("btn-open-notifications")?.addEventListener("click", fun
   document.getElementById("side-menu").style.width = "0";
 });
 
+document.getElementById("btn-open-support")?.addEventListener("click", async function() {
+  await openSupportModal();
+  document.getElementById("side-menu").style.width = "0";
+});
+document.getElementById("btn-close-support-modal")?.addEventListener("click", closeSupportModal);
+document.getElementById("support-modal")?.addEventListener("click", (e) => {
+  if (e.target?.id === "support-modal") closeSupportModal();
+});
+document.getElementById("support-student-select")?.addEventListener("change", (e) => {
+  const isTeacher = getStrictUserRole(userRole) === "teacher" || isSystemAdminUser(userData);
+  if (!isTeacher) return;
+  const studentId = String(e?.target?.value || "").trim();
+  if (!studentId) {
+    renderSupportThread([]);
+    return;
+  }
+  bindSupportThreadListener({ teacherId: currentUserId, studentId });
+});
+document.getElementById("support-student-search")?.addEventListener("input", (e) => {
+  const isTeacher = getStrictUserRole(userRole) === "teacher" || isSystemAdminUser(userData);
+  if (!isTeacher) return;
+  const searchText = String(e?.target?.value || "");
+  renderTeacherSupportStudentOptions(searchText);
+});
+document.getElementById("btn-send-support")?.addEventListener("click", async () => {
+  if (!currentUserId) return;
+  const titleEl = document.getElementById("support-title");
+  const messageEl = document.getElementById("support-message");
+  const title = String(titleEl?.value || "").trim();
+  const message = String(messageEl?.value || "").trim();
+  if (!title || !message) {
+    showNotice("Başlık ve mesaj zorunludur.", "#e74c3c");
+    return;
+  }
+  const isTeacher = getStrictUserRole(userRole) === "teacher" || isSystemAdminUser(userData);
+  if (isTeacher) {
+    const studentId = String(document.getElementById("support-student-select")?.value || "").trim();
+    if (!studentId) {
+      showNotice("Mesaj göndermek için önce öğrenci seçin.", "#f39c12");
+      return;
+    }
+    const student = supportTeacherStudents.find((s) => String(s.id || "") === studentId) || null;
+    if (!student?.id) {
+      showNotice("Seçilen öğrenci bulunamadı.", "#f39c12");
+      return;
+    }
+    const senderName = getUserDisplayName({ ...userData, id: currentUserId }) || "Öğretmen";
+    const studentName = getUserDisplayName(student) || "Öğrenci";
+    const nowMs = Date.now();
+    await addDoc(collection(db, "supportMessages"), {
+      teacherId: String(currentUserId),
+      studentId: String(student.id),
+      fromUserId: String(currentUserId),
+      fromRole: "teacher",
+      fromName: senderName,
+      toUserId: String(student.id),
+      toName: studentName,
+      className: String(student?.className || ""),
+      section: String(student?.section || ""),
+      title,
+      message,
+      createdAtMs: nowMs,
+      createdAt: serverTimestamp()
+    });
+    if (titleEl) titleEl.value = "";
+    if (messageEl) messageEl.value = "";
+    showNotice("Destek mesajı öğrenciye gönderildi.", "#2ecc71");
+    return;
+  }
+  if (!supportResolvedTeacher?.id) {
+    supportResolvedTeacher = await resolveSupportTeacherForStudent({ ...userData, id: currentUserId });
+    if (!supportResolvedTeacher?.id) {
+      showNotice("Öğretmen eşleşmesi bulunamadı.", "#f39c12");
+      return;
+    }
+  }
+  const senderName = getUserDisplayName({ ...userData, id: currentUserId }) || "Öğrenci";
+  const teacherName = getUserDisplayName(supportResolvedTeacher) || "Öğretmen";
+  const nowMs = Date.now();
+  await addDoc(collection(db, "supportMessages"), {
+    teacherId: String(supportResolvedTeacher.id),
+    studentId: String(currentUserId),
+    fromUserId: String(currentUserId),
+    fromRole: "student",
+    fromName: senderName,
+    toUserId: String(supportResolvedTeacher.id),
+    toName: teacherName,
+    className: String(userData?.className || ""),
+    section: String(userData?.section || ""),
+    title,
+    message,
+    createdAtMs: nowMs,
+    createdAt: serverTimestamp()
+  });
+  if (titleEl) titleEl.value = "";
+  if (messageEl) messageEl.value = "";
+  showNotice("Destek mesajı öğretmene gönderildi.", "#2ecc71");
+});
+
 document.getElementById("btn-close-reports").onclick = function() {
   if (reportsModal) reportsModal.style.display = "none";
 };
+document.getElementById("btn-teacher-statistics-back")?.addEventListener("click", () => {
+  showPage("home");
+});
 document.getElementById("btn-open-login-cards")?.addEventListener("click", async function() {
   if (userRole !== "teacher") return;
   const modal = document.getElementById("login-cards-modal");
@@ -11451,6 +12058,143 @@ function openStudentLessonsModalUI() {
   if (sideMenu) sideMenu.style.width = "0";
 }
 
+async function renderStudentFriendsCards() {
+  const grid = document.getElementById("student-friends-grid");
+  const empty = document.getElementById("student-friends-empty");
+  const subtitle = document.getElementById("student-friends-subtitle");
+  if (!grid || !empty) return;
+  const className = normalizeClassSectionText(userData?.className || userData?.class || "");
+  const section = normalizeClassSectionText(userData?.section || "");
+  if (subtitle) {
+    subtitle.innerText = className
+      ? `${className}${section ? "/" + section : ""} sınıfındaki öğrenciler`
+      : "Sınıf arkadaşlarının kart görünümü";
+  }
+  let students = Array.isArray(allStudents) ? allStudents.slice() : [];
+  if (!students.length) {
+    const snap = await getDocs(query(collection(db, "users"), where("role", "==", "student")));
+    students = [];
+    snap.forEach((d) => students.push({ id: d.id, ...d.data() }));
+  }
+  const scoped = getUniqueStudents(students).filter((s) => {
+    const sClass = normalizeClassSectionText(s?.className || s?.class || "");
+    const sSection = normalizeClassSectionText(s?.section || "");
+    if (className && sClass !== className) return false;
+    if (section && sSection !== section) return false;
+    return true;
+  }).sort((a, b) => {
+    const xpDiff = Number(getStudentXPValue(b) || 0) - Number(getStudentXPValue(a) || 0);
+    if (xpDiff !== 0) return xpDiff;
+    return getUserDisplayName(a).localeCompare(getUserDisplayName(b), "tr");
+  });
+  grid.innerHTML = "";
+  if (!scoped.length) {
+    empty.style.display = "block";
+    return;
+  }
+  empty.style.display = "none";
+  scoped.forEach((student) => {
+    const avatar = getAvatarById(student?.selectedAvatarId || AVATAR_DEFAULT_ID);
+    const fullName = escapeHtmlBasic(getUserDisplayName(student));
+    const xp = Math.max(0, Number(getStudentXPValue(student) || 0));
+    const card = document.createElement("article");
+    card.className = "student-friend-card";
+    card.innerHTML = `
+      <div class="student-friend-avatar" style="background:${avatar.gradient || "#e2e8f0"};">
+        <img src="${buildAvatarImageDataUri(avatar)}" alt="${escapeHtmlBasic(avatar.name || "Avatar")}">
+      </div>
+      <div style="font-weight:800;color:#0f172a;font-size:16px;line-height:1.2;">${fullName}</div>
+      <div style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-weight:700;font-size:12px;">⭐ ${xp} XP</div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+function openStudentFriendsPage() {
+  if (userRole !== "student") return;
+  renderStudentFriendsCards();
+  showPage("student-friends");
+  const sideMenu = document.getElementById("side-menu");
+  if (sideMenu) sideMenu.style.width = "0";
+}
+
+function getSystemBoardNotes() {
+  const xp = Math.max(0, Number(getStudentXPValue(userData || {}) || 0));
+  const notes = [];
+  if (xp >= 500) notes.push("Sınıf ritmini yükselten güçlü bir ilerleme çizgim var.");
+  if (xp >= 250) notes.push("Düzenli çalışarak her hafta puanımı artırıyorum.");
+  if (xp < 250) notes.push("Temelleri güçlendiriyorum, her gün biraz daha iyi oluyorum.");
+  notes.push("Algoritmik düşünmede adım adım daha net çözümler kuruyorum.");
+  notes.push("Hedefim: Bu ay ders ve uygulama dengesini daha da geliştirmek.");
+  notes.push("Süreklilik kazanarak sınıf panosunda kalıcı bir yer hedefliyorum.");
+  return Array.from(new Set(notes)).slice(0, 6);
+}
+
+function renderClassBoardGrid(targetId, rows = []) {
+  const grid = document.getElementById(targetId);
+  if (!grid) return;
+  grid.innerHTML = rows.map((row) => {
+    const avatar = getAvatarById(row?.selectedAvatarId || AVATAR_DEFAULT_ID);
+    const fullName = escapeHtmlBasic(String(row?.fullName || "-"));
+    const note = escapeHtmlBasic(String(row?.note || ""));
+    const xp = Math.max(0, Number(row?.xp || 0));
+    const updated = row?.updatedAtMs ? new Date(Number(row.updatedAtMs)).toLocaleDateString("tr-TR") : "-";
+    return `
+      <article class="class-board-card">
+        <div class="student-friend-avatar" style="background:${avatar.gradient || "#e2e8f0"};">
+          <img src="${buildAvatarImageDataUri(avatar)}" alt="${escapeHtmlBasic(avatar.name || "Avatar")}">
+        </div>
+        <div style="font-weight:800;color:#0f172a;font-size:16px;line-height:1.2;">${fullName}</div>
+        <div style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-weight:700;font-size:12px;">⭐ ${xp} XP</div>
+        <div style="font-size:13px;color:#334155;">${note}</div>
+        <div style="font-size:11px;color:#94a3b8;">Güncelleme: ${updated}</div>
+      </article>
+    `;
+  }).join("");
+}
+
+function closeClassBoardListener() {
+  if (classBoardUnsub) {
+    try { classBoardUnsub(); } catch {}
+    classBoardUnsub = null;
+  }
+}
+
+function closeBoardOverlays() {
+  const studentBoardFullpage = document.getElementById("student-class-board-fullpage");
+  if (studentBoardFullpage) studentBoardFullpage.style.display = "none";
+  const teacherBoardsModal = document.getElementById("teacher-student-boards-modal");
+  if (teacherBoardsModal) teacherBoardsModal.style.display = "none";
+  closeClassBoardListener();
+}
+
+function openStudentClassBoardPage() {
+  if (userRole !== "student") return;
+  const className = normalizeClassSectionText(userData?.className || userData?.class || "");
+  const section = normalizeClassSectionText(userData?.section || "");
+  const noteSelect = document.getElementById("class-board-note-select");
+  const empty = document.getElementById("student-class-board-empty");
+  const subtitle = document.getElementById("student-class-board-subtitle");
+  if (subtitle) subtitle.innerText = className ? `${className}${section ? "/" + section : ""} sınıf panosu` : "Sınıf panosu";
+  if (noteSelect) {
+    const notes = getSystemBoardNotes();
+    noteSelect.innerHTML = notes.map((n, i) => `<option value="${i}">${escapeHtmlBasic(n)}</option>`).join("");
+    noteSelect.dataset.notes = JSON.stringify(notes);
+  }
+  showPage("student-class-board");
+  const sideMenu = document.getElementById("side-menu");
+  if (sideMenu) sideMenu.style.width = "0";
+  closeClassBoardListener();
+  const qx = query(collection(db, "classBoards"), where("className", "==", className), where("section", "==", section), limit(300));
+  classBoardUnsub = onSnapshot(qx, (snap) => {
+    const rows = [];
+    snap.forEach((d) => rows.push({ id: d.id, ...d.data() }));
+    rows.sort((a, b) => Number(b?.xp || 0) - Number(a?.xp || 0));
+    renderClassBoardGrid("student-class-board-grid", rows);
+    if (empty) empty.style.display = rows.length ? "none" : "block";
+  });
+}
+
 function openLessonsFromSidebar() {
   if (userRole === "teacher") {
     openTeacherLessonsModalUI();
@@ -11466,12 +12210,42 @@ if (openLessonsMenuBtn) {
   };
 }
 
+const openFriendsMenuBtn = document.getElementById("btn-open-friends");
+if (openFriendsMenuBtn) {
+  openFriendsMenuBtn.onclick = function () {
+    openStudentFriendsPage();
+  };
+}
+
+const openClassBoardMenuBtn = document.getElementById("btn-open-class-board");
+if (openClassBoardMenuBtn) {
+  openClassBoardMenuBtn.onclick = function () {
+    openStudentClassBoardPage();
+  };
+}
+
 document.addEventListener("click", (e) => {
   const trigger = e.target?.closest?.("#btn-open-lessons");
   if (!trigger) return;
   e.preventDefault();
   e.stopPropagation();
   openLessonsFromSidebar();
+}, true);
+
+document.addEventListener("click", (e) => {
+  const trigger = e.target?.closest?.("#btn-open-class-board");
+  if (!trigger) return;
+  e.preventDefault();
+  e.stopPropagation();
+  openStudentClassBoardPage();
+}, true);
+
+document.addEventListener("click", (e) => {
+  const trigger = e.target?.closest?.("#btn-open-friends");
+  if (!trigger) return;
+  e.preventDefault();
+  e.stopPropagation();
+  openStudentFriendsPage();
 }, true);
 
 const closeTeacherLessonsModalBtn = document.getElementById("btn-close-teacher-lessons-modal");
@@ -11494,6 +12268,99 @@ if (studentLessonsBackBtn) {
     showPage("home");
   };
 }
+
+const studentFriendsBackBtn = document.getElementById("btn-student-friends-back");
+if (studentFriendsBackBtn) {
+  studentFriendsBackBtn.onclick = function () {
+    const fullPage = document.getElementById("student-friends-fullpage");
+    if (fullPage) fullPage.style.display = "none";
+    showPage("home");
+  };
+}
+
+const studentClassBoardBackBtn = document.getElementById("btn-student-class-board-back");
+if (studentClassBoardBackBtn) {
+  studentClassBoardBackBtn.onclick = function () {
+    const fullPage = document.getElementById("student-class-board-fullpage");
+    if (fullPage) fullPage.style.display = "none";
+    closeBoardOverlays();
+    showPage("home");
+  };
+}
+
+document.getElementById("btn-save-class-board")?.addEventListener("click", async () => {
+  if (userRole !== "student" || !currentUserId) return;
+  const className = normalizeClassSectionText(userData?.className || userData?.class || "");
+  const section = normalizeClassSectionText(userData?.section || "");
+  if (!className || !section) {
+    showNotice("Sınıf/şube bilgisi bulunamadı.", "#e74c3c");
+    return;
+  }
+  const noteSelect = document.getElementById("class-board-note-select");
+  const notes = JSON.parse(String(noteSelect?.dataset?.notes || "[]"));
+  const idx = Math.max(0, Number(noteSelect?.value || 0));
+  const note = String(notes[idx] || notes[0] || "").trim();
+  if (!note) {
+    showNotice("Lütfen bir not seçin.", "#e74c3c");
+    return;
+  }
+  const payload = {
+    userId: String(currentUserId),
+    fullName: getUserDisplayName(userData || {}),
+    selectedAvatarId: String(userData?.selectedAvatarId || AVATAR_DEFAULT_ID),
+    xp: Math.max(0, Number(getStudentXPValue(userData || {}) || 0)),
+    note,
+    className,
+    section,
+    updatedAtMs: Date.now(),
+    updatedAt: serverTimestamp()
+  };
+  await setDoc(doc(db, "classBoards", `${className}_${section}_${currentUserId}`), payload, { merge: true });
+  showNotice("Sınıf panosu kartın yayınlandı.", "#2ecc71");
+});
+
+async function openTeacherStudentBoardsModal() {
+  if (userRole !== "teacher") return;
+  const modal = document.getElementById("teacher-student-boards-modal");
+  const meta = document.getElementById("teacher-student-boards-meta");
+  const empty = document.getElementById("teacher-student-boards-empty");
+  if (!modal) return;
+  modal.style.position = "fixed";
+  modal.style.inset = "0";
+  modal.style.width = "100vw";
+  modal.style.height = "100vh";
+  modal.style.alignItems = "stretch";
+  modal.style.justifyContent = "stretch";
+  modal.style.background = "rgba(0,0,0,.55)";
+  modal.style.zIndex = "24020";
+  modal.style.display = "flex";
+  const boardsSnap = await getDocs(collection(db, "classBoards"));
+  const rows = [];
+  boardsSnap.forEach((d) => rows.push({ id: d.id, ...d.data() }));
+  const allowed = teacherAssignedClassKeys;
+  const filtered = rows.filter((r) => {
+    const key = buildClassSectionKey(r?.className || "", r?.section || "");
+    return !allowed?.size || allowed.has(key);
+  }).sort((a, b) => Number(b?.xp || 0) - Number(a?.xp || 0));
+  renderClassBoardGrid("teacher-student-boards-grid", filtered);
+  if (meta) meta.innerText = `${filtered.length} pano kartı listelendi.`;
+  if (empty) empty.style.display = filtered.length ? "none" : "block";
+}
+
+document.getElementById("btn-open-student-boards")?.addEventListener("click", async () => {
+  await openTeacherStudentBoardsModal();
+  document.getElementById("side-menu").style.width = "0";
+});
+document.getElementById("btn-close-student-boards-modal")?.addEventListener("click", () => {
+  const modal = document.getElementById("teacher-student-boards-modal");
+  if (modal) modal.style.display = "none";
+});
+document.getElementById("teacher-student-boards-modal")?.addEventListener("click", (e) => {
+  if (e.target?.id === "teacher-student-boards-modal") {
+    const modal = document.getElementById("teacher-student-boards-modal");
+    if (modal) modal.style.display = "none";
+  }
+});
 
 const openLessonBuilderFromModalBtn = document.getElementById("btn-open-lesson-builder-from-modal");
 if (openLessonBuilderFromModalBtn) {
@@ -13294,6 +14161,8 @@ onAuthStateChanged(auth, (user) => {
     if (loginCardsBtn) loginCardsBtn.style.display = "none";
     const notificationsBtn = document.getElementById("btn-open-notifications");
     if (notificationsBtn) notificationsBtn.style.display = "none";
+    const supportBtn = document.getElementById("btn-open-support");
+    if (supportBtn) supportBtn.style.display = "none";
     const studentDataToggleBtn = document.getElementById("btn-toggle-student-data-menu");
     if (studentDataToggleBtn) studentDataToggleBtn.style.display = "none";
     const contentBtn = document.getElementById("btn-open-content");
@@ -13325,6 +14194,10 @@ onAuthStateChanged(auth, (user) => {
     if (profileMenuItem) profileMenuItem.style.display = "none";
     const lessonsListMenuBtn = document.getElementById("btn-open-lessons");
     if (lessonsListMenuBtn) lessonsListMenuBtn.style.display = "none";
+    const friendsMenuBtn = document.getElementById("btn-open-friends");
+    if (friendsMenuBtn) friendsMenuBtn.style.display = "none";
+    const classBoardMenuBtn = document.getElementById("btn-open-class-board");
+    if (classBoardMenuBtn) classBoardMenuBtn.style.display = "none";
     const myStatsBtn = document.getElementById("btn-open-my-stats");
     if (myStatsBtn) myStatsBtn.style.display = "none";
     const quizSection = document.getElementById("quiz-section");
@@ -13333,10 +14206,14 @@ onAuthStateChanged(auth, (user) => {
     if (certificatesBtn) certificatesBtn.style.display = "none";
     const teacherCertificatesBtn = document.getElementById("btn-open-teacher-certificates");
     if (teacherCertificatesBtn) teacherCertificatesBtn.style.display = "none";
+    const studentBoardsBtn = document.getElementById("btn-open-student-boards");
+    if (studentBoardsBtn) studentBoardsBtn.style.display = "none";
     setSidebarSubmenuState("submenu-student-data", "btn-toggle-student-data-menu", false);
     if (certificatesModal) certificatesModal.style.display = "none";
     if (teacherCertificatesModal) teacherCertificatesModal.style.display = "none";
     if (notificationsModal) notificationsModal.style.display = "none";
+    closeSupportModal();
+    closeClassBoardListener();
     const loginCardsModal = document.getElementById("login-cards-modal");
     if (loginCardsModal) loginCardsModal.style.display = "none";
     closeAvatarShopModal();
@@ -13474,6 +14351,7 @@ onAuthStateChanged(auth, (user) => {
     loginScreen.classList.add("hidden");
     appScreen.style.display = "grid";
     document.getElementById("open-menu").style.display = "block";
+    closeBoardOverlays();
 
     const displayFirst = userData.firstName || "";
     const displayLast = userData.lastName || "";
@@ -13596,10 +14474,12 @@ onAuthStateChanged(auth, (user) => {
     if (loginCardsBtn) loginCardsBtn.style.display = teacherUiEnabled ? "block" : "none";
     const notificationsBtn = document.getElementById("btn-open-notifications");
     if (notificationsBtn) notificationsBtn.style.display = teacherUiEnabled ? "block" : "none";
+    const supportBtn = document.getElementById("btn-open-support");
+    if (supportBtn) supportBtn.style.display = "block";
     const contentBtn = document.getElementById("btn-open-content");
     if (contentBtn) {
       contentBtn.style.display = isTeacher ? "block" : "none";
-      contentBtn.innerText = "ğŸ¯ Etkinlik Ekle";
+      contentBtn.innerText = "🎯 Etkinlik Ekle";
     }
     const addMenuToggleBtn = document.getElementById("btn-toggle-add-menu");
     if (addMenuToggleBtn) {
@@ -13631,6 +14511,10 @@ onAuthStateChanged(auth, (user) => {
     if (appsHubKeyboardRaceCard) appsHubKeyboardRaceCard.style.display = isTeacher ? "flex" : "none";
     const lessonsListMenuBtn = document.getElementById("btn-open-lessons");
     if (lessonsListMenuBtn) lessonsListMenuBtn.style.display = "block";
+    const friendsMenuBtn = document.getElementById("btn-open-friends");
+    if (friendsMenuBtn) friendsMenuBtn.style.display = isTeacher ? "none" : "block";
+    const classBoardMenuBtn = document.getElementById("btn-open-class-board");
+    if (classBoardMenuBtn) classBoardMenuBtn.style.display = isTeacher ? "none" : "block";
     const liveQuizMenuBtn = document.getElementById("btn-open-live-quiz");
     if (liveQuizMenuBtn) liveQuizMenuBtn.style.display = isTeacher ? "block" : "none";
     const liveQuizStartMenuBtn = document.getElementById("btn-open-live-quiz-start");
@@ -13656,6 +14540,8 @@ onAuthStateChanged(auth, (user) => {
     if (certificatesBtn) certificatesBtn.style.display = isTeacher ? "none" : "block";
     const teacherCertificatesBtn = document.getElementById("btn-open-teacher-certificates");
     if (teacherCertificatesBtn) teacherCertificatesBtn.style.display = isTeacher ? "block" : "none";
+    const studentBoardsBtn = document.getElementById("btn-open-student-boards");
+    if (studentBoardsBtn) studentBoardsBtn.style.display = isTeacher ? "block" : "none";
     const studentDataToggleBtn = document.getElementById("btn-toggle-student-data-menu");
     if (studentDataToggleBtn) {
       const hasStudentDataItems = isTeacher && !!(
@@ -13664,6 +14550,7 @@ onAuthStateChanged(auth, (user) => {
         || (reportsBtn && reportsBtn.style.display !== "none")
         || (loginCardsBtn && loginCardsBtn.style.display !== "none")
         || (teacherCertificatesBtn && teacherCertificatesBtn.style.display !== "none")
+        || (studentBoardsBtn && studentBoardsBtn.style.display !== "none")
       );
       studentDataToggleBtn.style.display = hasStudentDataItems ? "block" : "none";
     }
@@ -13681,7 +14568,7 @@ onAuthStateChanged(auth, (user) => {
     const homeOverviewStrip = document.getElementById("home-overview-strip");
     if (homeOverviewStrip) homeOverviewStrip.style.display = "none";
     const teacherAnalytics = document.getElementById("teacher-analytics");
-    if (teacherAnalytics) teacherAnalytics.style.display = isTeacher ? "flex" : "none";
+    if (teacherAnalytics) teacherAnalytics.style.display = "none";
     const quizSection = document.getElementById("quiz-section");
     if (quizSection) quizSection.style.display = "none";
     const quizTabs = document.getElementById("quiz-tabs");
@@ -14099,6 +14986,50 @@ function createTaskElement(task, isCompleted, completionData, manualProgress) {
     badge = `${controlBadge}<span class="badge badge-info" style="font-size:1.02rem; padding:8px 14px;">${uniqueCount}${suffix} tamamlama</span>`;
     deadlineInfo = "";
     timeInfo = xpInfo;
+    li.classList.add("teacher-task-card");
+    li.innerHTML = `
+      <div style="display:flex; justify-content:space-between; gap:10px; align-items:flex-start;">
+        <div style="flex:1; min-width:0;">
+          <div class="task-title">${escapeHtmlBasic(String(task.title || "Başlıksız Ödev"))}</div>
+          <div class="task-meta">${deadline ? `Son tarih: ${deadline.toLocaleDateString('tr-TR')}` : "Son tarih yok"}</div>
+          ${timeInfo}
+        </div>
+        <div>${badge}</div>
+      </div>
+      <div class="task-actions">
+        <button type="button" class="btn btn-primary btn-task-assign">Ödev Ver</button>
+        <button type="button" class="btn btn-warning btn-task-edit">Düzenle</button>
+        <button type="button" class="btn btn-danger btn-task-delete">Sil</button>
+      </div>
+    `;
+
+    li.querySelector(".btn-task-assign")?.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      if (userRole !== "teacher") return;
+      populateTaskTargets();
+      populateTaskTargetClassSection();
+      loadBooksForTeacher();
+      taskQuestions = [];
+      if (createModal) createModal.style.display = "flex";
+      document.getElementById("side-menu").style.width = "0";
+    });
+
+    li.querySelector(".btn-task-edit")?.addEventListener("click", async (ev) => {
+      ev.stopPropagation();
+      await openTaskModal(task.id, task, false);
+      const editBtn = document.getElementById("btn-edit-task");
+      if (editBtn) editBtn.click();
+    });
+
+    li.querySelector(".btn-task-delete")?.addEventListener("click", async (ev) => {
+      ev.stopPropagation();
+      await archiveTaskById(task);
+    });
+
+    li.onclick = () => {
+      openTaskModal(task.id, task, false);
+    };
+    return li;
   }
   
   li.innerHTML = `
@@ -17689,7 +18620,7 @@ async function openStudentReportWindow(detail) {
           <div style="flex:1;">
             <img src="${appUrl("logo.png")}" alt="Logo" class="logo" />
             <div class="title">Öğrenci Performans Raporu</div>
-            <div class="subtitle">${new Date().toLocaleDateString("tr-TR")} â€¢ Kurumsal Öğrenci Takip Sistemi</div>
+            <div class="subtitle">${new Date().toLocaleDateString("tr-TR")} • Kurumsal Öğrenci Takip Sistemi</div>
           </div>
         </div>
           <div class="card grid">
@@ -17712,7 +18643,7 @@ async function openStudentReportWindow(detail) {
           <div class="kpi"><div class="value">${totalXPCombined}</div><div class="label">Toplam XP</div></div>
         </div>
         <div class="kpi-alt-grid">
-          <div class="kpi-alt a">Sınıf Sırası: ${classRank}<small>Sınıf/Åube içi</small></div>
+          <div class="kpi-alt a">Sınıf Sırası: ${classRank}<small>Sınıf/Şube içi</small></div>
           <div class="kpi-alt b">Okul Sırası: ${schoolRank}<small>Genel sıralama</small></div>
           <div class="kpi-alt c">Sistem Süresi<small>${systemTimeText}</small></div>
           <div class="kpi-alt d">Genel İlerleme<small>%${combinedCompletionRate}</small></div>
@@ -17791,7 +18722,7 @@ async function openStudentReportWindow(detail) {
         <div class="card header">
           <div style="flex:1;">
             <img src="${appUrl("logo.png")}" alt="Logo" class="logo" />
-            <div class="title">Öğrenci Gelişim Raporu â€¢ Sayfa 2</div>
+            <div class="title">Öğrenci Gelişim Raporu • Sayfa 2</div>
             <div class="subtitle">Güçlü Yönler ve Odak Alanları</div>
           </div>
         </div>
@@ -17850,10 +18781,12 @@ async function openStudentReportWindow(detail) {
     const closeBtn = reportWindow.document.getElementById("closeBtn");
     if (downloadFileBtn) {
       downloadFileBtn.onclick = async () => {
+        const progress = createFixedProgressToast(reportWindow.document, { title: "PDF oluşturuluyor" });
         try {
           const jsPdfCtor = reportWindow?.jspdf?.jsPDF || window?.jspdf?.jsPDF;
           const h2c = reportWindow?.html2canvas || window?.html2canvas;
           if (!jsPdfCtor || !h2c) {
+            progress.remove();
             reportWindow.focus();
             reportWindow.print();
             return;
@@ -17861,6 +18794,7 @@ async function openStudentReportWindow(detail) {
 
           const pages = Array.from(reportWindow.document.querySelectorAll(".page"));
           if (!pages.length) {
+            progress.remove();
             reportWindow.focus();
             reportWindow.print();
             return;
@@ -17869,8 +18803,10 @@ async function openStudentReportWindow(detail) {
           const pdf = new jsPdfCtor("p", "mm", "a4");
           const pageWidth = pdf.internal.pageSize.getWidth();
           const pageHeight = pdf.internal.pageSize.getHeight();
+          progress.set(3, `0/${pages.length} sayfa hazırlanıyor...`);
 
           for (let i = 0; i < pages.length; i += 1) {
+            progress.set(Math.round((i / pages.length) * 90), `${i + 1}/${pages.length} sayfa işleniyor...`);
             const canvas = await h2c(pages[i], {
               scale: 2,
               useCORS: true,
@@ -17887,9 +18823,13 @@ async function openStudentReportWindow(detail) {
 
           const safeName = String(studentName || "ogrenci").replace(/[^a-z0-9_-]+/gi, "_");
           const datePart = new Date().toISOString().slice(0, 10);
+          progress.set(98, "Dosya indiriliyor...");
           pdf.save(`${safeName}_gelisim_raporu_${datePart}.pdf`);
+          progress.set(100, "Tamamlandı");
+          setTimeout(() => progress.remove(), 700);
         } catch (e) {
           console.error("pdf export failed", e);
+          progress.remove();
           reportWindow.focus();
           reportWindow.print();
         }
@@ -18301,7 +19241,7 @@ async function buildStudentReportHtml(detail) {
           <div style="flex:1;">
             <img src="${appUrl("logo.png")}" alt="Logo" class="logo" />
             <div class="title">Öğrenci Performans Raporu</div>
-            <div class="subtitle">${new Date().toLocaleDateString("tr-TR")} â€¢ Kurumsal Öğrenci Takip Sistemi</div>
+            <div class="subtitle">${new Date().toLocaleDateString("tr-TR")} • Kurumsal Öğrenci Takip Sistemi</div>
           </div>
         </div>
           <div class="card grid">
@@ -18324,7 +19264,7 @@ async function buildStudentReportHtml(detail) {
           <div class="kpi"><div class="value">${totalXPCombined}</div><div class="label">Toplam XP</div></div>
         </div>
         <div class="kpi-alt-grid">
-          <div class="kpi-alt a">Sınıf Sırası: ${classRank}<small>Sınıf/Åube içi</small></div>
+          <div class="kpi-alt a">Sınıf Sırası: ${classRank}<small>Sınıf/Şube içi</small></div>
           <div class="kpi-alt b">Okul Sırası: ${schoolRank}<small>Genel sıralama</small></div>
           <div class="kpi-alt c">Toplam Süre<small>${systemTimeText}</small></div>
           <div class="kpi-alt d">Genel İlerleme<small>%${combinedCompletionRate}</small></div>
@@ -18397,7 +19337,7 @@ async function buildStudentReportHtml(detail) {
         <div class="card header">
           <div style="flex:1;">
             <img src="${appUrl("logo.png")}" alt="Logo" class="logo" />
-            <div class="title">Öğrenci Gelişim Raporu â€¢ Sayfa 2</div>
+            <div class="title">Öğrenci Gelişim Raporu • Sayfa 2</div>
             <div class="subtitle">Ders, Ödev ve Kodlama Detayı</div>
           </div>
         </div>
@@ -18724,10 +19664,10 @@ function renderBlockHomeworkList() {
   if (!pendingList || !completedList) return;
   const activeBlockLabel = getBlockHomeworkTypeLabel(currentBlockAssignType || "block2d");
   if (noPending) {
-    noPending.innerHTML = `<div class="empty-state-icon">ğŸ§©</div>Bekleyen ${activeBlockLabel} ödevi yok.`;
+    noPending.innerHTML = `<div class="empty-state-icon">\u{1F9E9}</div>Bekleyen ${activeBlockLabel} ödevi yok.`;
   }
   if (noCompleted) {
-    noCompleted.innerHTML = `<div class="empty-state-icon">âœ…</div>Tamamlanan ${activeBlockLabel} ödevi yok.`;
+    noCompleted.innerHTML = `<div class="empty-state-icon">\u2705</div>Tamamlanan ${activeBlockLabel} ödevi yok.`;
   }
 
   pendingList.innerHTML = "";
@@ -19408,7 +20348,7 @@ function renderTeacherLessonsModalList() {
   if (metaEl) {
     const draftCount = items.filter((l) => l?.isPublished === false).length;
     const publishedCount = items.filter((l) => l?.isPublished !== false).length;
-    metaEl.innerText = `Toplam: ${items.length} â€¢ Taslak: ${draftCount} â€¢ Yayında: ${publishedCount}`;
+    metaEl.innerText = `${items.length} ders kartı hazır. Taslak: ${draftCount} • Yayında: ${publishedCount}`;
   }
 
   if (!items.length) {
@@ -19422,6 +20362,7 @@ function renderTeacherLessonsModalList() {
     li.className = "list-item";
     const slides = Array.isArray(lesson.slides) ? lesson.slides : [];
     const isPublished = lesson.isPublished !== false;
+    const firstTitle = String(slides[0]?.title || "Yeni Slide");
     const assigned = allStudents.filter((s) => assignmentMatchesStudentFor(lesson, s)).length;
     let done = 0;
     lessonProgressMap.forEach((p) => {
@@ -19429,16 +20370,42 @@ function renderTeacherLessonsModalList() {
       const isDone = !!p.completed || Number(p.percent || 0) >= 100;
       if (isDone) done++;
     });
+    const total = Math.max(1, slides.length);
+    const completionPercent = assigned > 0 ? Math.round((done / Math.max(1, assigned)) * 100) : 0;
+    const getLessonPreviewImage = (row) => {
+      const rowSlides = Array.isArray(row?.slides) ? row.slides : [];
+      const fromSlide = rowSlides.find((s) => String(s?.imageUrl || "").trim().length > 0)?.imageUrl || "";
+      return String(row?.coverImage || row?.thumbnailUrl || row?.bgImage || fromSlide || "").trim();
+    };
+    const previewImage = getLessonPreviewImage(lesson);
+
+    li.style.cssText = "border-left:none;background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%);border:1px solid #dbeafe;border-radius:22px;box-shadow:0 14px 30px rgba(15,23,42,.10);padding:0;display:flex;flex-direction:column;gap:0;align-items:stretch;overflow:hidden;";
     li.innerHTML = `
-      <div>
-        <div style="font-weight:700;">${lesson.title || "Ders"}</div>
-        <small style="color:#64748b;">📘 ${slides.length} slayt • Hedef: ${lesson.targetClass || "Seçilmedi"}${lesson.targetSection ? "/" + lesson.targetSection : ""}</small>
+      <div style="position:relative;height:210px;background:#eef2ff;display:flex;align-items:center;justify-content:center;">
+        ${previewImage
+          ? `<img src="${previewImage}" alt="Ders görseli" style="width:100%;height:100%;object-fit:cover;">`
+          : `<div style="font-size:54px;opacity:.85;">📘</div>`
+        }
+        <div style="position:absolute;inset:0;background:linear-gradient(180deg,transparent 10%,rgba(15,23,42,.55) 100%);"></div>
+        <span style="position:absolute;left:12px;top:12px;padding:6px 10px;border-radius:999px;background:rgba(15,23,42,.72);color:#e2e8f0;font-size:12px;font-weight:700;">${Math.max(0, completionPercent)}% tamamlandı</span>
+        <span style="position:absolute;right:12px;bottom:12px;padding:8px 12px;border-radius:999px;background:#fbbf24;color:#422006;font-weight:800;">${Math.min(done, total)}/${total}</span>
       </div>
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
-        <span class="completion-badge" style="background:${isPublished ? "#dcfce7" : "#fff7ed"};color:${isPublished ? "#166534" : "#9a3412"};border-color:${isPublished ? "#86efac" : "#fdba74"};">${isPublished ? "Yayında" : "Taslak"}</span>
-        <span class="completion-badge">${done}/${assigned} tamamlama</span>
-        ${!isPublished ? `<button type="button" class="btn btn-primary btn-lesson-publish" style="padding:6px 10px;">Ödev Olarak Ver</button>` : ""}
-        <button type="button" class="btn" style="padding:6px 10px;background:#e2e8f0;" data-edit="1">Düzenle</button>
+      <div style="padding:14px 14px 16px;display:flex;flex-direction:column;gap:8px;min-height:190px;">
+        <div style="font-size:40px;font-weight:900;color:#1e293b;line-height:1.05;word-break:break-word;">${escapeHtmlBasic(String(lesson.title || "Ders"))}</div>
+        <div style="font-size:15px;color:#64748b;line-height:1.25;min-height:38px;">${escapeHtmlBasic(firstTitle)}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <span style="display:inline-flex;align-items:center;padding:5px 10px;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-weight:700;font-size:12px;">📑 ${total} slide</span>
+          <span style="display:inline-flex;align-items:center;padding:5px 10px;border-radius:999px;background:#ecfeff;color:#0e7490;font-weight:700;font-size:12px;">🎯 ${Math.max(0, completionPercent)}%</span>
+          <span style="display:inline-flex;align-items:center;padding:5px 10px;border-radius:999px;background:${isPublished ? "#dcfce7" : "#fff7ed"};color:${isPublished ? "#166534" : "#9a3412"};font-weight:700;font-size:12px;">${isPublished ? "Yayında" : "Taslak"}</span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <span class="completion-badge">${done}/${assigned} tamamlama</span>
+          <span style="display:inline-flex;align-items:center;padding:5px 10px;border-radius:999px;background:#f1f5f9;color:#334155;font-weight:700;font-size:12px;">Hedef: ${lesson.targetClass || "Seçilmedi"}${lesson.targetSection ? "/" + lesson.targetSection : ""}</span>
+        </div>
+        <div style="margin-top:auto;display:grid;grid-template-columns:repeat(${isPublished ? 1 : 2},minmax(0,1fr));gap:8px;">
+          ${!isPublished ? `<button type="button" class="btn btn-primary btn-lesson-publish" style="width:100%;padding:10px 12px;border-radius:12px;">Ödev Olarak Ver</button>` : ""}
+          <button type="button" class="btn" style="width:100%;padding:10px 12px;border-radius:12px;background:#e2e8f0;" data-edit="1">Düzenle</button>
+        </div>
       </div>
     `;
     li.querySelector('[data-edit="1"]')?.addEventListener("click", (ev) => {
@@ -21975,6 +22942,16 @@ async function downloadFilteredTeacherCertificatesPdf() {
 }
 
 function renderHomeOverviewStrip() {
+  const overviewStrip = document.getElementById("home-overview-strip");
+  const isMobileLike = window.matchMedia("(max-width: 1200px), (pointer: coarse)").matches;
+  if (overviewStrip) {
+    if (userRole === "teacher" || isMobileLike) {
+      overviewStrip.style.display = "none";
+    } else {
+      overviewStrip.style.display = "grid";
+    }
+  }
+
   const setText = (id, val) => {
     const el = document.getElementById(id);
     if (el) el.innerText = String(val);
@@ -24759,81 +25736,83 @@ async function loadReportsModal() {
       list.innerHTML = "<div class='empty-state'>Öğrenci bulunamadı.</div>";
       return;
     }
-    
+
     const classGroups = new Map();
     displayStudents.forEach(s => {
       const key = `${s.className || "-"}|${s.section || "-"}`;
       if (!classGroups.has(key)) classGroups.set(key, []);
       classGroups.get(key).push(s);
     });
-    
+
+    const userIds = displayStudents.map((s) => String(s.id || "")).filter(Boolean);
+    const idChunks = chunkArray(userIds, 10);
+
+    const completionTaskIdsByUser = new Map();
+    const progressRowsByUser = new Map();
+    const pushMapRow = (map, key, row) => {
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(row);
+    };
+
+    await Promise.all(idChunks.map(async (ch) => {
+      const [compSnap, progSnap] = await Promise.all([
+        getDocs(query(collection(db, "completions"), where("userId", "in", ch))),
+        getDocs(query(collection(db, "contentProgress"), where("userId", "in", ch)))
+      ]);
+      compSnap.forEach((docSnap) => {
+        const data = docSnap.data() || {};
+        const uid = String(data.userId || "");
+        if (!uid) return;
+        const taskId = String(data.taskId || "");
+        pushMapRow(completionTaskIdsByUser, uid, taskId);
+      });
+      progSnap.forEach((docSnap) => {
+        const p = docSnap.data() || {};
+        const uid = String(p.userId || "");
+        if (!uid) return;
+        const totalItems = Math.max(0, Number(p.totalItems || 0));
+        const completedItems = Array.isArray(p.completedItemIds) ? p.completedItemIds.length : 0;
+        let best = 0;
+        Object.values(p.appUsage || {}).forEach((u) => {
+          const val = Math.max(0, Math.min(100, Number(u?.percent || 0)));
+          if (val > best) best = val;
+        });
+        const hasDone = best > 0 || completedItems > 0 || totalItems > 0;
+        pushMapRow(progressRowsByUser, uid, { contentId: String(p.contentId || ""), hasDone });
+      });
+    }));
+
     for (const [key, group] of classGroups.entries()) {
       const [className, section] = key.split("|");
       const totalStudents = group.length;
       const classTasks = allTasks.filter((t) => !t?.isDeleted && taskMatchesStudentFor(t, { className, section }));
       const classTaskIds = new Set(classTasks.map((t) => String(t.id)));
       const totalTasksForClass = classTasks.length;
-      let completedTotal = 0;
-      const studentReportMap = new Map();
-      try {
-        await Promise.all(group.map(async (student) => {
-          const uid = String(student?.id || "");
-          if (!uid) return;
-          const snap = await getDoc(doc(db, "studentReports", uid));
-          if (!snap.exists()) return;
-          const data = snap.data() || {};
-          const percent = Number(data.completionPercent ?? data.completion_percent ?? 0);
-          if (Number.isFinite(percent)) {
-            studentReportMap.set(uid, Math.max(0, Math.min(100, percent)));
-          }
-        }));
-      } catch (e) {
-        console.warn("studentReports load failed:", e);
-      }
-      
-      const userIds = group.map(g => g.id);
-      const chunks = chunkArray(userIds, 10);
-      for (const ch of chunks) {
-        const compSnap = await getDocs(query(collection(db, "completions"), where("userId", "in", ch)));
-        compSnap.forEach((docSnap) => {
-          const data = docSnap.data() || {};
-          const taskId = String(data.taskId || "");
-          if (!classTaskIds.size || (taskId && classTaskIds.has(taskId))) {
-            completedTotal += 1;
-          }
-        });
-      }
-      
+
       const classAssignments = contentAssignments.filter(a => assignmentMatchesClass(a, className, section));
       const totalActivitiesForClass = classAssignments.length;
+      const assignedIds = new Set(classAssignments.map(a => String(a.contentId || "")));
+      let completedTotal = 0;
       let completedActivitiesTotal = 0;
-      if (userIds.length && totalActivitiesForClass) {
-        const assignedIds = new Set(classAssignments.map(a => a.contentId));
-        const chunks2 = chunkArray(userIds, 10);
-        for (const ch2 of chunks2) {
-          const progSnap = await getDocs(query(collection(db, "contentProgress"), where("userId", "in", ch2)));
-          progSnap.forEach((docSnap) => {
-            const p = docSnap.data();
-            if (!assignedIds.has(p.contentId)) return;
-            let best = 0;
-            Object.values(p.appUsage || {}).forEach((u) => {
-              const percent = u?.percent || 0;
-              if (percent > best) best = percent;
-            });
-            const done = best > 0 || (p.completedItemIds || []).length > 0;
-            if (done) completedActivitiesTotal++;
+      group.forEach((student) => {
+        const uid = String(student?.id || "");
+        const completionTaskIds = completionTaskIdsByUser.get(uid) || [];
+        completionTaskIds.forEach((taskId) => {
+          if (!classTaskIds.size || (taskId && classTaskIds.has(taskId))) completedTotal++;
+        });
+        if (assignedIds.size) {
+          const rows = progressRowsByUser.get(uid) || [];
+          rows.forEach((row) => {
+            if (row?.hasDone && assignedIds.has(String(row.contentId || ""))) completedActivitiesTotal++;
           });
         }
-      }
+      });
+
       const totalPossibleClass = (totalTasksForClass + totalActivitiesForClass) * totalStudents;
       const completedAll = completedTotal + completedActivitiesTotal;
-      let completionRate = totalPossibleClass > 0
+      const completionRate = totalPossibleClass > 0
         ? Math.round((completedAll / totalPossibleClass) * 100)
         : 0;
-      const reportPercents = Array.from(studentReportMap.values()).filter((v) => Number.isFinite(v));
-      if (reportPercents.length) {
-        completionRate = Math.round(reportPercents.reduce((a, b) => a + b, 0) / reportPercents.length);
-      }
       const cappedRate = Math.min(100, Math.max(0, completionRate));
       
       const row = document.createElement("div");
@@ -24864,7 +25843,7 @@ async function loadReportsModal() {
       };
       
       row.onclick = async () => {
-        openClassStudentsModal(className, section, group, totalTasksForClass, classTaskIds, studentReportMap);
+        openClassStudentsModal(className, section, group, totalTasksForClass, classTaskIds, new Map());
       };
       
       list.appendChild(row);
@@ -25230,7 +26209,7 @@ async function downloadClassPdf(className, section, students, completionRate) {
       <span style="font-size:12px;color:#6b7280;">${new Date().toLocaleDateString("tr-TR")}</span>
     </div>
     <div style="margin-bottom:10px;">
-      <strong>Sınıf/Åube:</strong> ${className}/${section} | <strong>Öğrenci:</strong> ${rows.length}
+      <strong>Sınıf/Şube:</strong> ${className}/${section} | <strong>Öğrenci:</strong> ${rows.length}
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-bottom:10px;">
       <div style="padding:10px;background:#f0f7ff;border-radius:8px;">
@@ -25347,12 +26326,19 @@ async function openAllStudentsReportPreview(className, section, students) {
       <style>
         body { margin: 0; padding: 16px; background:#f4f5f9; font-family: "Montserrat","Segoe UI",Tahoma,Arial,sans-serif; }
         .loading-overlay { position: fixed; inset: 0; display:flex; align-items:center; justify-content:center; background: rgba(255,255,255,0.9); z-index: 50; }
-        .loading-card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:14px 18px; box-shadow: 0 10px 24px rgba(0,0,0,0.12); font-weight:600; color:#1f2937; }
+        .loading-card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:14px 18px; box-shadow: 0 10px 24px rgba(0,0,0,0.12); font-weight:600; color:#1f2937; width:min(420px, calc(100vw - 40px)); }
+        .loading-progress-track { height:10px; border-radius:999px; background:#e2e8f0; overflow:hidden; margin-top:10px; }
+        .loading-progress-fill { height:100%; width:0%; background:linear-gradient(90deg,#22d3ee,#2563eb,#22c55e); transition:width .18s ease; }
+        .loading-progress-meta { margin-top:8px; font-size:12px; color:#475569; text-align:right; }
       </style>
     </head>
     <body>
       <div class="loading-overlay" id="loading-overlay">
-        <div class="loading-card">Raporlar hazırlanıyor...</div>
+        <div class="loading-card">
+          <div id="loading-message">Raporlar oluşturuluyor, lütfen bekleyin...</div>
+          <div class="loading-progress-track"><div id="loading-progress-fill" class="loading-progress-fill"></div></div>
+          <div id="loading-progress-meta" class="loading-progress-meta">%0 (0/${students.length})</div>
+        </div>
       </div>
       <div id="report-root"></div>
     </body>
@@ -25362,10 +26348,25 @@ async function openAllStudentsReportPreview(className, section, students) {
   const blocks = [];
   let sharedStyles = "";
   let failedCount = 0;
+  const setPreviewProgress = (done = 0, total = students.length, msg = "Raporlar hazırlanıyor...") => {
+    try {
+      const safeTotal = Math.max(1, Number(total || 1));
+      const safeDone = Math.max(0, Math.min(safeTotal, Number(done || 0)));
+      const percent = Math.max(0, Math.min(100, Math.round((safeDone / safeTotal) * 100)));
+      const fill = reportWindow.document.getElementById("loading-progress-fill");
+      const meta = reportWindow.document.getElementById("loading-progress-meta");
+      const text = reportWindow.document.getElementById("loading-message");
+      if (fill) fill.style.width = `${percent}%`;
+      if (meta) meta.textContent = `%${percent} (${safeDone}/${safeTotal})`;
+      if (text) text.textContent = msg;
+    } catch (e) {}
+  };
   suppressStudentDetailModal = true;
   try {
+    setPreviewProgress(0, students.length, "Raporlar hazırlanıyor, lütfen bekleyin...");
     for (let i = 0; i < students.length; i++) {
       const student = students[i];
+      setPreviewProgress(i, students.length, `${i + 1}/${students.length} öğrenci raporu hazırlanıyor...`);
       try {
         const completionsSnap = await getDocs(query(collection(db, "completions"), where("userId", "==", student.id)));
         const completions = [];
@@ -25389,6 +26390,7 @@ async function openAllStudentsReportPreview(className, section, students) {
         console.error("openAllStudentsReportPreview student error:", student?.id, err);
       }
     }
+    setPreviewProgress(students.length, students.length, "Raporlar hazırlandı.");
 
     const styleEl = reportWindow.document.createElement("style");
     styleEl.textContent = `

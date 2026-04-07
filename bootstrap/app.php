@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\AuthenticateClientApi;
+use App\Http\Middleware\ForceUtf8Headers;
 use App\Http\Middleware\SecureHeaders;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -14,6 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->append(ForceUtf8Headers::class);
         $middleware->append(SecureHeaders::class);
         $middleware->validateCsrfTokens(except: [
             'login',
