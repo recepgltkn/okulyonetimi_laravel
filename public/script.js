@@ -398,6 +398,8 @@ let myComputeChart = null;
 let myBlock3DChart = null;
 let myLessonChart = null;
 let myPythonQuizChart = null;
+let teacherStatsPieChart = null;
+let teacherStatsLineChart = null;
 let statsPageLoading = false;
 let statsPageQueued = false;
 let lastTaskXP = 0;
@@ -549,6 +551,11 @@ let latestKeyboardRaceAnnouncement = null;
 const joinedKeyboardRaceRooms = new Set();
 let shownNotificationIds = new Set();
 const SYSTEM_NOTIFICATIONS_COLLECTION = "systemNotifications";
+const WEB_PUSH_SUBSCRIPTIONS_COLLECTION = "webPushSubscriptions";
+const WEB_PUSH_BROADCASTS_COLLECTION = "webPushBroadcasts";
+const VAPID_PUBLIC_KEY = String(
+  document.querySelector('meta[name="web-push-vapid-public-key"]')?.content || ""
+).trim();
 let flowNodes = [];
 let flowEdges = [];
 let flowSelectedTool = "start";
@@ -684,8 +691,8 @@ function ensureLoginSceneRuntime() {
 
   // little robots / icons
   [
-    { t: "??", x: 12, y: 28 }, { t: "??", x: 83, y: 78 }, { t: "??", x: 45, y: 86 },
-    { t: "?", x: 78, y: 18 }, { t: "?", x: 56, y: 39 }, { t: "?", x: 12, y: 60 }, { t: "?", x: 91, y: 78 }
+    { t: "🤖", x: 12, y: 28 }, { t: "🧠", x: 83, y: 78 }, { t: "🧩", x: 45, y: 86 },
+    { t: "⭐", x: 78, y: 18 }, { t: "🎯", x: 56, y: 39 }, { t: "🚀", x: 12, y: 60 }, { t: "💡", x: 91, y: 78 }
   ].forEach((k, i) => {
     const el = make("div", {
       position: "absolute",
@@ -693,7 +700,7 @@ function ensureLoginSceneRuntime() {
       top: `${k.y}%`,
       transform: "translate(-50%, -50%)",
       color: "rgba(255,255,255,0.7)",
-      fontSize: k.t === "??" ? "26px" : "24px",
+      fontSize: k.t === "🤖" ? "26px" : "24px",
       lineHeight: "1"
     });
     el.textContent = k.t;
@@ -2017,13 +2024,7 @@ document.addEventListener('DOMContentLoaded', function(){
       window.open(appUrl("index.php/keyboard-race?role=teacher"), "_blank", "noopener,noreferrer");
     });
   }
-  const hubKeyboardRaceReportBtn = document.getElementById('btn-apps-hub-keyboard-race-report');
-  if (hubKeyboardRaceReportBtn) {
-    hubKeyboardRaceReportBtn.addEventListener('click', () => {
-      if (userRole !== "teacher") return;
-      openKeyboardRaceReportPrompt().catch((e) => alert(e?.message || "Rapor alınamadı."));
-    });
-  }
+  // Keyboard race report button removed from apps hub card by design.
 });
 
 function buildKeyboardRaceReportHtml(report) {
@@ -2384,12 +2385,138 @@ function getNotificationPermissionState() {
   return String(Notification.permission || "default");
 }
 
+function isIosDevice() {
+  const ua = String(navigator.userAgent || "").toLowerCase();
+  return /iphone|ipad|ipod/.test(ua);
+}
+
+function isStandalonePwa() {
+  try {
+    return !!(
+      (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches)
+      || window.navigator.standalone === true
+    );
+  } catch {
+    return false;
+  }
+}
+
+function getWebPushSupportState() {
+  if (!window.isSecureContext) return { ok: false, reason: "secure-context-required" };
+  if (!("serviceWorker" in navigator)) return { ok: false, reason: "no-service-worker" };
+  if (!("PushManager" in window)) return { ok: false, reason: "no-push-manager" };
+  if (!("Notification" in window)) return { ok: false, reason: "no-notification-api" };
+  if (isIosDevice() && !isStandalonePwa()) return { ok: false, reason: "ios-needs-pwa-install" };
+  return { ok: true, reason: "supported" };
+}
+
+function getWebPushSupportText() {
+  const state = getWebPushSupportState();
+  if (state.ok) return "Push desteği hazır.";
+  if (state.reason === "secure-context-required") return "Push için HTTPS zorunlu.";
+  if (state.reason === "ios-needs-pwa-install") return "iOS için uygulamayı Ana Ekrana ekleyip oradan açın.";
+  if (state.reason === "no-service-worker") return "Service Worker desteği yok.";
+  if (state.reason === "no-push-manager") return "Push API bu tarayıcıda desteklenmiyor.";
+  if (state.reason === "no-notification-api") return "Bildirim API desteği yok.";
+  return "Push desteği sınırlı.";
+}
+
+function toUint8ArrayFromBase64(base64String = "") {
+  const input = String(base64String || "").trim();
+  if (!input) return null;
+  const padding = "=".repeat((4 - (input.length % 4)) % 4);
+  const base64 = (input + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(base64);
+  const output = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) output[i] = raw.charCodeAt(i);
+  return output;
+}
+
+function extractPushSubscriptionKeys(subscription = null) {
+  try {
+    const json = subscription?.toJSON?.() || {};
+    if (json?.keys?.p256dh || json?.keys?.auth) return json.keys;
+  } catch {}
+  try {
+    const p256dhRaw = subscription?.getKey?.("p256dh");
+    const authRaw = subscription?.getKey?.("auth");
+    const toB64 = (arrBuf) => {
+      if (!arrBuf) return "";
+      const arr = new Uint8Array(arrBuf);
+      let s = "";
+      for (let i = 0; i < arr.length; i++) s += String.fromCharCode(arr[i]);
+      return btoa(s);
+    };
+    return { p256dh: toB64(p256dhRaw), auth: toB64(authRaw) };
+  } catch {
+    return { p256dh: "", auth: "" };
+  }
+}
+
+async function saveWebPushSubscription(subscription = null) {
+  if (!subscription || !currentUserId) return false;
+  try {
+    const keys = extractPushSubscriptionKeys(subscription);
+    const endpoint = String(subscription.endpoint || "").trim();
+    if (!endpoint) return false;
+    const docId = endpoint.replace(/[^a-zA-Z0-9_-]/g, "_").slice(-180);
+    await setDoc(doc(db, WEB_PUSH_SUBSCRIPTIONS_COLLECTION, docId), {
+      userId: String(currentUserId || ""),
+      role: String(userRole || ""),
+      userName: getUserDisplayName(userData || {}) || String(userData?.username || ""),
+      endpoint,
+      keys: {
+        p256dh: String(keys?.p256dh || ""),
+        auth: String(keys?.auth || "")
+      },
+      ua: String(navigator.userAgent || ""),
+      platform: String(navigator.platform || ""),
+      language: String(navigator.language || ""),
+      appBaseUrl: APP_BASE_URL,
+      active: true,
+      updatedAt: serverTimestamp(),
+      createdAt: serverTimestamp()
+    }, { merge: true });
+    return true;
+  } catch (e) {
+    console.warn("saveWebPushSubscription failed", e);
+    return false;
+  }
+}
+
+async function ensureWebPushSubscription() {
+  const support = getWebPushSupportState();
+  if (!support.ok) return { ok: false, reason: support.reason };
+  if (getNotificationPermissionState() !== "granted") return { ok: false, reason: "permission-required" };
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    let subscription = await registration.pushManager.getSubscription();
+    if (!subscription) {
+      const options = { userVisibleOnly: true };
+      const key = toUint8ArrayFromBase64(VAPID_PUBLIC_KEY);
+      if (key) options.applicationServerKey = key;
+      subscription = await registration.pushManager.subscribe(options);
+    }
+    const saved = await saveWebPushSubscription(subscription);
+    return { ok: !!subscription && saved, reason: saved ? "subscribed" : "save-failed" };
+  } catch (e) {
+    console.warn("ensureWebPushSubscription failed", e);
+    return { ok: false, reason: "subscribe-failed", error: e };
+  }
+}
+
 function updateNotificationsPermissionLabel() {
   const el = document.getElementById("notifications-permission-state");
   if (!el) return;
+  const support = getWebPushSupportState();
+  if (!support.ok) {
+    el.textContent = getWebPushSupportText();
+    el.style.color = "#b45309";
+    return;
+  }
   const state = getNotificationPermissionState();
   if (state === "granted") {
-    el.textContent = "Bildirim izni açık.";
+    el.textContent = "Bildirim izni açık. Push hazır.";
     el.style.color = "#166534";
     return;
   }
@@ -2408,6 +2535,13 @@ function updateNotificationsPermissionLabel() {
 }
 
 async function ensureNotificationPermission() {
+  const support = getWebPushSupportState();
+  if (!support.ok) {
+    const txt = getWebPushSupportText();
+    showNotice(txt, "#f39c12");
+    updateNotificationsPermissionLabel();
+    return false;
+  }
   if (!("Notification" in window)) {
     showNotice("Bu tarayıcı bildirim desteklemiyor.", "#f39c12");
     updateNotificationsPermissionLabel();
@@ -2424,6 +2558,8 @@ async function ensureNotificationPermission() {
     return false;
   }
   showNotice("Bildirim izni açıldı.", "#2ecc71");
+  await ensureWebPushSubscription();
+  updateNotificationsPermissionLabel();
   return true;
 }
 
@@ -2462,18 +2598,33 @@ async function showSystemNotification(payload = {}) {
   const normalized = normalizeNotificationDoc(payload);
   if (getNotificationPermissionState() !== "granted") return false;
   try {
-    const registration = await navigator.serviceWorker.ready;
-    if (registration.showNotification) {
-      await registration.showNotification(normalized.title, {
+    if ("serviceWorker" in navigator) {
+      const registration = await navigator.serviceWorker.ready;
+      if (registration?.showNotification) {
+        await registration.showNotification(normalized.title, {
+          body: normalized.body,
+          tag: normalized.id || `system-notification-${Date.now()}`,
+          renotify: true,
+          icon: appUrl("logo192.png"),
+          badge: appUrl("logo192.png"),
+          data: { url: normalized.url },
+        });
+        return true;
+      }
+    }
+    if ("Notification" in window) {
+      const n = new Notification(normalized.title, {
         body: normalized.body,
-        tag: normalized.id || `system-notification-${Date.now()}`,
-        renotify: true,
         icon: appUrl("logo192.png"),
         badge: appUrl("logo192.png"),
-        data: { url: normalized.url },
+        tag: normalized.id || `system-notification-${Date.now()}`
       });
+      n.onclick = () => {
+        try { window.open(normalized.url, "_blank"); } catch {}
+      };
+      return true;
     }
-    return true;
+    return false;
   } catch (e) {
     console.warn("showSystemNotification", e);
     return false;
@@ -3185,6 +3336,7 @@ window.showPage = function(page) {
     return;
   }
   if (page === "home") {
+    document.body?.classList?.remove("teacher-lessons-modal-open");
     const app = document.getElementById("app-screen");
     if (app) app.style.display = "grid";
     const isTeacher = getStrictUserRole(userRole) === "teacher" || isSystemAdminUser(userData);
@@ -3196,8 +3348,13 @@ window.showPage = function(page) {
     setDisp("student-homework-shell", "block");
     setDisp("student-apps-shell", isTeacher ? "" : "block");
     setDisp("leaderboard-section", isTeacher ? "none" : "block");
-    setDisp("quiz-section", isTeacher ? "block" : "none");
+    setDisp("quiz-section", "none");
     setDisp("lessons-section", isTeacher ? "flex" : "none");
+    if (isTeacher && typeof switchTeacherHomeTab === "function") {
+      const activeBtn = document.querySelector("#teacher-home-tabs .tab-btn.active");
+      const activeTab = String(activeBtn?.dataset?.homeTab || "tasks").toLowerCase();
+      switchTeacherHomeTab(activeTab || "tasks");
+    }
   }
 };
 
@@ -7967,6 +8124,7 @@ function ensureTeacherSectionsIntegratedIntoBlock() {
 }
 
 window.switchTeacherHomeTab = function(tabName) {
+  document.body?.classList?.remove("teacher-lessons-modal-open");
   const type = String(tabName || "tasks").toLowerCase();
   document.querySelectorAll("#teacher-home-tabs .tab-btn").forEach((btn) => {
     const btnType = String(btn.dataset.homeTab || "").toLowerCase();
@@ -10127,6 +10285,63 @@ function renderTeacherStatsList(targetId, rows = [], formatter) {
   `).join("");
 }
 
+function renderTeacherStatisticsCharts(statRows = [], classRows = []) {
+  if (typeof Chart === "undefined") return;
+  const pieCanvas = document.getElementById("tstats-pie-chart");
+  const lineCanvas = document.getElementById("tstats-line-chart");
+  if (!pieCanvas || !lineCanvas) return;
+
+  const high = statRows.filter((r) => Number(r.completionRate || 0) >= 70).length;
+  const mid = statRows.filter((r) => Number(r.completionRate || 0) >= 35 && Number(r.completionRate || 0) < 70).length;
+  const low = statRows.filter((r) => Number(r.completionRate || 0) > 0 && Number(r.completionRate || 0) < 35).length;
+  const inactive = statRows.filter((r) => Number(r.activeScore || 0) <= 0).length;
+
+  if (teacherStatsPieChart) {
+    try { teacherStatsPieChart.destroy(); } catch {}
+    teacherStatsPieChart = null;
+  }
+  if (teacherStatsLineChart) {
+    try { teacherStatsLineChart.destroy(); } catch {}
+    teacherStatsLineChart = null;
+  }
+
+  teacherStatsPieChart = new Chart(pieCanvas, {
+    type: "pie",
+    data: {
+      labels: ["Yüksek Başarı", "Orta Başarı", "Riskli", "Pasif"],
+      datasets: [{
+        data: [high, mid, low, inactive],
+        backgroundColor: ["#22c55e", "#38bdf8", "#f59e0b", "#ef4444"],
+        borderColor: "#ffffff",
+        borderWidth: 2
+      }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "bottom" } } }
+  });
+
+  teacherStatsLineChart = new Chart(lineCanvas, {
+    type: "line",
+    data: {
+      labels: classRows.map((r) => String(r.key || "-")),
+      datasets: [{
+        label: "Ort. Tamamlama (%)",
+        data: classRows.map((r) => Number(r.avg || 0)),
+        fill: true,
+        tension: 0.3,
+        borderColor: "#2563eb",
+        backgroundColor: "rgba(37,99,235,0.18)",
+        pointRadius: 4,
+        pointBackgroundColor: "#1d4ed8"
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: { y: { min: 0, max: 100, ticks: { callback: (v) => `%${v}` } } }
+    }
+  });
+}
+
 async function loadTeacherStatisticsPage() {
   const isTeacher = getStrictUserRole(userRole) === "teacher" || isSystemAdminUser(userData);
   if (!isTeacher) return;
@@ -10243,6 +10458,7 @@ async function loadTeacherStatisticsPage() {
       const avgXp = rows.length ? Math.round(rows.reduce((acc, r) => acc + r.xp, 0) / rows.length) : 0;
       return { key, avg, avgXp, count: rows.length, score: avg };
     }).sort((a, b) => b.avg - a.avg);
+    renderTeacherStatisticsCharts(statRows, classRows);
     classSummaryBox.innerHTML = classRows.length ? classRows.map((row) => `
       <div class="list-item" style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
         <div>
@@ -12806,12 +13022,20 @@ document.getElementById("btn-close-notifications")?.addEventListener("click", fu
 });
 
 document.getElementById("btn-enable-notifications")?.addEventListener("click", async function() {
-  await ensureNotificationPermission();
+  const ok = await ensureNotificationPermission();
+  if (!ok) return;
+  const sub = await ensureWebPushSubscription();
+  if (!sub.ok) {
+    showNotice("Bildirim izni açıldı ancak push aboneliği kurulamadı.", "#f39c12");
+    return;
+  }
+  showNotice("Bildirim izni ve push aboneliği aktif.", "#2ecc71");
 });
 
 document.getElementById("btn-test-notification")?.addEventListener("click", async function() {
   const ok = await ensureNotificationPermission();
   if (!ok) return;
+  await ensureWebPushSubscription();
   await showSystemNotification({
     id: `test-${Date.now()}`,
     title: "Test Bildirimi",
@@ -12830,6 +13054,10 @@ document.getElementById("btn-send-notification")?.addEventListener("click", asyn
     return;
   }
   try {
+    const support = getWebPushSupportState();
+    if (support.ok && getNotificationPermissionState() === "granted") {
+      await ensureWebPushSubscription();
+    }
     const payload = {
       title,
       body,
@@ -12841,6 +13069,13 @@ document.getElementById("btn-send-notification")?.addEventListener("click", asyn
       status: "active",
     };
     const ref = await addDoc(collection(db, SYSTEM_NOTIFICATIONS_COLLECTION), payload);
+    await addDoc(collection(db, WEB_PUSH_BROADCASTS_COLLECTION), {
+      ...payload,
+      notificationId: String(ref?.id || ""),
+      channel: "webpush",
+      deliveryScope: "all-subscribers",
+      queuedAt: serverTimestamp()
+    });
     await showSystemNotification({ id: String(ref?.id || ""), ...payload, createdAt: new Date() });
     shownNotificationIds.add(String(ref?.id || ""));
     persistSeenNotificationIds();
@@ -14341,6 +14576,9 @@ onAuthStateChanged(auth, (user) => {
     notificationSessionStartedAt = Date.now();
     loadSeenNotificationIds();
     updateNotificationsPermissionLabel();
+    if (getNotificationPermissionState() === "granted") {
+      try { await ensureWebPushSubscription(); } catch {}
+    }
     startNotificationPolling();
     if (userRole === "student") {
       startKeyboardRaceAnnouncementPolling();
@@ -15333,7 +15571,7 @@ async function doPasswordlessLoginAfterWin() {
     const overlay = document.createElement("div");
     overlay.id = "mini-game-login-overlay";
     overlay.style.cssText = "position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,0.45);backdrop-filter:blur(2px);z-index:32000;";
-    overlay.innerHTML = '<div style="background:#fff;border:1px solid #dbe5f4;border-radius:14px;padding:16px 20px;font-weight:700;color:#0f172a;box-shadow:0 12px 26px rgba(0,0,0,0.2);">? Oyun tamamlandı. Giriş yapılıyor...</div>';
+    overlay.innerHTML = '<div style="background:#fff;border:1px solid #dbe5f4;border-radius:14px;padding:16px 20px;font-weight:700;color:#0f172a;box-shadow:0 12px 26px rgba(0,0,0,0.2);">🎉 Oyun tamamlandı. Giriş yapılıyor...</div>';
     document.body.appendChild(overlay);
     await new Promise((r) => setTimeout(r, 2000));
     overlay.remove();
@@ -15364,7 +15602,7 @@ async function doPasswordlessLoginAfterWin() {
     const ready = await waitForAuthReady(12000);
     if (!ready) restoreLoginButtonState();
   } catch (err) {
-    showNotice("Åifresiz giriş başarısız: " + (err?.message || "Giriş hatası"), "#e74c3c");
+    showNotice("Şifresiz giriş başarısız: " + (err?.message || "Giriş hatası"), "#e74c3c");
   } finally {
     const stillOnLogin = !!loginScreen && !loginScreen.classList.contains("hidden");
     if (loginBtn && stillOnLogin) {
@@ -15542,7 +15780,7 @@ function initLoginMiniGame() {
       if (s.taken) return;
       ctx.fillStyle = "#f59e0b";
       ctx.font = "bold 22px Arial";
-      ctx.fillText("?", s.x, s.y + 16);
+      ctx.fillText("⭐", s.x, s.y + 16);
       const hit = collides(hero, { x: s.x - 2, y: s.y - 2, w: s.w + 4, h: s.h + 4 });
       if (hit) {
         s.taken = true;
@@ -15563,10 +15801,10 @@ function initLoginMiniGame() {
     };
     if (collides(hero, goalHitbox) && !miniGameWon) {
       if (starCount < 3) {
-        if (miniGameStatus) miniGameStatus.textContent = `Yıldız: ${starCount}/3 â€¢ Önce tüm yıldızları topla`;
+        if (miniGameStatus) miniGameStatus.textContent = `Yıldız: ${starCount}/3 • Önce tüm yıldızları topla`;
       } else {
         miniGameWon = true;
-        if (miniGameStatus) miniGameStatus.textContent = "Başarılı! Åifresiz giriş yapılıyor...";
+        if (miniGameStatus) miniGameStatus.textContent = "Başarılı! Şifresiz giriş yapılıyor...";
         stopMiniGameLoop();
         if (miniGameModal) miniGameModal.style.display = "none";
         doPasswordlessLoginAfterWin();
@@ -17203,7 +17441,7 @@ function renderLoginCardsModal() {
         <article class="login-card-item">
           <span class="login-card-accent" aria-hidden="true"></span>
           <div class="login-card-head">
-            <img src="${appUrl("logo.png")}" alt="Logo" class="login-card-logo">
+            <img src="${appUrl("public/logo.png")}" alt="Logo" class="login-card-logo">
             <div class="login-card-title-row" style="flex:1;">
               <div class="login-card-title">
                 <span class="name">${escapeHtmlBasic(name)}</span>
@@ -17267,7 +17505,7 @@ function openLoginCardsPrintPreview() {
         <article class="print-login-card">
           <span class="print-accent" aria-hidden="true"></span>
           <div class="print-head">
-            <img src="${appUrl("logo.png")}" alt="Logo" class="print-logo">
+            <img src="${appUrl("public/logo.png")}" alt="Logo" class="print-logo">
             <div class="print-title-row">
               <div class="print-title">
                 <span class="print-name">${name}</span>
@@ -17287,7 +17525,7 @@ function openLoginCardsPrintPreview() {
         </article>
       `;
     }).join("");
-    return `<section class="print-sheet"><div class="print-header"><img src="${appUrl("logo.png")}" alt="Logo" class="center-logo"></div>${cards}</section>`;
+    return `<section class="print-sheet"><div class="print-header"><img src="${appUrl("public/logo.png")}" alt="Logo" class="center-logo"></div>${cards}</section>`;
   }).join("");
 
   const w = window.open("", "_blank");
@@ -22518,20 +22756,53 @@ function buildCertificatePageHtml(page) {
     <section class="cert-page">
       <div class="cert-card">
         <div class="cert-frame">
-          <img src="${appUrl("logo.png")}" alt="Logo" class="cert-logo" />
-          <div class="cert-badge">?</div>
-          <h1 class="cert-title">BAÅARI SERTİFİKASI</h1>
-          <div class="cert-name">${fullName}</div>
-          <p class="cert-text">${awardText}</p>
-          <div class="cert-meta">
-            <div class="cert-meta-item"><span class="k">Sınıf / Åube</span><span class="v">${cls} / ${sec}</span></div>
-            <div class="cert-meta-item"><span class="k">Toplam XP</span><span class="v">${xp} XP</span></div>
-            <div class="cert-meta-item"><span class="k">Tamamlama</span><span class="v">%${completionRate} (${completed}/${total})</span></div>
-            <div class="cert-meta-item"><span class="k">Veriliş Tarihi</span><span class="v">${issuedAt}</span></div>
+          <div class="cert-top-glow"></div>
+          <div class="cert-head">
+            <img src="${appUrl("public/logo.png")}" alt="Logo" class="cert-logo" />
+            <div class="cert-head-right">
+              <div class="cert-chip">Öğrenci Akademi</div>
+              <h1 class="cert-title">Başarı Sertifikası</h1>
+              <div class="cert-sub">Bu belge öğrencinin dönem içi akademik ilerlemesini onaylar.</div>
+            </div>
           </div>
+
+          <div class="cert-name-block">
+            <div class="cert-name-label">Sertifika Sahibi</div>
+            <div class="cert-name">${fullName}</div>
+          </div>
+
+          <p class="cert-text">${awardText}</p>
+
+          <div class="cert-meta">
+            <div class="cert-meta-item">
+              <span class="k">Sınıf / Şube</span>
+              <span class="v">${cls} / ${sec}</span>
+            </div>
+            <div class="cert-meta-item">
+              <span class="k">Toplam XP</span>
+              <span class="v">${xp} XP</span>
+            </div>
+            <div class="cert-meta-item">
+              <span class="k">Tamamlama</span>
+              <span class="v">%${completionRate} (${completed}/${total})</span>
+            </div>
+            <div class="cert-meta-item">
+              <span class="k">Veriliş Tarihi</span>
+              <span class="v">${issuedAt}</span>
+            </div>
+          </div>
+
           <div class="cert-signatures">
-            <div class="sig-box"><div class="line"></div><div class="label">Ders Öğretmeni</div><div class="name">${teacherName}</div></div>
-            <div class="sig-box"><div class="line"></div><div class="label">Okul Müdürü</div><div class="name">${principalName}</div></div>
+            <div class="sig-box">
+              <div class="line"></div>
+              <div class="label">Ders Öğretmeni</div>
+              <div class="name">${teacherName}</div>
+            </div>
+            <div class="sig-box">
+              <div class="line"></div>
+              <div class="label">Okul Müdürü</div>
+              <div class="name">${principalName}</div>
+            </div>
           </div>
         </div>
       </div>
@@ -22541,46 +22812,49 @@ function buildCertificatePageHtml(page) {
 
 function getCertificatePreviewStyles() {
   return `
-    :root { --ink:#0f355d; --muted:#374151; --blue:#0f4c81; --blue-soft:#f6f9fc; --bg:#eef4fb; }
+    :root { --ink:#1e1b4b; --muted:#475569; --violet:#5b21b6; --violet-soft:#ede9fe; --bg:#eef2ff; }
     * { box-sizing: border-box; }
-    body { margin:0; padding:16px; background:var(--bg); font-family:"Montserrat","Segoe UI",Tahoma,Arial,sans-serif; color:var(--ink); }
-    .toolbar { position: sticky; top: 0; z-index: 20; display:flex; justify-content:flex-end; gap:8px; margin:0 auto 12px; max-width:1200px; background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; padding:10px; box-shadow:0 8px 20px rgba(2,6,23,0.08); }
+    body { margin:0; padding:16px; background:var(--bg); font-family:"Poppins","Segoe UI",Tahoma,Arial,sans-serif; color:var(--ink); }
+    .toolbar { position: sticky; top: 0; z-index: 20; display:flex; justify-content:flex-end; gap:8px; margin:0 auto 12px; max-width:1200px; background:#ffffff; border:1px solid #ddd6fe; border-radius:14px; padding:10px; box-shadow:0 8px 20px rgba(30,27,75,0.08); }
     .btn { border:none; border-radius:10px; padding:10px 14px; font-weight:700; cursor:pointer; }
-    .btn-primary { background:#0f4c81; color:#fff; }
+    .btn-primary { background:linear-gradient(135deg,#4c1d95,#6d28d9); color:#fff; }
     .btn-danger { background:#dc2626; color:#fff; }
     .cert-page { page-break-after: always; max-width:1200px; margin:0 auto 14px; }
-    .cert-card { background:#ffffff; border-radius:16px; border:1px solid #d2dcea; box-shadow:0 12px 30px rgba(15,23,42,0.1); padding:14px; }
+    .cert-card { background:#ffffff; border-radius:20px; border:1px solid #ddd6fe; box-shadow:0 16px 34px rgba(30,27,75,0.14); padding:14px; }
     .cert-frame {
       position: relative;
       overflow: hidden;
       min-height: 760px;
-      border-radius: 24px;
-      border: 1px solid #c9d9e8;
+      border-radius: 20px;
+      border: 1px solid #c4b5fd;
       background:
-        radial-gradient(circle at 10% 12%, rgba(30, 64, 175, 0.08), transparent 38%),
-        radial-gradient(circle at 90% 88%, rgba(3, 105, 161, 0.09), transparent 40%),
+        radial-gradient(circle at 15% 12%, rgba(139, 92, 246, 0.18), transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(99, 102, 241, 0.16), transparent 40%),
         #ffffff;
-      padding: 42px 44px 34px;
-      text-align: center;
-      display:flex; flex-direction:column; justify-content:flex-start; align-items:center;
-      gap:12px;
+      padding: 38px 38px 30px;
+      display:flex; flex-direction:column; gap:14px;
     }
-    .cert-frame::before { content:""; position:absolute; inset:20px; border:2px solid #0f4c81; border-radius:14px; pointer-events:none; }
-    .cert-frame::after { content:""; position:absolute; inset:33px; border:1px solid rgba(15, 76, 129, 0.22); border-radius:10px; pointer-events:none; }
-    .cert-badge { width:88px; height:88px; border-radius:999px; border:3px solid #d4af37; background:radial-gradient(circle at 30% 30%, #fff7d2 0%, #e8b84e 72%); display:grid; place-items:center; color:#6f4b00; font-size:40px; box-shadow:0 8px 20px rgba(111, 75, 0, 0.2); margin-top:4px; }
-    .cert-logo { width:188px; height:auto; margin-top:4px; margin-bottom:0; filter:drop-shadow(0 4px 10px rgba(15, 23, 42, 0.15)); }
-    .cert-title { margin:0; font-family:"Cinzel","Times New Roman",Georgia,serif; font-size:54px; letter-spacing:0.08em; text-transform:uppercase; color:#0f355d; font-weight:700; }
-    .cert-name { margin:0; font-family:"Brush Script MT","Segoe Script","Times New Roman",Georgia,serif; font-size:68px; line-height:1.1; color:#0b5fa0; font-weight:700; padding:0 16px 10px; border-bottom:2px solid rgba(11, 95, 160, 0.35); }
-    .cert-text { margin:0; max-width:920px; font-size:20px; line-height:1.75; color:#374151; }
-    .cert-meta { margin-top:6px; width:100%; display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:12px; }
-    .cert-meta-item { border:1px solid #d1dbe7; background:linear-gradient(180deg, #ffffff 0%, #f6f9fc 100%); border-radius:10px; padding:10px 8px; display:flex; flex-direction:column; gap:4px; }
-    .cert-meta-item .k { font-size:11px; letter-spacing:0.09em; text-transform:uppercase; color:#1d4f7a; font-weight:700; }
-    .cert-meta-item .v { font-size:16px; color:#0f355d; font-weight:700; }
+    .cert-frame::before { content:""; position:absolute; inset:16px; border:1.5px solid rgba(76,29,149,.35); border-radius:14px; pointer-events:none; }
+    .cert-top-glow { position:absolute; top:-120px; right:-80px; width:320px; height:320px; border-radius:50%; background:radial-gradient(circle, rgba(99,102,241,.26), rgba(255,255,255,0)); pointer-events:none; }
+    .cert-head { display:flex; align-items:center; gap:18px; }
+    .cert-logo { width:118px; height:auto; filter:drop-shadow(0 4px 10px rgba(76,29,149,.2)); }
+    .cert-chip { display:inline-flex; padding:6px 10px; border-radius:999px; background:var(--violet-soft); color:#4c1d95; font-size:12px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; }
+    .cert-head-right { display:flex; flex-direction:column; gap:6px; }
+    .cert-title { margin:0; font-family:"Unbounded","Poppins",sans-serif; font-size:38px; line-height:1.1; color:#2e1065; letter-spacing:.01em; }
+    .cert-sub { color:#64748b; font-size:14px; }
+    .cert-name-block { margin-top:4px; padding:14px 16px; border-radius:14px; border:1px solid #ddd6fe; background:linear-gradient(180deg,#faf5ff,#f5f3ff); }
+    .cert-name-label { font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:#6d28d9; font-weight:700; margin-bottom:4px; }
+    .cert-name { font-family:"Cinzel","Georgia",serif; font-size:44px; color:#312e81; font-weight:700; line-height:1.15; }
+    .cert-text { margin:0; font-size:18px; line-height:1.7; color:#334155; }
+    .cert-meta { margin-top:4px; width:100%; display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:12px; }
+    .cert-meta-item { border:1px solid #ddd6fe; background:linear-gradient(180deg, #ffffff 0%, #f5f3ff 100%); border-radius:12px; padding:12px 10px; display:flex; flex-direction:column; gap:4px; }
+    .cert-meta-item .k { font-size:11px; letter-spacing:0.09em; text-transform:uppercase; color:#6d28d9; font-weight:700; }
+    .cert-meta-item .v { font-size:16px; color:#1e1b4b; font-weight:700; }
     .cert-signatures { width:100%; display:grid; grid-template-columns:1fr 1fr; gap:30px; margin-top:8px; }
     .sig-box { display:flex; flex-direction:column; align-items:center; gap:6px; }
-    .sig-box .line { width:78%; border-bottom:1.7px solid #264f77; height:24px; }
-    .sig-box .label { font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:#1d4f7a; font-weight:700; }
-    .sig-box .name { font-size:16px; color:#0f355d; font-weight:700; }
+    .sig-box .line { width:78%; border-bottom:1.7px solid #5b21b6; height:24px; }
+    .sig-box .label { font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:#6d28d9; font-weight:700; }
+    .sig-box .name { font-size:16px; color:#312e81; font-weight:700; }
     @page { size: A4 landscape; margin: 10mm; }
     @media print {
       body { padding:0; background:#fff; }
@@ -22590,10 +22864,10 @@ function getCertificatePreviewStyles() {
       .cert-frame { min-height: 185mm; }
     }
     @media (max-width: 900px) {
-      .cert-badge { width:68px; height:68px; font-size:30px; }
-      .cert-logo { width:130px; }
-      .cert-title { font-size:34px; }
-      .cert-name { font-size:40px; }
+      .cert-head { flex-direction:column; align-items:flex-start; }
+      .cert-logo { width:90px; }
+      .cert-title { font-size:30px; }
+      .cert-name { font-size:34px; }
       .cert-text { font-size:16px; }
       .cert-meta { grid-template-columns: 1fr 1fr; }
     }

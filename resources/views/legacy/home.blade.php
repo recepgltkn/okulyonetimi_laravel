@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
     <meta name="app-base-url" content="{{ rtrim(request()->getSchemeAndHttpHost() . request()->getBaseUrl(), '/') }}">
+    <meta name="web-push-vapid-public-key" content="{{ env('WEB_PUSH_VAPID_PUBLIC_KEY', '') }}">
     <meta name="theme-color" content="#2563eb">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1979,7 +1980,6 @@
         /* Anasayfa kartlarını esnek tut */
         #tasks-section,
         #activities-section,
-        #quiz-section,
         #block-homework-section,
         #compute-homework-section,
         #lessons-section,
@@ -1988,6 +1988,9 @@
             display: flex;
             flex-direction: column;
             min-height: 0;
+        }
+        #app-screen.teacher-view #quiz-section {
+            display: none !important;
         }
         #student-homework-shell,
         #student-apps-shell {
@@ -3576,6 +3579,21 @@
         .tab-btn:focus-visible {
             outline: none;
             box-shadow: none;
+        }
+        #block-homework-assign-tabs {
+            border-bottom: 0 !important;
+            box-shadow: none !important;
+            outline: none !important;
+        }
+        #block-homework-assign-tabs::before,
+        #block-homework-assign-tabs::after {
+            content: none !important;
+            display: none !important;
+            border: 0 !important;
+            box-shadow: none !important;
+        }
+        #block-homework-assign-tabs .tab-btn {
+            border-bottom-width: 0 !important;
         }
         #block-homework-assign-tabs .tab-btn[data-assign-type="computeit"] {
             border-top: none !important;
@@ -8822,6 +8840,34 @@
             display: flex;
             flex-direction: column;
             gap: 12px;
+            position: relative;
+        }
+        .support-modal-header {
+            position: relative;
+            padding-right: 52px;
+            min-height: 40px;
+            display: flex;
+            align-items: center;
+        }
+        #btn-close-support-modal {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 36px;
+            height: 36px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            border: 1px solid #cbd5e1;
+            background: #f8fafc;
+            color: #334155;
+            font-size: 20px;
+            line-height: 1;
+            cursor: pointer;
+        }
+        #btn-close-support-modal:hover {
+            background: #eef2f7;
         }
         .support-top-grid {
             display: grid;
@@ -9046,6 +9092,9 @@
             margin: 0;
         }
         @media (max-width: 1180px) {
+            #teacher-statistics-charts {
+                grid-template-columns: 1fr !important;
+            }
             #teacher-statistics-grid {
                 grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
             }
@@ -9061,6 +9110,19 @@
         @media (max-width: 1200px) { .class-board-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
         @media (max-width: 860px) { .class-board-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
         @media (max-width: 540px) { .class-board-grid { grid-template-columns:1fr; } }
+        /* Force remove residual bottom line under block assign tabs */
+        #app-screen.teacher-view #block-homework-assign-tabs,
+        #app-screen.teacher-view #block-homework-assign-tabs.tabs {
+            border: 0 !important;
+            border-bottom: 0 !important;
+            box-shadow: none !important;
+            background-image: none !important;
+        }
+        #app-screen.teacher-view #block-homework-assign-tabs .tab-btn,
+        #app-screen.teacher-view #block-homework-assign-tabs .tab-btn.active {
+            border-bottom: 0 !important;
+            box-shadow: none !important;
+        }
     </style>
 </head>
 <body class="{{ !empty($studentPanelMode) ? 'student-panel-mode' : '' }}">
@@ -9180,8 +9242,7 @@
                     <img src="{{ url('public/quiz.png') }}" alt="Klavye Yarışması" class="apps-hub-card-image">
                     <h4>Klavye Yarışması</h4>
                     <p>Gerçek zamanlı oda aç, yarışı başlat ve canlı sıralamayı yönet.</p>
-                    <button id="btn-apps-hub-open-keyboard-race" class="btn btn-primary apps-hub-start-btn">Yarışı Başlat</button>
-                    <button id="btn-apps-hub-keyboard-race-report" class="btn apps-hub-start-btn" style="margin-top:8px; background:#e2e8f0; color:#0f172a;">Rapor Al (PDF)</button>
+                    <button id="btn-apps-hub-open-keyboard-race" class="btn btn-primary apps-hub-start-btn">Uygulamayı Başlat</button>
                 </article>
                 <article class="apps-hub-card">
                     <img src="{{ url('public/code-robot.png') }}" alt="Code Robot Lab" class="apps-hub-card-image">
@@ -10069,7 +10130,7 @@
                 </div>
             </div>
 
-            <div id="teacher-statistics-fullpage" class="card" style="display:none; position:fixed; inset:0; width:100vw; height:100vh; z-index:24010; margin:0; border-radius:0; box-shadow:none; flex-direction:column; background:radial-gradient(circle at 15% 10%, #dbeafe 0%, #eef2ff 35%, #f8fafc 70%, #f8fafc 100%); padding:18px 18px 14px; overflow:hidden;">
+            <div id="teacher-statistics-fullpage" class="card" style="display:none; position:fixed; inset:0; width:100vw; height:100vh; z-index:24010; margin:0; border-radius:0; box-shadow:none; flex-direction:column; background:radial-gradient(circle at 15% 10%, #dbeafe 0%, #eef2ff 35%, #f8fafc 70%, #f8fafc 100%); padding:18px 18px 14px; overflow:auto;">
                 <div style="position:relative; display:flex;justify-content:space-between;align-items:flex-start;gap:12px; margin-bottom:14px; padding:18px 20px; border-radius:24px; background:linear-gradient(135deg,#0f172a,#1d4ed8 45%,#22d3ee); box-shadow:0 14px 40px rgba(30,64,175,.28);">
                     <div>
                         <div style="font-size:12px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#bae6fd;">Öğrenci Verileri</div>
@@ -10085,7 +10146,17 @@
                     <div class="stat-card"><div class="stat-number" id="tstats-total-xp">0</div><div class="stat-label">Toplam XP</div></div>
                     <div class="stat-card"><div class="stat-number" id="tstats-risk-count">0</div><div class="stat-label">Riskli Öğrenci</div></div>
                 </div>
-                <div id="teacher-statistics-grid" style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; align-content:start; overflow:auto; padding-bottom:8px;">
+                <div id="teacher-statistics-charts" style="display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-bottom:12px;">
+                    <div class="card" style="margin:0; min-height:260px;">
+                        <h4 style="margin:0 0 8px 0;">Genel Durum (Pasta)</h4>
+                        <div style="height:210px;"><canvas id="tstats-pie-chart"></canvas></div>
+                    </div>
+                    <div class="card" style="margin:0; min-height:260px;">
+                        <h4 style="margin:0 0 8px 0;">Sınıf Bazlı Tamamlama (Çizgi)</h4>
+                        <div style="height:210px;"><canvas id="tstats-line-chart"></canvas></div>
+                    </div>
+                </div>
+                <div id="teacher-statistics-grid" style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; align-content:start; overflow:visible; padding-bottom:8px;">
                     <div class="card" style="margin:0;">
                         <h4 style="margin:0 0 8px 0;">En Başarılı 5</h4>
                         <div id="tstats-top-success" style="display:flex; flex-direction:column; gap:8px;"></div>
@@ -10995,20 +11066,20 @@ Ayşe, Yılmaz, ayse, 123456, 9, B"></textarea>
             <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; margin-bottom:12px;">
                 <div>
                     <h2 style="margin:0;">Bildirimler</h2>
-                    <div style="font-size:13px; color:#64748b;">Açık olan tüm sistem oturumlarına tarayıcı bildirimi gönderin.</div>
+                    <div style="font-size:13px; color:#64748b;">Chrome, Edge, Safari, Opera ve mobil cihazlar için web bildirimlerini yönetin.</div>
                 </div>
                 <button id="btn-close-notifications" class="btn" style="background:#e5e7eb;">Kapat</button>
             </div>
             <div style="display:grid; gap:10px;">
                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                    <button id="btn-enable-notifications" class="btn btn-primary" type="button">Bildirim İzni Aç</button>
+                    <button id="btn-enable-notifications" class="btn btn-primary" type="button">Bildirim + Push Aboneliği Aç</button>
                     <button id="btn-test-notification" class="btn" type="button" style="background:#eff6ff; color:#1d4ed8;">Test Bildirimi</button>
                     <span id="notifications-permission-state" style="align-self:center; font-size:13px; color:#475569;">İzin durumu kontrol ediliyor...</span>
                 </div>
                 <input id="notifications-title" class="form-control" type="text" maxlength="120" placeholder="Bildirim başlığı">
                 <textarea id="notifications-body" class="form-control" rows="4" maxlength="500" placeholder="Bildirim mesajı"></textarea>
                 <input id="notifications-link" class="form-control" type="text" maxlength="255" placeholder="Açılacak sayfa yolu (opsiyonel) örn: /v1-okul/okulyonetimi_laravel/">
-                <button id="btn-send-notification" class="btn btn-success" type="button">Tüm Açık Uygulamalara Gönder</button>
+                <button id="btn-send-notification" class="btn btn-success" type="button">Tüm Cihazlara Gönder (Açık Oturum + Push)</button>
                 <div style="margin-top:8px;">
                     <div style="font-weight:700; margin-bottom:8px;">Son Bildirimler</div>
                     <div id="notifications-history-list" style="max-height:280px; overflow:auto; border:1px solid #e5e7eb; border-radius:12px; padding:10px; background:#f8fafc;"></div>
@@ -11102,7 +11173,7 @@ Ayşe, Yılmaz, ayse, 123456, 9, B"></textarea>
 
     <div id="support-modal" class="modal-overlay" style="display:none; z-index:23030;">
         <div class="modal-content support-modal-shell">
-            <div class="modal-header" style="margin-bottom:0;">
+            <div class="modal-header support-modal-header" style="margin-bottom:0;">
                 <h2 style="margin:0;">Destek Paneli</h2>
                 <button id="btn-close-support-modal" class="close-btn">✕</button>
             </div>
