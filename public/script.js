@@ -804,7 +804,7 @@ function installZoomLock() {
 function maybeRepairMojibakeText(input) {
   const text = String(input ?? "");
   if (!text) return text;
-  const hasSuspicious = /[ÃÅâğÄÂ]/.test(text) || text.includes("\u009f");
+  const hasSuspicious = /[ÃÅâÄÂ]/.test(text) || text.includes("\u009f");
   if (!hasSuspicious) return text;
   try {
     const bytes = new Uint8Array(Array.from(text, (ch) => ch.charCodeAt(0) & 0xff));
@@ -812,7 +812,7 @@ function maybeRepairMojibakeText(input) {
     const score = (s) => {
       if (!s) return -999;
       let bad = 0;
-      bad += (s.match(/[ÃÅâğÄÂ]/g) || []).length * 3;
+      bad += (s.match(/[ÃÅâÄÂ]/g) || []).length * 3;
       bad += (s.match(/\uFFFD/g) || []).length * 4;
       bad += (s.match(/[\u0080-\u009f]/g) || []).length * 5;
       const good = (s.match(/[çğıöşüÇĞİÖŞÜ]/g) || []).length * 2;
