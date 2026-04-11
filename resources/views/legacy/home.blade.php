@@ -2917,6 +2917,26 @@
             width: 100%;
             justify-content: center;
         }
+        .sidebar-theme-toggle-slot {
+            width: 100%;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 2px;
+        }
+        @media (max-width: 768px) {
+            .sidebar-theme-toggle-slot {
+                display: flex;
+            }
+            .sidebar-theme-toggle-slot #theme-toggle-app {
+                width: 100%;
+                min-height: 42px;
+                border-radius: 12px;
+                display: inline-flex;
+                justify-content: center;
+                align-items: center;
+            }
+        }
         #side-menu.student-minimal #btn-toggle-tasks-menu,
         #side-menu.student-minimal #btn-toggle-add-menu,
         #side-menu.student-minimal #btn-toggle-apps-menu,
@@ -2931,6 +2951,7 @@
         #side-menu.student-minimal #btn-open-students,
         #side-menu.student-minimal #btn-open-classes,
         #side-menu.student-minimal #btn-open-reports,
+        #side-menu.student-minimal #btn-open-student-reports,
         #side-menu.student-minimal #btn-open-login-cards,
         #side-menu.student-minimal #btn-open-teacher-certificates,
         #side-menu.student-minimal #btn-open-block-runner-menu,
@@ -9167,6 +9188,7 @@
             <button id="btn-open-students" class="nav-btn submenu-item" style="display: none;">👥 Öğrencilerim</button>
             <button id="btn-open-classes" class="nav-btn submenu-item" style="display: none;">🏫 Sınıflarım</button>
             <button id="btn-open-reports" class="nav-btn submenu-item" style="display: none;">📈 İstatistikler</button>
+            <button id="btn-open-student-reports" class="nav-btn submenu-item" style="display: none;">🧾 Öğrenci Raporları</button>
             <button id="btn-open-login-cards" class="nav-btn submenu-item" style="display: none;">🪪 Giriş Kartları</button>
             <button id="btn-open-teacher-certificates" class="nav-btn submenu-item" style="display: none;">🎓 Sertifika Yönetimi</button>
             <button id="btn-open-student-boards" class="nav-btn submenu-item" style="display: none;">📌 Öğrenci Panoları</button>

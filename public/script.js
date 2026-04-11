@@ -3375,7 +3375,7 @@ window.showPage = function(page) {
     document.body?.classList?.remove("teacher-lessons-modal-open");
     const app = document.getElementById("app-screen");
     if (app) app.style.display = "grid";
-    const isTeacher = getStrictUserRole(userRole) === "teacher" || isSystemAdminUser(userData);
+    const isTeacher = isTeacherSession(userData, userRole);
     const setDisp = (id, val) => { const el = document.getElementById(id); if (el) el.style.display = val; };
     setDisp("home-overview-strip", "none");
     setDisp("student-stats-bar", isTeacher ? "none" : "block");
@@ -7483,6 +7483,10 @@ function getStrictUserRole(rawRole) {
   return "";
 }
 
+function isTeacherSession(profile = userData, role = userRole) {
+  return getStrictUserRole(role) === "teacher" || isSystemAdminUser(profile) || profile?.isTeacher === true;
+}
+
 function isProtectedUserAccount(row = {}) {
   const strictRole = getStrictUserRole(row?.role);
   if (strictRole === "teacher") return true;
@@ -10511,11 +10515,17 @@ async function loadTeacherStatisticsPage() {
 }
 
 document.getElementById("btn-open-reports").onclick = async function() {
-  if (userRole !== "teacher") return;
+  if (!isTeacherSession()) return;
   await loadTeacherStatisticsPage();
   showPage("teacher-statistics");
   document.getElementById("side-menu").style.width = "0";
 };
+document.getElementById("btn-open-student-reports")?.addEventListener("click", async function() {
+  if (!isTeacherSession()) return;
+  if (reportsModal) reportsModal.style.display = "flex";
+  await loadReportsModal();
+  document.getElementById("side-menu").style.width = "0";
+});
 
 document.getElementById("btn-open-notifications")?.addEventListener("click", function() {
   if (userRole !== "teacher") return;
@@ -14431,6 +14441,8 @@ onAuthStateChanged(auth, (user) => {
     if (tasksBtn) tasksBtn.style.display = "none";
     const reportsBtn = document.getElementById("btn-open-reports");
     if (reportsBtn) reportsBtn.style.display = "none";
+    const studentReportsBtn = document.getElementById("btn-open-student-reports");
+    if (studentReportsBtn) studentReportsBtn.style.display = "none";
     const loginCardsBtn = document.getElementById("btn-open-login-cards");
     if (loginCardsBtn) loginCardsBtn.style.display = "none";
     const notificationsBtn = document.getElementById("btn-open-notifications");
@@ -14638,6 +14650,7 @@ onAuthStateChanged(auth, (user) => {
     renderTeacherWorkspaceHero();
     renderStudentAdventureBoard();
     syncMobileOpenMenuPlacement();
+    syncMobileThemeTogglePlacement();
 
     const isTeacher = getStrictUserRole(userRole) === "teacher" || isSystemAdminUser(userData);
     const sideMenu = document.getElementById("side-menu");
@@ -14747,6 +14760,8 @@ onAuthStateChanged(auth, (user) => {
     }
     const reportsBtn = document.getElementById("btn-open-reports");
     if (reportsBtn) reportsBtn.style.display = teacherUiEnabled ? "block" : "none";
+    const studentReportsBtn = document.getElementById("btn-open-student-reports");
+    if (studentReportsBtn) studentReportsBtn.style.display = teacherUiEnabled ? "block" : "none";
     const loginCardsBtn = document.getElementById("btn-open-login-cards");
     if (loginCardsBtn) loginCardsBtn.style.display = teacherUiEnabled ? "block" : "none";
     const notificationsBtn = document.getElementById("btn-open-notifications");
@@ -14825,6 +14840,7 @@ onAuthStateChanged(auth, (user) => {
         (classesBtn && classesBtn.style.display !== "none")
         || (studentsBtn && studentsBtn.style.display !== "none")
         || (reportsBtn && reportsBtn.style.display !== "none")
+        || (studentReportsBtn && studentReportsBtn.style.display !== "none")
         || (loginCardsBtn && loginCardsBtn.style.display !== "none")
         || (teacherCertificatesBtn && teacherCertificatesBtn.style.display !== "none")
         || (studentBoardsBtn && studentBoardsBtn.style.display !== "none")
@@ -23709,6 +23725,40 @@ function syncMobileOpenMenuPlacement() {
   }
 }
 
+function syncMobileThemeTogglePlacement() {
+  const themeToggleBtn = document.getElementById("theme-toggle-app");
+  const userMenu = document.getElementById("user-menu");
+  const sidebarFooter = document.querySelector("#side-menu .sidebar-footer");
+  if (!themeToggleBtn || !userMenu || !sidebarFooter) return;
+
+  const isMobile = window.matchMedia("(max-width: 768px)").matches;
+  let slot = document.getElementById("sidebar-theme-toggle-slot");
+
+  if (isMobile) {
+    if (!slot) {
+      slot = document.createElement("div");
+      slot.id = "sidebar-theme-toggle-slot";
+      slot.className = "sidebar-theme-toggle-slot";
+      const totalTimeEl = document.getElementById("student-total-time");
+      if (totalTimeEl) {
+        sidebarFooter.insertBefore(slot, totalTimeEl);
+      } else {
+        sidebarFooter.insertBefore(slot, sidebarFooter.firstChild);
+      }
+    }
+    if (themeToggleBtn.parentElement !== slot) {
+      slot.appendChild(themeToggleBtn);
+    }
+  } else {
+    if (themeToggleBtn.parentElement !== userMenu) {
+      userMenu.insertBefore(themeToggleBtn, userMenu.firstChild);
+    }
+    if (slot && !slot.hasChildNodes()) {
+      slot.remove();
+    }
+  }
+}
+
 window.scrollStudentPanel = function(panelId) {
   const target = document.getElementById(panelId);
   if (!target) return;
@@ -23725,6 +23775,7 @@ window.addEventListener("resize", () => {
   if (!currentUserId) return;
   syncResponsiveHeaderGreeting();
   syncMobileOpenMenuPlacement();
+  syncMobileThemeTogglePlacement();
 });
 
 function openAllItemsModal(title, pendingRows = [], completedRows = []) {
