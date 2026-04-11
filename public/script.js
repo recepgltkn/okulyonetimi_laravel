@@ -21099,7 +21099,7 @@ function renderLessonSlideList() {
     row.dataset.slideIndex = String(i);
     row.innerHTML = `
       <div class="lesson-frame-title">${i + 1}. ${s.title || "Başlıksız Slide"}</div>
-      <div class="lesson-frame-meta">${typeLabel} â€¢ ${s.layout || "text"}</div>
+      <div class="lesson-frame-meta">${typeLabel} • ${s.layout || "text"}</div>
     `;
     row.addEventListener("dragstart", (ev) => {
       lessonSlideDragIndex = i;
@@ -21359,7 +21359,7 @@ function updateLessonSlidePreview() {
     box.innerHTML = `
       <div style="font-weight:700;margin-bottom:6px;">Soru Önizleme</div>
       <div style="margin-bottom:6px;padding:8px;border-radius:8px;background:${cardBg};color:${cardText};border:1px solid ${cardBorder};">${draft.question || "-"}</div>
-      <div style="font-size:12px;color:#475569;">Tür: ${draftQType}${draftQType === "fill" || draftQType === "dragdrop" ? ` â€¢ Alan: ${(draft.fillAnswers || []).length}` : ` â€¢ Doğru: ${correctLabel || "-"}`} â€¢ XP: ${questionXP}</div>
+      <div style="font-size:12px;color:#475569;">Tür: ${draftQType}${draftQType === "fill" || draftQType === "dragdrop" ? ` • Alan: ${(draft.fillAnswers || []).length}` : ` • Doğru: ${correctLabel || "-"}`} • XP: ${questionXP}</div>
       ${(draft.type || "content") === "mixed" ? `<hr style="border:none;border-top:1px solid #e5e7eb;margin:8px 0;"><div>${draft.content || "<span style='color:#94a3b8;'>İçerik yok</span>"}</div>` : ""}
     `;
     return;
@@ -21647,10 +21647,10 @@ function renderLessonPlayer() {
     const isLockedByTime = hasTimer && !!st.questionExpired[slideAnswerKey] && !hasLessonAnswerValue(cur, selected);
     const qTypeLabelMap = {
       multiple: "Coktan Secmeli",
-      boolean: "Dogru / Yanlis",
-      short: "Kisa Cevap",
-      fill: "Bosluk Doldurma",
-      dragdrop: "Surukle Birak"
+      boolean: "Doğru / Yanlış",
+      short: "Kısa Cevap",
+      fill: "Boşluk Doldurma",
+      dragdrop: "Sürükle Bırak"
     };
     const qTypeLabel = qTypeLabelMap[qType] || "Soru";
     const questionImageHtml = cur.imageUrl
