@@ -27,6 +27,7 @@ Route::get('/lightbot-runner', fn () => response()->file(public_path('lightbot-r
 Route::get('/line-trace-runner', fn () => response()->file(public_path('line-trace-runner/index.html')));
 Route::get('/silent-teacher-runner', fn () => response()->file(public_path('silent-teacher-runner/index.html')));
 Route::view('/keyboard-race', 'keyboard-race.index');
+Route::view('/block-builder-studio', 'block-builder.index');
 
 // Shared-hosting compatibility aliases for race API paths when rewrite rules alter prefixes.
 foreach (['api/race', 'public/api/race', 'index.php/api/race'] as $racePrefix) {

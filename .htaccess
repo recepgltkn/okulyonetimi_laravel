@@ -1,6 +1,11 @@
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
+    # Vite build assets are under /public/build in this subfolder setup.
+    # If requested as /build/*, serve from /public/build/* instead of falling back to index.php.
+    RewriteCond %{REQUEST_URI} !^/public/ [NC]
+    RewriteRule ^build/(.*)$ public/build/$1 [L,QSA,NC]
+
     # API is physically served by /public; force API traffic there to avoid 405 on subfolder installs.
     RewriteCond %{REQUEST_URI} ^(.*/)?api/ [NC]
     RewriteCond %{REQUEST_URI} !^/public/ [NC]

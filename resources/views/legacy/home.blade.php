@@ -9173,10 +9173,10 @@
             <button id="btn-open-notifications" class="nav-btn submenu-item" style="display: none;">🔔 Bildirimler</button>
         </div>
         <button id="btn-open-my-stats" class="nav-btn" style="display: none;">📊 İstatistiklerim</button>
-        <button id="btn-open-support" class="nav-btn" style="display: none;">💬 Destek</button>
         <button id="btn-open-badges" class="nav-btn" style="display: none;">🏅 Rozetlerim</button>
         <button id="btn-open-certificates" class="nav-btn" style="display: none;">📜 Sertifikalarım</button>
         <button id="btn-open-avatar-shop" class="nav-btn" style="display: none;">🧩 Avatar Al</button>
+        <button id="btn-open-support" class="nav-btn" style="display: none;">💬 Destek</button>
         <div class="sidebar-footer">
             <div class="sidebar-footer-title">Sitede Geçen Süren</div>
             <div id="student-total-time" class="time-widget" style="display:none;">
@@ -9221,6 +9221,12 @@
                     <button id="btn-apps-hub-open-block3d" class="btn btn-primary apps-hub-start-btn">Uygulamaya Başla</button>
                 </article>
                 <article class="apps-hub-card">
+                    <img src="{{ url('public/3d-blok-grid-runner.png') }}" alt="3D Grid Tasarım" class="apps-hub-card-image">
+                    <h4>3D Grid Tasarım</h4>
+                    <p>Minecraft benzeri editor ile bloklarını yerleştir, kaydet ve tekrar yükle.</p>
+                    <button id="btn-apps-hub-open-block-builder" class="btn btn-primary apps-hub-start-btn">Uygulamaya Başla</button>
+                </article>
+                <article class="apps-hub-card">
                     <img src="{{ url('public/compute-it.png') }}" alt="Compute It" class="apps-hub-card-image">
                     <h4>Compute It</h4>
                     <p>Algoritma ve problem çözme becerini güçlendir.</p>
@@ -9239,7 +9245,7 @@
                     <button id="btn-apps-hub-open-live-quiz" class="btn btn-primary apps-hub-start-btn">Quiz Yönet</button>
                 </article>
                 <article class="apps-hub-card" id="apps-hub-card-keyboard-race" style="display:none;">
-                    <img src="{{ url('public/quiz.png') }}" alt="Klavye Yarışması" class="apps-hub-card-image">
+                    <img src="{{ url('public/keyboard-runner.png') }}" alt="Klavye Yarışması" class="apps-hub-card-image">
                     <h4>Klavye Yarışması</h4>
                     <p>Gerçek zamanlı oda aç, yarışı başlat ve canlı sıralamayı yönet.</p>
                     <button id="btn-apps-hub-open-keyboard-race" class="btn btn-primary apps-hub-start-btn">Uygulamayı Başlat</button>
@@ -11906,7 +11912,3 @@ Ayşe, Yılmaz, ayse, 123456, 9, B"></textarea>
     <script type="module" src="{{ url('public/script.js') }}?v={{ filemtime(public_path('script.js')) }}"></script>
 </body>
 </html>
-
-
-
-

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ClientDataController;
 use App\Http\Controllers\ClientLiveQuizController;
+use App\Http\Controllers\ClientBlockBuilderController;
 use App\Http\Controllers\RaceController;
 use App\Http\Controllers\RoomController;
 use Illuminate\Support\Facades\Route;
@@ -43,6 +44,12 @@ Route::prefix('client')->group(function () {
             Route::post('/sessions/{sessionId}/next', [ClientLiveQuizController::class, 'nextQuestion']);
             Route::post('/sessions/{sessionId}/finish', [ClientLiveQuizController::class, 'finishSession']);
             Route::get('/sessions/{sessionId}/leaderboard', [ClientLiveQuizController::class, 'leaderboard']);
+        });
+
+        Route::prefix('/block-builder')->group(function () {
+            Route::get('/designs/latest', [ClientBlockBuilderController::class, 'latest']);
+            Route::get('/designs/{id}', [ClientBlockBuilderController::class, 'show'])->whereNumber('id');
+            Route::post('/designs', [ClientBlockBuilderController::class, 'store']);
         });
     });
 });

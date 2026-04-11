@@ -1973,6 +1973,13 @@ document.addEventListener('DOMContentLoaded', function(){
       openBlock3DRunner();
     });
   }
+  const hubBlockBuilderBtn = document.getElementById('btn-apps-hub-open-block-builder');
+  if (hubBlockBuilderBtn) {
+    hubBlockBuilderBtn.addEventListener('click', () => {
+      closeAppsHubModal();
+      window.open(appUrl('index.php/block-builder-studio'), '_blank', 'noopener,noreferrer');
+    });
+  }
   const hubComputeBtn = document.getElementById('btn-apps-hub-open-compute');
   if (hubComputeBtn) {
     hubComputeBtn.addEventListener('click', () => {
@@ -2489,7 +2496,19 @@ async function ensureWebPushSubscription() {
   if (!support.ok) return { ok: false, reason: support.reason };
   if (getNotificationPermissionState() !== "granted") return { ok: false, reason: "permission-required" };
   try {
-    const registration = await navigator.serviceWorker.ready;
+    const readyWithTimeout = new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("sw-ready-timeout")), 4000);
+      navigator.serviceWorker.ready
+        .then((reg) => {
+          clearTimeout(timer);
+          resolve(reg);
+        })
+        .catch((err) => {
+          clearTimeout(timer);
+          reject(err);
+        });
+    });
+    const registration = await readyWithTimeout;
     let subscription = await registration.pushManager.getSubscription();
     if (!subscription) {
       const options = { userVisibleOnly: true };
@@ -3928,7 +3947,7 @@ function openTeacherQuizResultsReport() {
       <div class="card">
         <div class="report-head">
           <div class="report-head-left">
-            <img src="${appUrl("logo.png")}" alt="Logo" class="report-logo">
+            <img src="${appUrl("public/logo.png")}" alt="Logo" class="report-logo">
             <h2>Quiz Sonuç Raporu</h2>
           </div>
         </div>
@@ -7531,6 +7550,9 @@ async function resolveLoginEmails(identifier) {
     ? [raw]
     : [raw, `${raw}@okul.com`, `${raw}@okul.local`, `${raw}@gmail.com`];
   candidates.forEach((c) => pushUnique(c));
+  // Login ekranında (auth yokken) users koleksiyonu korumalı endpoint'e düşer ve 401 üretir.
+  // Bu yüzden giriş öncesinde sadece aday email listesiyle devam ederiz.
+  if (!currentUserId) return out;
   try {
     for (const candidate of candidates) {
       const [byUsername, byEmail] = await Promise.all([
@@ -14577,7 +14599,7 @@ onAuthStateChanged(auth, (user) => {
     loadSeenNotificationIds();
     updateNotificationsPermissionLabel();
     if (getNotificationPermissionState() === "granted") {
-      try { await ensureWebPushSubscription(); } catch {}
+      ensureWebPushSubscription().catch(() => {});
     }
     startNotificationPolling();
     if (userRole === "student") {
@@ -15418,6 +15440,7 @@ async function loginWithResolvedCredentials(identifier, pass) {
 async function resolvePasswordlessLoginSecret(identifier) {
   const raw = String(identifier || "").trim();
   if (!raw) return null;
+  if (!currentUserId) return null;
   const norm = String(raw || "").trim().toLowerCase();
   const normAlias = norm.includes("@") ? norm.split("@")[0] : norm;
   const candidates = Array.from(new Set([
@@ -18515,7 +18538,7 @@ async function openStudentReportWindow(detail) {
     const lessonHistoryRows = lessonItems.map((l, i) => `
       <tr>
         <td>${i + 1}. ${String(l.title || "Ders").replace(/^Ders:\s*/i, "")}</td>
-        <td>${l.date || "-"}</td>
+        <td>${formatCompletionDate(l)}</td>
         <td>%${Math.max(0, Math.min(100, Number(l.score || 0)))}</td>
         <td>${Math.floor((Number(l.duration || 0)) / 60)} dk</td>
         <td>+${Math.max(0, Number(l.xp || 0))} XP</td>
@@ -18529,7 +18552,7 @@ async function openStudentReportWindow(detail) {
       return `
       <tr>
       <td>${i + 1}. ${t.title}</td>
-      <td>${t.date}</td>
+      <td>${formatCompletionDate(t)}</td>
       <td>
         <div class="score-wrap">
           <span class="score-text">%${safeScore}</span>
@@ -18561,6 +18584,7 @@ async function openStudentReportWindow(detail) {
       codingRuns.push({
         app: `${appLabel}${run?.title ? `: ${run.title}` : ""}`,
         range: run?.rangeText ? `Seviye ${run.rangeText}` : "-",
+        date: formatCompletionDate(run),
         duration: formatRunDuration(run?.durationSeconds || 0),
         xp: Math.max(0, Number(run?.xp || 0)),
         percent: Math.max(0, Math.min(100, Number(run?.percent || 0)))
@@ -18570,6 +18594,7 @@ async function openStudentReportWindow(detail) {
       codingRuns.push({
         app: `Compute It${run?.title ? `: ${run.title}` : ""}`,
         range: run?.rangeText ? `Seviye ${run.rangeText}` : "-",
+        date: formatCompletionDate(run),
         duration: formatRunDuration(run?.durationSeconds || 0),
         xp: Math.max(0, Number(run?.xp || 0)),
         percent: Math.max(0, Math.min(100, Number(run?.percent || 0)))
@@ -18579,6 +18604,7 @@ async function openStudentReportWindow(detail) {
     codingRuns.push({
       app: `Canlı Quiz: ${qz?.quizTitle || "Quiz"}`,
       range: "-",
+      date: formatCompletionDate({ finishedAtMs: qz?.finishedAtMs }),
       duration: formatQuizDurationText(qz?.durationMs, qz?.durationMinutes) || "-",
       xp: Math.max(0, Number(qz?.xpEarned || 0)),
       percent: Math.max(0, Math.min(100, Number(qz?.successRate || 0)))
@@ -18588,6 +18614,7 @@ async function openStudentReportWindow(detail) {
       <tr>
         <td>${i + 1}. ${run.app}</td>
         <td>${run.range}</td>
+        <td>${run.date}</td>
         <td>${run.duration}</td>
         <td>+${run.xp} XP</td>
         <td>%${run.percent}</td>
@@ -18856,7 +18883,7 @@ async function openStudentReportWindow(detail) {
       <div class="page content-page">
         <div class="card header">
           <div style="flex:1;">
-            <img src="${appUrl("logo.png")}" alt="Logo" class="logo" />
+            <img src="${appUrl("public/logo.png")}" alt="Logo" class="logo" />
             <div class="title">Öğrenci Performans Raporu</div>
             <div class="subtitle">${new Date().toLocaleDateString("tr-TR")} • Kurumsal Öğrenci Takip Sistemi</div>
           </div>
@@ -18893,13 +18920,13 @@ async function openStudentReportWindow(detail) {
             <div style="display:grid; grid-template-columns: repeat(2, minmax(200px, 1fr)); gap:14px; align-items:start;">
               <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
                 ${group1Chart}
-                <div style="font-size:11px; color:#475569; text-align:center;">Ödev â€¢ Etkinlik â€¢ Ders</div>
-                <div style="font-size:11px; color:#475569;">Toplam: ${group1Total} â€¢ Tamamlandı: ${group1Completed}</div>
+                <div style="font-size:11px; color:#475569; text-align:center;">Ödev &bull; Etkinlik &bull; Ders</div>
+                <div style="font-size:11px; color:#475569;">Toplam: ${group1Total} &bull; Tamamlandı: ${group1Completed}</div>
               </div>
               <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
                 ${group2Chart}
                 <div style="font-size:11px; color:#475569; text-align:center;">Kodlama Uygulamaları</div>
-                <div style="font-size:11px; color:#475569;">Toplam: ${group2Total} â€¢ Tamamlandı: ${group2Completed}</div>
+                <div style="font-size:11px; color:#475569;">Toplam: ${group2Total} &bull; Tamamlandı: ${group2Completed}</div>
               </div>
             </div>
           </div>
@@ -18911,7 +18938,7 @@ async function openStudentReportWindow(detail) {
           </div>
           <div class="report-two-col">
             <div class="card">
-              <div class="section-title">Dersler â€¢ Etkinlik â€¢ Ödevler</div>
+              <div class="section-title">Dersler &bull; Etkinlik &bull; Ödevler</div>
               <div class="kpi-grid" style="margin-bottom:8px; grid-template-columns: repeat(3, minmax(0, 1fr));">
                 <div class="kpi"><div class="value">${taskCompletedCount}/${taskTotalCount}</div><div class="label">Ödevler</div></div>
                 <div class="kpi"><div class="value">${activityCompletedCount}/${activityTotalCount}</div><div class="label">Etkinlikler</div></div>
@@ -18959,7 +18986,7 @@ async function openStudentReportWindow(detail) {
       <div class="page content-page">
         <div class="card header">
           <div style="flex:1;">
-            <img src="${appUrl("logo.png")}" alt="Logo" class="logo" />
+            <img src="${appUrl("public/logo.png")}" alt="Logo" class="logo" />
             <div class="title">Öğrenci Gelişim Raporu • Sayfa 2</div>
             <div class="subtitle">Güçlü Yönler ve Odak Alanları</div>
           </div>
@@ -18996,11 +19023,11 @@ async function openStudentReportWindow(detail) {
           <table>
             <thead>
               <tr>
-                <th>Uygulama</th><th>Level Aralığı</th><th>Süre</th><th>XP</th><th>İlerleme</th>
+                <th>Uygulama</th><th>Level Aralığı</th><th>Tarih</th><th>Süre</th><th>XP</th><th>İlerleme</th>
               </tr>
             </thead>
             <tbody>
-              ${codingRows || "<tr><td colspan='5'>Veri yok.</td></tr>"}
+              ${codingRows || "<tr><td colspan='6'>Veri yok.</td></tr>"}
             </tbody>
           </table>
         </div>
@@ -19211,6 +19238,7 @@ async function buildStudentReportHtml(detail) {
     codingRuns.push({
       app: `${appLabel}${run?.title ? `: ${run.title}` : ""}`,
       range: run?.rangeText ? `Seviye ${run.rangeText}` : "-",
+      date: formatCompletionDate(run),
       duration: formatRunDuration(run?.durationSeconds || 0),
       xp: Math.max(0, Number(run?.xp || 0)),
       percent: Math.max(0, Math.min(100, Number(run?.percent || 0)))
@@ -19220,6 +19248,7 @@ async function buildStudentReportHtml(detail) {
     codingRuns.push({
       app: `Compute It${run?.title ? `: ${run.title}` : ""}`,
       range: run?.rangeText ? `Seviye ${run.rangeText}` : "-",
+      date: formatCompletionDate(run),
       duration: formatRunDuration(run?.durationSeconds || 0),
       xp: Math.max(0, Number(run?.xp || 0)),
       percent: Math.max(0, Math.min(100, Number(run?.percent || 0)))
@@ -19229,6 +19258,7 @@ async function buildStudentReportHtml(detail) {
     codingRuns.push({
       app: `Canlı Quiz: ${qz?.quizTitle || "Quiz"}`,
       range: "-",
+      date: formatCompletionDate({ finishedAtMs: qz?.finishedAtMs }),
       duration: formatQuizDurationText(qz?.durationMs, qz?.durationMinutes) || "-",
       xp: Math.max(0, Number(qz?.xpEarned || 0)),
       percent: Math.max(0, Math.min(100, Number(qz?.successRate || 0)))
@@ -19238,6 +19268,7 @@ async function buildStudentReportHtml(detail) {
       <tr>
         <td>${i + 1}. ${run.app}</td>
         <td>${run.range}</td>
+        <td>${run.date}</td>
         <td>${run.duration}</td>
         <td>+${run.xp} XP</td>
         <td>%${run.percent}</td>
@@ -19247,7 +19278,7 @@ async function buildStudentReportHtml(detail) {
   const lessonHistoryRows = lessonItems.map((l, i) => `
       <tr>
         <td>${i + 1}. ${String(l.title || "Ders").replace(/^Ders:\s*/i, "")}</td>
-        <td>${l.date || "-"}</td>
+        <td>${formatCompletionDate(l)}</td>
         <td>%${Math.max(0, Math.min(100, Number(l.score || 0)))}</td>
         <td>${Math.floor((Number(l.duration || 0)) / 60)} dk</td>
         <td>+${Math.max(0, Number(l.xp || 0))} XP</td>
@@ -19261,7 +19292,7 @@ async function buildStudentReportHtml(detail) {
     return `
       <tr>
       <td>${i + 1}. ${t.title}</td>
-      <td>${t.date}</td>
+      <td>${formatCompletionDate(t)}</td>
       <td>
         <div class="score-wrap">
           <span class="score-text">%${safeScore}</span>
@@ -19477,7 +19508,7 @@ async function buildStudentReportHtml(detail) {
       <div class="page content-page">
         <div class="card header">
           <div style="flex:1;">
-            <img src="${appUrl("logo.png")}" alt="Logo" class="logo" />
+            <img src="${appUrl("public/logo.png")}" alt="Logo" class="logo" />
             <div class="title">Öğrenci Performans Raporu</div>
             <div class="subtitle">${new Date().toLocaleDateString("tr-TR")} • Kurumsal Öğrenci Takip Sistemi</div>
           </div>
@@ -19514,19 +19545,19 @@ async function buildStudentReportHtml(detail) {
             <div style="display:grid; grid-template-columns: repeat(2, minmax(200px, 1fr)); gap:14px; align-items:start;">
               <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
                 ${group1Chart}
-                <div style="font-size:11px; color:#475569; text-align:center;">Ödev â€¢ Etkinlik â€¢ Ders</div>
-                <div style="font-size:11px; color:#475569;">Toplam: ${group1Total} â€¢ Tamamlandı: ${group1Completed}</div>
+                <div style="font-size:11px; color:#475569; text-align:center;">Ödev &bull; Etkinlik &bull; Ders</div>
+                <div style="font-size:11px; color:#475569;">Toplam: ${group1Total} &bull; Tamamlandı: ${group1Completed}</div>
               </div>
               <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
                 ${group2Chart}
                 <div style="font-size:11px; color:#475569; text-align:center;">Kodlama Uygulamaları</div>
-                <div style="font-size:11px; color:#475569;">Toplam: ${group2Total} â€¢ Tamamlandı: ${group2Completed}</div>
+                <div style="font-size:11px; color:#475569;">Toplam: ${group2Total} &bull; Tamamlandı: ${group2Completed}</div>
               </div>
             </div>
           </div>
           <div class="report-two-col">
             <div class="card">
-              <div class="section-title">Dersler â€¢ Etkinlik â€¢ Ödevler</div>
+              <div class="section-title">Dersler &bull; Etkinlik &bull; Ödevler</div>
               <div class="kpi-grid" style="margin-bottom:8px; grid-template-columns: repeat(3, minmax(0, 1fr));">
                 <div class="kpi"><div class="value">${taskCompletedCount}/${taskTotalCount}</div><div class="label">Ödevler</div></div>
                 <div class="kpi"><div class="value">${activityCompletedCount}/${activityTotalCount}</div><div class="label">Etkinlikler</div></div>
@@ -19574,7 +19605,7 @@ async function buildStudentReportHtml(detail) {
       <div class="page content-page">
         <div class="card header">
           <div style="flex:1;">
-            <img src="${appUrl("logo.png")}" alt="Logo" class="logo" />
+            <img src="${appUrl("public/logo.png")}" alt="Logo" class="logo" />
             <div class="title">Öğrenci Gelişim Raporu • Sayfa 2</div>
             <div class="subtitle">Ders, Ödev ve Kodlama Detayı</div>
           </div>
@@ -19595,11 +19626,11 @@ async function buildStudentReportHtml(detail) {
           <table>
             <thead>
               <tr>
-                <th>Uygulama</th><th>Level Aralığı</th><th>Süre</th><th>XP</th><th>İlerleme</th>
+                <th>Uygulama</th><th>Level Aralığı</th><th>Tarih</th><th>Süre</th><th>XP</th><th>İlerleme</th>
               </tr>
             </thead>
             <tbody>
-              ${codingRows || "<tr><td colspan='5'>Veri yok.</td></tr>"}
+              ${codingRows || "<tr><td colspan='6'>Veri yok.</td></tr>"}
             </tbody>
           </table>
         </div>
@@ -19615,6 +19646,56 @@ function toDateOnly(value) {
   if (Number.isNaN(d.getTime())) return null;
   d.setHours(0, 0, 0, 0);
   return d;
+}
+
+function parseDateFromAny(value) {
+  if (value == null) return null;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+  if (typeof value === "number") {
+    if (!Number.isFinite(value) || value <= 0) return null;
+    const ms = value > 1e12 ? value : value * 1000;
+    const d = new Date(ms);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  if (typeof value === "string") {
+    const v = value.trim();
+    if (!v || v === "-") return null;
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  if (typeof value?.toDate === "function") {
+    const d = value.toDate();
+    return d instanceof Date && !Number.isNaN(d.getTime()) ? d : null;
+  }
+  if (typeof value === "object") {
+    if (Number.isFinite(Number(value.seconds))) {
+      const d = new Date(Number(value.seconds) * 1000);
+      return Number.isNaN(d.getTime()) ? null : d;
+    }
+  }
+  return null;
+}
+
+function formatCompletionDate(entry, fallback = "-") {
+  const src = entry || {};
+  const candidates = [
+    src.date,
+    src.completedAt,
+    src.updatedAt,
+    src.finishedAt,
+    src.completedAtMs,
+    src.updatedAtMs,
+    src.finishedAtMs,
+    src.createdAt,
+    src.createdAtMs
+  ];
+  for (const c of candidates) {
+    const d = parseDateFromAny(c);
+    if (d) return d.toLocaleDateString("tr-TR");
+  }
+  return fallback;
 }
 
 function getTaskDate(task) {
@@ -28656,6 +28737,3 @@ async function loadMyStatsModal() {
     showNotice("İstatistikler yüklenemedi. Lütfen tekrar deneyin.", "#e74c3c");
   }
 }
-
-
-

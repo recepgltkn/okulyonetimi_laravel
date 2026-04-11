@@ -90,6 +90,8 @@ async function api(path, method = "GET", body = null) {
   const headers = { "Content-Type": "application/json" };
   const uid = String(currentUser?.uid || currentUser?.id || "").trim();
   const token = String(currentUser?.token || "").trim();
+  const requestUid = uid;
+  const requestToken = token;
   const needsAuth = !/\/auth\/(login|register)/.test(path);
   if (needsAuth && (!uid || !token)) {
     throw new Error("unauthenticated");
@@ -111,7 +113,12 @@ async function api(path, method = "GET", body = null) {
       uid: uid || null,
       hasToken: !!token
     });
-    if (uid && token) persistAuthUser(null);
+    // Eski token ile dönmüş geç 401 cevapları yeni oturumu düşürmemeli.
+    const activeUid = String(currentUser?.uid || currentUser?.id || "").trim();
+    const activeToken = String(currentUser?.token || "").trim();
+    if (requestUid && requestToken && requestUid === activeUid && requestToken === activeToken) {
+      persistAuthUser(null);
+    }
   }
   if (!res.ok) throw new Error(translateApiErrorMessage(json?.message || `HTTP ${res.status}`, res.status));
   return json;

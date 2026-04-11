@@ -1,4 +1,4 @@
-const SW_VERSION = "v1.1.0";
+const SW_VERSION = "v1.1.1";
 const RUNTIME_CACHE = `runtime-${SW_VERSION}`;
 const SHELL_CACHE = `shell-${SW_VERSION}`;
 const SCOPE_PATH = new URL(self.registration.scope).pathname.replace(/\/+$/, "");
@@ -70,20 +70,19 @@ self.addEventListener("fetch", (event) => {
 
   if (request.destination === "script" || request.destination === "style" || request.destination === "image" || request.destination === "font") {
     event.respondWith(
-      caches.match(request).then((cached) => {
-        const networkFetch = fetch(request)
-          .then((response) => {
-            if (response && response.ok) {
-              const copy = response.clone();
-              caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy)).catch(() => {});
-            }
-            return response;
-          })
-          .catch(async () => {
-            return cached;
-          });
-        return cached || networkFetch;
-      })
+      (async () => {
+        try {
+          const response = await fetch(request);
+          if (response && response.ok) {
+            const copy = response.clone();
+            caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy)).catch(() => {});
+          }
+          return response;
+        } catch (_error) {
+          const cached = await caches.match(request);
+          return cached || fetch(request);
+        }
+      })()
     );
   }
 });
