@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
-    <meta name="app-base-url" content="{{ rtrim(request()->getSchemeAndHttpHost() . request()->getBaseUrl(), '/') }}">
+    <meta name="app-base-url" content="{{ rtrim(request()->getBaseUrl(), '/') }}">
     <meta name="web-push-vapid-public-key" content="{{ env('WEB_PUSH_VAPID_PUBLIC_KEY', '') }}">
     <meta name="theme-color" content="#2563eb">
     <meta name="mobile-web-app-capable" content="yes">

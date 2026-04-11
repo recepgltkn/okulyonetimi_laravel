@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="app-base-url" content="{{ rtrim(request()->getSchemeAndHttpHost() . request()->getBaseUrl(), '/') }}">
+    <meta name="app-base-url" content="{{ rtrim(request()->getBaseUrl(), '/') }}">
     <title>3D Grid Tasarim Studyosu</title>
     @php
         $viteFailed = false;
