@@ -1,0 +1,26 @@
+{
+  "resources/css/app.css": {
+    "file": "assets/app-Ca-iyiCS.css",
+    "src": "resources/css/app.css",
+    "isEntry": true,
+    "name": "app",
+    "names": [
+      "app.css"
+    ]
+  },
+  "resources/js/app.js": {
+    "file": "assets/app-BuG9aa18.js",
+    "name": "app",
+    "src": "resources/js/app.js",
+    "isEntry": true
+  },
+  "resources/js/block-builder-page.js": {
+    "file": "assets/block-builder-page-DKrbhO2N.js",
+    "name": "block-builder-page",
+    "src": "resources/js/block-builder-page.js",
+    "isEntry": true,
+    "css": [
+      "assets/block-builder-page-SkVmbK5l.css"
+    ]
+  }
+}
