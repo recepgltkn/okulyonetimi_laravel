@@ -11964,6 +11964,13 @@ if (lessonZoomInBtn) {
 const lessonPrevBtn = document.getElementById("btn-lesson-prev");
 if (lessonPrevBtn) lessonPrevBtn.onclick = async function () {
   if (!lessonPlayerState) return;
+  if (lessonPlayerState.showCompletionPage) {
+    lessonPlayerState.showCompletionPage = false;
+    const totalSlides = Array.isArray(lessonPlayerState.lesson?.slides) ? lessonPlayerState.lesson.slides.length : 0;
+    lessonPlayerState.index = Math.max(0, totalSlides - 1);
+    renderLessonPlayer();
+    return;
+  }
   lessonPlayerState.index = Math.max(0, lessonPlayerState.index - 1);
   renderLessonPlayer();
   await persistLessonProgress(false);
@@ -11972,6 +11979,11 @@ if (lessonPrevBtn) lessonPrevBtn.onclick = async function () {
 const lessonNextBtn = document.getElementById("btn-lesson-next");
 if (lessonNextBtn) lessonNextBtn.onclick = async function () {
   if (!lessonPlayerState) return;
+  if (lessonPlayerState.showCompletionPage) {
+    persistLessonProgress(true).catch((e) => console.warn("lesson finish close persist failed", e));
+    showNotice("Tebrikler! Ders tamamlandı.", "#16a34a");
+    return;
+  }
   const total = Array.isArray(lessonPlayerState.lesson?.slides) ? lessonPlayerState.lesson.slides.length : 0;
   if (lessonPlayerState.index < total - 1) {
     lessonPlayerState.index += 1;
@@ -11979,8 +11991,10 @@ if (lessonNextBtn) lessonNextBtn.onclick = async function () {
     await persistLessonProgress(false);
     return;
   }
-  persistLessonProgress(true).catch((e) => console.warn("lesson finish persist failed", e));
-  showNotice("Ders ilerlemesi kaydedildi.", "#2ecc71");
+  await persistLessonProgress(false);
+  lessonPlayerState.showCompletionPage = true;
+  lessonPlayerState.completionFxPlayed = false;
+  renderLessonPlayer();
 };
 
 const showAllLessonsBtn = document.getElementById("btn-show-all-lessons");
@@ -21508,7 +21522,9 @@ function openLessonPlayerModal(lesson) {
     answered: {},
     correctCount: 0,
     questionTimers: {},
-    questionExpired: {}
+    questionExpired: {},
+    showCompletionPage: false,
+    completionFxPlayed: false
   };
   const saved = lessonProgressMap.get(lesson.id);
   if (saved) {
@@ -21556,6 +21572,49 @@ function renderLessonPlayer() {
   }
   const cur = slides[st.index];
   if (!cur || !stage) return;
+
+  if (st.showCompletionPage) {
+    const stats = getLessonProgressStats(st);
+    stage.classList.remove("lesson-code-layout");
+    stage.innerHTML = `
+      <div class="lesson-complete-shell">
+        <div class="lesson-complete-card">
+          <div class="lesson-complete-kicker">Tebrikler</div>
+          <h2 class="lesson-complete-title">Dersi Başarıyla Tamamladın</h2>
+          <p class="lesson-complete-sub">Son sayfaya ulaştın. Öğrenme serini koru.</p>
+          <div class="lesson-complete-xp">
+            <span class="star">⭐</span>
+            <span class="xp-value">+${stats.totalXP} XP</span>
+            <span class="star">✨</span>
+          </div>
+          <div class="lesson-complete-meta">%${stats.percent} tamamlandı • ${stats.correctCount}/${stats.questionSlidesCount || 0} doğru</div>
+        </div>
+      </div>
+    `;
+    if (!st.completionFxPlayed) {
+      st.completionFxPlayed = true;
+      launchLessonCompletionConfetti(stage);
+    }
+    const counterEl = document.getElementById("lesson-player-counter");
+    if (counterEl) counterEl.innerText = `${slides.length + 1} / ${slides.length + 1}`;
+    const nextBtn = document.getElementById("btn-lesson-next");
+    if (nextBtn) {
+      nextBtn.innerText = "Kapat";
+      nextBtn.classList.add("is-end");
+    }
+    const label = document.getElementById("lesson-player-progress");
+    if (label) label.innerText = `%${stats.percent} tamamlandı • ${stats.totalXP} XP`;
+    const trackEl = document.getElementById("lesson-player-track");
+    if (trackEl) {
+      trackEl.innerHTML = Array.from({ length: slides.length + 1 }).map((_, i) => {
+        const active = i === slides.length;
+        const done = i < slides.length;
+        return `<span style="display:inline-block;width:26px;height:6px;border-radius:999px;background:${active ? "#16a34a" : done ? "#93c5fd" : "#d1d5db"};"></span>`;
+      }).join("");
+    }
+    return;
+  }
+
   stage.style.overflowX = "auto";
   stage.style.overflowY = "auto";
   st.visited.add(st.index);
@@ -21947,7 +22006,10 @@ function renderLessonPlayer() {
     }).join("");
   }
   const nextBtn = document.getElementById("btn-lesson-next");
-  if (nextBtn) nextBtn.innerText = st.index >= (slides.length - 1) ? "Bitir" : "Sonraki";
+  if (nextBtn) {
+    nextBtn.innerText = st.index >= (slides.length - 1) ? "Bitir" : "Sonraki";
+    nextBtn.classList.toggle("is-end", st.index >= (slides.length - 1));
+  }
   updateLessonProgressBar();
 }
 
@@ -22253,32 +22315,63 @@ function getLessonSlideQuestionXP(slide) {
   return clampLessonQuestionXP(slide?.questionXP ?? slide?.xp ?? MAX_QUESTION_XP);
 }
 
-function updateLessonProgressBar() {
-  const st = lessonPlayerState;
-  if (!st) return;
-  const slides = Array.isArray(st.lesson.slides) ? st.lesson.slides : [];
+function getLessonProgressStats(st) {
+  const slides = Array.isArray(st?.lesson?.slides) ? st.lesson.slides : [];
   const total = slides.length || 1;
-  const visitedCount = st.visited.size;
+  const visitedCount = st?.visited?.size || 0;
   let correctCount = 0;
   let questionXPBonus = 0;
   const questionSlides = slides.filter((s) => s.type === "question" || s.type === "mixed");
   slides.forEach((s, idx) => {
     if (!(s.type === "question" || s.type === "mixed")) return;
     const key = s.id || `slide_${idx}`;
-    const answer = st.answered[key];
+    const answer = st?.answered?.[key];
     if (!hasLessonAnswerValue(s, answer)) return;
     if (isLessonAnswerCorrect(s, answer)) {
       correctCount++;
       questionXPBonus += getLessonSlideQuestionXP(s);
     }
   });
-  st.correctCount = correctCount;
   const basePercent = Math.round((visitedCount / total) * 70);
   const qPercent = questionSlides.length > 0 ? Math.round((correctCount / questionSlides.length) * 30) : 30;
   const percent = Math.min(100, basePercent + qPercent);
-  const xp = Math.round((visitedCount * 2) + questionXPBonus);
+  const totalXP = Math.round((visitedCount * 2) + questionXPBonus);
+  return {
+    slides,
+    total,
+    visitedCount,
+    correctCount,
+    questionSlidesCount: questionSlides.length,
+    percent,
+    totalXP,
+    completed: visitedCount >= total
+  };
+}
+
+function launchLessonCompletionConfetti(container) {
+  if (!container) return;
+  const root = document.createElement("div");
+  root.className = "lesson-complete-confetti";
+  for (let i = 0; i < 26; i++) {
+    const piece = document.createElement("span");
+    piece.className = "lesson-confetti-piece";
+    piece.style.left = `${Math.random() * 100}%`;
+    piece.style.animationDelay = `${Math.random() * 0.7}s`;
+    piece.style.animationDuration = `${2.2 + Math.random() * 1.4}s`;
+    piece.style.background = ["#f59e0b", "#22c55e", "#3b82f6", "#ec4899", "#a78bfa"][i % 5];
+    root.appendChild(piece);
+  }
+  container.appendChild(root);
+  setTimeout(() => root.remove(), 4200);
+}
+
+function updateLessonProgressBar() {
+  const st = lessonPlayerState;
+  if (!st) return;
+  const stats = getLessonProgressStats(st);
+  st.correctCount = stats.correctCount;
   const label = document.getElementById("lesson-player-progress");
-  if (label) label.innerText = `%${percent} tamamlandı • ${xp} XP`;
+  if (label) label.innerText = `%${stats.percent} tamamlandı • ${stats.totalXP} XP`;
 }
 
 async function persistLessonProgress(closeAfter) {
@@ -22291,43 +22384,23 @@ async function persistLessonProgress(closeAfter) {
     lessonPlayerState = null;
   }
   if (!currentUserId || userRole !== "student") return;
-  const slides = Array.isArray(st.lesson.slides) ? st.lesson.slides : [];
-  const total = slides.length || 1;
-  const visitedCount = st.visited.size;
-  let correctCount = 0;
-  let questionXPBonus = 0;
-  const questionSlides = slides.filter((s) => s.type === "question" || s.type === "mixed");
-  slides.forEach((s, idx) => {
-    if (!(s.type === "question" || s.type === "mixed")) return;
-    const key = s.id || `slide_${idx}`;
-    const answer = st.answered[key];
-    if (!hasLessonAnswerValue(s, answer)) return;
-    if (isLessonAnswerCorrect(s, answer)) {
-      correctCount++;
-      questionXPBonus += getLessonSlideQuestionXP(s);
-    }
-  });
-  const basePercent = Math.round((visitedCount / total) * 70);
-  const qPercent = questionSlides.length > 0 ? Math.round((correctCount / questionSlides.length) * 30) : 30;
-  const percent = Math.min(100, basePercent + qPercent);
-  const totalXP = Math.round((visitedCount * 2) + questionXPBonus);
-  const completed = visitedCount >= total;
+  const stats = getLessonProgressStats(st);
   const ref = doc(db, "lessonProgress", `${st.lesson.id}_${currentUserId}`);
   const prevSnap = await getDoc(ref);
   const prev = prevSnap.exists() ? (prevSnap.data() || {}) : {};
   const prevXP = Math.max(0, Number(prev.totalXP || 0));
-  const xpDelta = Math.max(0, totalXP - prevXP);
+  const xpDelta = Math.max(0, stats.totalXP - prevXP);
   await setDoc(ref, {
     lessonId: st.lesson.id,
     userId: currentUserId,
     visitedSlides: Array.from(st.visited),
     currentSlideIndex: st.index,
     answers: st.answered,
-    correctCount,
-    totalQuestions: questionSlides.length,
-    percent,
-    totalXP,
-    completed,
+    correctCount: stats.correctCount,
+    totalQuestions: stats.questionSlidesCount,
+    percent: stats.percent,
+    totalXP: stats.totalXP,
+    completed: stats.completed,
     updatedAt: serverTimestamp()
   }, { merge: true });
   if (xpDelta > 0) {

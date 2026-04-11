@@ -5504,6 +5504,139 @@
             background: linear-gradient(135deg, #0ea5e9 0%, #22c55e 100%);
             box-shadow: 0 10px 20px rgba(34, 197, 94, 0.25);
         }
+        .lesson-complete-shell {
+            position: relative;
+            min-height: 460px;
+            border-radius: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            overflow: hidden;
+            background:
+                radial-gradient(1200px 360px at 0% 0%, rgba(56, 189, 248, 0.22), transparent 72%),
+                radial-gradient(900px 340px at 100% 100%, rgba(34, 197, 94, 0.20), transparent 70%),
+                linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(30, 41, 59, 0.94));
+        }
+        .lesson-complete-card {
+            position: relative;
+            z-index: 2;
+            width: min(680px, 100%);
+            border-radius: 20px;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            background: linear-gradient(165deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.04));
+            backdrop-filter: blur(8px);
+            box-shadow: 0 30px 60px rgba(2, 6, 23, 0.42);
+            text-align: center;
+            padding: 28px 24px;
+            color: #f8fafc;
+        }
+        .lesson-complete-kicker {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 34px;
+            padding: 0 14px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #bbf7d0;
+            border: 1px solid rgba(134, 239, 172, 0.6);
+            background: rgba(22, 163, 74, 0.2);
+        }
+        .lesson-complete-title {
+            margin: 16px 0 8px;
+            font-size: clamp(26px, 3.4vw, 42px);
+            font-weight: 900;
+            line-height: 1.1;
+            color: #ffffff;
+        }
+        .lesson-complete-sub {
+            margin: 0 auto;
+            max-width: 520px;
+            color: #cbd5e1;
+            font-size: 15px;
+            line-height: 1.5;
+        }
+        .lesson-complete-xp {
+            margin: 20px auto 10px;
+            padding: 14px 18px;
+            width: fit-content;
+            min-width: 240px;
+            border-radius: 14px;
+            border: 1px solid rgba(250, 204, 21, 0.5);
+            background: linear-gradient(135deg, rgba(251, 191, 36, 0.25), rgba(249, 115, 22, 0.2));
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            box-shadow: 0 18px 28px rgba(245, 158, 11, 0.24);
+        }
+        .lesson-complete-xp .xp-value {
+            font-size: clamp(24px, 3.6vw, 36px);
+            font-weight: 900;
+            color: #fef3c7;
+            letter-spacing: 0.02em;
+            text-shadow: 0 0 24px rgba(245, 158, 11, 0.35);
+        }
+        .lesson-complete-xp .star {
+            font-size: clamp(22px, 3vw, 30px);
+            animation: lessonStarPulse 1.25s ease-in-out infinite;
+        }
+        .lesson-complete-xp .star:last-child {
+            animation-delay: .24s;
+        }
+        .lesson-complete-meta {
+            margin-top: 8px;
+            color: #cbd5e1;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+            font-size: 14px;
+        }
+        .lesson-complete-confetti {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            overflow: hidden;
+            z-index: 1;
+        }
+        .lesson-confetti-piece {
+            position: absolute;
+            top: -18px;
+            width: 12px;
+            height: 20px;
+            border-radius: 2px;
+            opacity: .95;
+            transform: translateY(-20px) rotate(0deg);
+            animation-name: lessonConfettiFall;
+            animation-timing-function: cubic-bezier(.2,.78,.28,1);
+            animation-fill-mode: forwards;
+        }
+        @keyframes lessonStarPulse {
+            0%, 100% { transform: scale(1) rotate(0deg); filter: drop-shadow(0 0 0 rgba(255,255,255,0)); }
+            50% { transform: scale(1.2) rotate(-8deg); filter: drop-shadow(0 0 12px rgba(251, 191, 36, .7)); }
+        }
+        @keyframes lessonConfettiFall {
+            0% { transform: translateY(-24px) rotate(0deg); opacity: 0; }
+            10% { opacity: 1; }
+            100% { transform: translateY(118vh) rotate(620deg); opacity: 0; }
+        }
+        @media (max-width: 768px) {
+            .lesson-complete-shell {
+                min-height: 400px;
+                padding: 16px;
+            }
+            .lesson-complete-card {
+                padding: 20px 14px;
+                border-radius: 16px;
+            }
+            .lesson-complete-xp {
+                min-width: 0;
+                width: 100%;
+            }
+        }
         .lesson-player-zoom-controls {
             position: absolute;
             left: 12px;
