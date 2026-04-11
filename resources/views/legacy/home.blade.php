@@ -5595,6 +5595,55 @@
             letter-spacing: 0.01em;
             font-size: 14px;
         }
+        .lesson-complete-stats {
+            margin-top: 14px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px;
+        }
+        .lesson-complete-stats span {
+            background: rgba(15, 23, 42, 0.45);
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            color: #dbeafe;
+            border-radius: 999px;
+            padding: 6px 10px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+        }
+        .lesson-complete-feedback {
+            margin: 14px auto 0;
+            max-width: 600px;
+            border-radius: 12px;
+            padding: 12px 14px;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            background: rgba(30, 41, 59, 0.5);
+            color: #f8fafc;
+            font-size: 14px;
+            line-height: 1.5;
+            font-weight: 700;
+        }
+        .lesson-complete-feedback.good {
+            border-color: rgba(74, 222, 128, 0.55);
+            background: rgba(22, 163, 74, 0.2);
+            color: #dcfce7;
+        }
+        .lesson-complete-feedback.ok {
+            border-color: rgba(56, 189, 248, 0.55);
+            background: rgba(14, 116, 144, 0.2);
+            color: #e0f2fe;
+        }
+        .lesson-complete-feedback.warn {
+            border-color: rgba(251, 191, 36, 0.55);
+            background: rgba(180, 83, 9, 0.23);
+            color: #fef3c7;
+        }
+        .lesson-complete-feedback.neutral {
+            border-color: rgba(148, 163, 184, 0.45);
+            background: rgba(51, 65, 85, 0.38);
+            color: #e2e8f0;
+        }
         .lesson-complete-confetti {
             position: absolute;
             inset: 0;
@@ -5635,6 +5684,17 @@
             .lesson-complete-xp {
                 min-width: 0;
                 width: 100%;
+            }
+            .lesson-complete-stats {
+                gap: 6px;
+            }
+            .lesson-complete-stats span {
+                font-size: 11px;
+                padding: 5px 8px;
+            }
+            .lesson-complete-feedback {
+                padding: 10px 11px;
+                font-size: 13px;
             }
         }
         .lesson-player-zoom-controls {

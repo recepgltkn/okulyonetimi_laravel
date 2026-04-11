@@ -21575,6 +21575,7 @@ function renderLessonPlayer() {
 
   if (st.showCompletionPage) {
     const stats = getLessonProgressStats(st);
+    const feedbackToneClass = stats.feedback?.tone ? `lesson-complete-feedback ${stats.feedback.tone}` : "lesson-complete-feedback";
     stage.classList.remove("lesson-code-layout");
     stage.innerHTML = `
       <div class="lesson-complete-shell">
@@ -21587,7 +21588,16 @@ function renderLessonPlayer() {
             <span class="xp-value">+${stats.totalXP} XP</span>
             <span class="star">✨</span>
           </div>
-          <div class="lesson-complete-meta">%${stats.percent} tamamlandı • ${stats.correctCount}/${stats.questionSlidesCount || 0} doğru</div>
+          <div class="lesson-complete-meta">%${stats.percent} tamamlandı • Basari: %${stats.accuracy}</div>
+          <div class="lesson-complete-stats">
+            <span>Slayt XP: ${stats.slideXP}</span>
+            <span>Soru XP: ${stats.questionXP}</span>
+            <span>Cozulen Soru: ${stats.answeredCount}/${stats.questionSlidesCount || 0}</span>
+            <span>Dogru: ${stats.correctCount}</span>
+            <span>Yanlis: ${stats.wrongCount}</span>
+            <span>Bos: ${stats.unansweredCount}</span>
+          </div>
+          <div class="${feedbackToneClass}">${escapeHtmlBasic(stats.feedback?.text || "")}</div>
         </div>
       </div>
     `;
@@ -22315,35 +22325,99 @@ function getLessonSlideQuestionXP(slide) {
   return clampLessonQuestionXP(slide?.questionXP ?? slide?.xp ?? MAX_QUESTION_XP);
 }
 
+function getLessonCompletionFeedback(stats) {
+  const totalQ = Number(stats?.questionSlidesCount || 0);
+  const answered = Number(stats?.answeredCount || 0);
+  const accuracy = Number(stats?.accuracy || 0);
+  if (totalQ <= 0) {
+    return {
+      tone: "neutral",
+      text: "Bu ders bilgi odaklı ilerledi. Sonraki derste soru çözüp seviyeni daha net gorebilirsin."
+    };
+  }
+  if (answered <= 0) {
+    return {
+      tone: "warn",
+      text: "Bu derste sorulari yanitlamadin. Konuyu pekistirmek icin sorulari cozmeyi unutma."
+    };
+  }
+  if (accuracy >= 85 && answered >= Math.max(1, Math.ceil(totalQ * 0.8))) {
+    return {
+      tone: "good",
+      text: "Harika! Bu konuya hakimsin. Bir sonraki seviyeye gecmeye hazirsin."
+    };
+  }
+  if (accuracy >= 60) {
+    return {
+      tone: "ok",
+      text: "Iyi gidiyorsun. Konuyu buyuk oranda kavramissin, zorlandigin noktalari bir kez daha tekrar et."
+    };
+  }
+  if (accuracy >= 35) {
+    return {
+      tone: "warn",
+      text: "Temelin var ama konuya tekrar calismalisin. Ozellikle yanlis yaptigin soru tiplerine odaklan."
+    };
+  }
+  return {
+    tone: "warn",
+    text: "Bu konuya yeniden calismalisin. Kisa bir tekrar ve bol soru cozumu ile hizla guclenebilirsin."
+  };
+}
+
 function getLessonProgressStats(st) {
   const slides = Array.isArray(st?.lesson?.slides) ? st.lesson.slides : [];
   const total = slides.length || 1;
   const visitedCount = st?.visited?.size || 0;
   let correctCount = 0;
-  let questionXPBonus = 0;
+  let wrongCount = 0;
+  let answeredCount = 0;
+  let questionXP = 0;
   const questionSlides = slides.filter((s) => s.type === "question" || s.type === "mixed");
   slides.forEach((s, idx) => {
     if (!(s.type === "question" || s.type === "mixed")) return;
     const key = s.id || `slide_${idx}`;
     const answer = st?.answered?.[key];
     if (!hasLessonAnswerValue(s, answer)) return;
+    answeredCount++;
+    const questionBaseXP = getLessonSlideQuestionXP(s);
     if (isLessonAnswerCorrect(s, answer)) {
       correctCount++;
-      questionXPBonus += getLessonSlideQuestionXP(s);
+      questionXP += questionBaseXP;
+    } else {
+      wrongCount++;
+      questionXP += Math.max(1, Math.round(questionBaseXP * 0.25));
     }
   });
   const basePercent = Math.round((visitedCount / total) * 70);
   const qPercent = questionSlides.length > 0 ? Math.round((correctCount / questionSlides.length) * 30) : 30;
   const percent = Math.min(100, basePercent + qPercent);
-  const totalXP = Math.round((visitedCount * 2) + questionXPBonus);
+  const slideXP = Math.round(visitedCount * 2);
+  const totalXP = Math.max(0, Math.round(slideXP + questionXP));
+  const unansweredCount = Math.max(0, questionSlides.length - answeredCount);
+  const accuracy = answeredCount > 0 ? Math.round((correctCount / answeredCount) * 100) : 0;
+  const feedback = getLessonCompletionFeedback({
+    questionSlidesCount: questionSlides.length,
+    answeredCount,
+    correctCount,
+    wrongCount,
+    accuracy
+  });
   return {
     slides,
     total,
     visitedCount,
     correctCount,
+    wrongCount,
+    answeredCount,
+    unansweredCount,
+    accuracy,
     questionSlidesCount: questionSlides.length,
     percent,
+    slideXP,
+    questionXP,
     totalXP,
+    feedback,
     completed: visitedCount >= total
   };
 }
