@@ -48,9 +48,26 @@ const deleteUserByAdmin = httpsCallable(functions, "deleteUserByAdmin");
 const setUserPasswordByAdmin = httpsCallable(functions, "setUserPasswordByAdmin");
 const getMyStatsSummary = httpsCallable(functions, "getMyStats");
 const isLocalDevHost = ["127.0.0.1", "localhost"].includes(String(window.location.hostname || "").toLowerCase());
-const APP_BASE_URL = String(
-  document.querySelector('meta[name="app-base-url"]')?.content || window.location.origin
-).replace(/\/+$/, "");
+const APP_BASE_URL = (() => {
+  const metaBase = String(
+    document.querySelector('meta[name="app-base-url"]')?.content || ""
+  ).trim().replace(/\/+$/, "");
+  const fallback = window.location.origin;
+  if (!metaBase) return fallback;
+  try {
+    const parsed = new URL(metaBase, window.location.origin);
+    const parsedHost = String(parsed.hostname || "").toLowerCase();
+    const currentHost = String(window.location.hostname || "").toLowerCase();
+    const parsedIsLocal = parsedHost === "localhost" || parsedHost === "127.0.0.1";
+    const currentIsLocal = currentHost === "localhost" || currentHost === "127.0.0.1";
+    if (parsedIsLocal && !currentIsLocal) {
+      return `${window.location.origin}${parsed.pathname}`.replace(/\/+$/, "");
+    }
+    return `${parsed.origin}${parsed.pathname}`.replace(/\/+$/, "");
+  } catch (_) {
+    return fallback;
+  }
+})();
 const PROFILE_CHANGE_REQUESTS_COLLECTION = "profileChangeRequests";
 
 function appUrl(path = "") {

@@ -48,7 +48,22 @@
       const metaBaseUrl = String(
         document.querySelector('meta[name="app-base-url"]')?.content || ""
       ).trim().replace(/\/+$/, "");
-      const root = metaBaseUrl || window.location.origin;
+      const root = (() => {
+        if (!metaBaseUrl) return window.location.origin;
+        try {
+          const parsed = new URL(metaBaseUrl, window.location.origin);
+          const parsedHost = String(parsed.hostname || "").toLowerCase();
+          const currentHost = String(window.location.hostname || "").toLowerCase();
+          const parsedIsLocal = parsedHost === "localhost" || parsedHost === "127.0.0.1";
+          const currentIsLocal = currentHost === "localhost" || currentHost === "127.0.0.1";
+          if (parsedIsLocal && !currentIsLocal) {
+            return `${window.location.origin}${parsed.pathname}`.replace(/\/+$/, "");
+          }
+          return `${parsed.origin}${parsed.pathname}`.replace(/\/+$/, "");
+        } catch (_) {
+          return window.location.origin;
+        }
+      })();
       const candidates = [
         `${root}/public/service-worker.js`,
         `${root}/service-worker.js`,
