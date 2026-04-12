@@ -903,6 +903,9 @@ function applyThemeMode(mode) {
   ];
   btns.forEach((btn) => {
     if (!btn) return;
+    if (btn.id === "theme-toggle-app") {
+      btn.dataset.themeState = normalized === "dark" ? "on" : "off";
+    }
     btn.textContent = normalized === "dark" ? "\u2600\uFE0F" : "\uD83C\uDF19";
     btn.title = normalized === "dark" ? "Açık Mod" : "Karanlık Mod";
   });
@@ -23858,7 +23861,7 @@ function syncMobileOpenMenuPlacement() {
   const openMenuBtn = document.getElementById("open-menu");
   const appHeader = document.querySelector("#app-screen[style*='display: grid'] .app-header") || document.querySelector("#app-screen .app-header");
   if (!openMenuBtn || !appHeader) return;
-  const isMobile = window.matchMedia("(max-width: 768px)").matches;
+  const isMobile = window.matchMedia("(max-width: 1000px)").matches;
   const forceInHeader = userRole === "teacher" || userRole === "student";
   if (isMobile || forceInHeader) {
     if (openMenuBtn.parentElement !== appHeader) {
@@ -23878,7 +23881,7 @@ function syncMobileThemeTogglePlacement() {
   const sidebarFooter = document.querySelector("#side-menu .sidebar-footer");
   if (!themeToggleBtn || !userMenu || !sidebarFooter) return;
 
-  const isMobile = window.matchMedia("(max-width: 768px)").matches;
+  const isMobile = window.matchMedia("(max-width: 1000px)").matches;
   let slot = document.getElementById("sidebar-theme-toggle-slot");
 
   if (isMobile) {
@@ -23886,8 +23889,11 @@ function syncMobileThemeTogglePlacement() {
       slot = document.createElement("div");
       slot.id = "sidebar-theme-toggle-slot";
       slot.className = "sidebar-theme-toggle-slot";
+      const footerTitleEl = sidebarFooter.querySelector(".sidebar-footer-title");
       const totalTimeEl = document.getElementById("student-total-time");
-      if (totalTimeEl) {
+      if (footerTitleEl) {
+        sidebarFooter.insertBefore(slot, footerTitleEl);
+      } else if (totalTimeEl) {
         sidebarFooter.insertBefore(slot, totalTimeEl);
       } else {
         sidebarFooter.insertBefore(slot, sidebarFooter.firstChild);

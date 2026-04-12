@@ -1,5 +1,7 @@
 (function () {
   const INSTALL_BUTTON_ID = "pwa-install-btn";
+  const INSTALL_SLOT_ID = "login-install-slot";
+  const INSTALL_WRAP_ID = "login-install-wrap";
   const IOS_HINT_ID = "pwa-ios-hint";
   const HINT_DISMISS_KEY = "pwa-ios-hint-dismissed";
   let deferredPrompt = null;
@@ -10,23 +12,30 @@
 
     button = document.createElement("button");
     button.id = INSTALL_BUTTON_ID;
+    button.className = "login-install-btn";
     button.type = "button";
-    button.textContent = "Uygulamayi Ekle";
+    button.textContent = "Kur";
     button.setAttribute("aria-label", "Uygulamayi cihaza ekle");
-    button.style.position = "fixed";
-    button.style.right = "16px";
-    button.style.bottom = "16px";
-    button.style.zIndex = "9999";
     button.style.display = "none";
-    button.style.padding = "10px 14px";
-    button.style.border = "0";
-    button.style.borderRadius = "999px";
-    button.style.fontWeight = "700";
-    button.style.cursor = "pointer";
-    button.style.background = "linear-gradient(135deg,#2563eb,#0ea5e9)";
-    button.style.color = "#fff";
-    button.style.boxShadow = "0 10px 24px rgba(37,99,235,.35)";
-    document.body.appendChild(button);
+
+    const installSlot = document.getElementById(INSTALL_SLOT_ID);
+    if (installSlot) {
+      installSlot.appendChild(button);
+    } else {
+      document.body.appendChild(button);
+      button.style.position = "fixed";
+      button.style.right = "16px";
+      button.style.bottom = "16px";
+      button.style.zIndex = "9999";
+      button.style.padding = "10px 14px";
+      button.style.border = "0";
+      button.style.borderRadius = "999px";
+      button.style.fontWeight = "700";
+      button.style.cursor = "pointer";
+      button.style.background = "linear-gradient(135deg,#2563eb,#0ea5e9)";
+      button.style.color = "#fff";
+      button.style.boxShadow = "0 10px 24px rgba(37,99,235,.35)";
+    }
 
     button.addEventListener("click", async () => {
       if (!deferredPrompt) return;
@@ -83,16 +92,19 @@
 
   function setupInstallPrompt() {
     const button = createInstallButton();
+    const installWrap = document.getElementById(INSTALL_WRAP_ID);
     window.addEventListener("beforeinstallprompt", (event) => {
       deferredPrompt = event;
       button.style.display = "inline-flex";
       button.style.alignItems = "center";
       button.style.gap = "8px";
+      if (installWrap) installWrap.style.display = "block";
     });
 
     window.addEventListener("appinstalled", () => {
       deferredPrompt = null;
       button.style.display = "none";
+      if (installWrap) installWrap.style.display = "none";
     });
   }
 
