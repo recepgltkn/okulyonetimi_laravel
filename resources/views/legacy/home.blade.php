@@ -43,7 +43,7 @@
         body :not(code):not(pre):not(kbd):not(samp) {
             font-family: var(--app-font-family) !important;
         }
-        body { background: #f2f2f6; margin: 0; overflow-x: hidden; width: 100vw; }
+        body { background: #f2f2f6; margin: 0; overflow-x: hidden; width: 100%; }
         #app-screen { background: #f2f2f6; border-radius: 16px; padding: 12px; width: 100%; max-width: 100%; overflow-x: hidden; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); align-items: start; }
         #app-screen > .app-header,
         #app-screen > #home-overview-strip,
@@ -6818,12 +6818,13 @@
             z-index: 3000;
             min-height: 100svh;
             height: 100svh;
-            width: 100vw;
+            width: 100%;
         }
         .login-screen.hidden { display: none !important; }
         .login-screen .login-card { position: relative; top: auto; left: auto; transform: none; margin: 0; pointer-events: auto; }
         .login-card {
             width: 100%;
+            max-width: 100%;
             min-height: 100svh;
             border-radius: 0;
             border: 0;
@@ -6831,6 +6832,7 @@
             box-shadow: none;
             overflow: hidden;
             padding: 0;
+            margin: 0 auto;
         }
         .login-layout {
             display: grid;
@@ -7000,7 +7002,7 @@
             line-height: 1.5;
         }
         .login-hero-logo {
-            max-width: 520px;
+            max-width: 340px;
             width: 100%;
             margin: 2px auto;
             display: block;
@@ -7095,6 +7097,8 @@
             align-items: center;
             justify-content: center;
             padding: 0;
+            z-index: 20;
+            pointer-events: auto;
         }
         .theme-toggle:hover { background: #f8fafc; }
         #login-screen .form-control {
@@ -8882,20 +8886,21 @@
                 background: linear-gradient(135deg, #e7f0ff 0%, #dbeafe 55%, #e0f2fe 100%);
                 left: 0 !important;
                 right: 0 !important;
-                width: 100vw !important;
-                max-width: 100vw !important;
+                width: 100% !important;
+                max-width: 100% !important;
                 padding: 0 !important;
             }
             .login-card {
-                width: 100vw !important;
-                max-width: 100vw !important;
+                width: 100% !important;
+                max-width: 100% !important;
                 margin: 0 !important;
             }
             .login-layout {
                 grid-template-columns: 1fr;
                 min-height: 100svh;
-                width: 100vw !important;
-                max-width: 100vw !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 0 auto;
             }
             .login-left {
                 align-items: center;
@@ -8919,7 +8924,7 @@
                 text-align: center;
             }
             .login-hero-logo {
-                max-width: min(70vw, 300px);
+                max-width: min(35vw, 150px);
             }
             .login-right {
                 padding: 12px 0 18px;
@@ -9814,14 +9819,13 @@
                     </div>
                     <div class="login-left-top">
                         <h2>Dijital Bilişim Eğitim Platformu</h2>
-                        <p>Kısa, odaklı ve uygulamalı içeriklerle öğrenme sürecini hızlandır.</p>
                     </div>
                     <img src="{{ url('public/logo.png') }}" alt="Logo" class="login-hero-logo">
                     <div class="login-slogan">Özelsin Çünkü Gelecek Sensin</div>
                 </section>
                 <section class="login-right">
-                    <button id="theme-toggle-login" class="theme-toggle" type="button" title="Karanlık Mod">🌙</button>
                     <div class="login-form-wrap">
+                        <button id="theme-toggle-login" class="theme-toggle" type="button" title="Karanlık Mod">🌙</button>
                         <div class="login-title-bar">
                             <h3>Giriş Yap</h3>
                         </div>
