@@ -2,8 +2,8 @@
   const INSTALL_BUTTON_ID = "pwa-install-btn";
   const INSTALL_SLOT_ID = "login-install-slot";
   const INSTALL_WRAP_ID = "login-install-wrap";
-  const IOS_HINT_ID = "pwa-ios-hint";
-  const HINT_DISMISS_KEY = "pwa-ios-hint-dismissed";
+  const INSTALL_STATUS_ID = "login-install-status";
+  const INSTALLED_FLAG_KEY = "pwa-installed-flag";
   let deferredPrompt = null;
 
   function createInstallButton() {
@@ -14,7 +14,7 @@
     button.id = INSTALL_BUTTON_ID;
     button.className = "login-install-btn";
     button.type = "button";
-    button.textContent = "Kur";
+    button.textContent = "Uygulamayi Kur";
     button.setAttribute("aria-label", "Uygulamayi cihaza ekle");
     button.style.display = "none";
 
@@ -49,6 +49,34 @@
     });
 
     return button;
+  }
+
+  function getInstallStatusElement() {
+    return document.getElementById(INSTALL_STATUS_ID);
+  }
+
+  function setInstallState(installed, message = "") {
+    const button = document.getElementById(INSTALL_BUTTON_ID) || createInstallButton();
+    const installWrap = document.getElementById(INSTALL_WRAP_ID);
+    const statusEl = getInstallStatusElement();
+
+    if (installWrap) installWrap.style.display = "block";
+
+    if (installed) {
+      button.style.display = "none";
+      if (statusEl) {
+        statusEl.textContent = "Uygulamaniz zaten kurulu.";
+        statusEl.classList.add("login-install-status-ok");
+        statusEl.style.display = "block";
+      }
+      return;
+    }
+
+    if (statusEl) {
+      statusEl.textContent = message || "";
+      statusEl.classList.remove("login-install-status-ok");
+      statusEl.style.display = message ? "block" : "none";
+    }
   }
 
   function registerServiceWorker() {
@@ -117,54 +145,46 @@
   function setupInstallPrompt() {
     const button = createInstallButton();
     const installWrap = document.getElementById(INSTALL_WRAP_ID);
+    const installed = supportsPwaContext() || localStorage.getItem(INSTALLED_FLAG_KEY) === "1";
+
+    if (installed) {
+      setInstallState(true);
+      return;
+    }
+
+    setInstallState(false);
+    button.style.display = "inline-flex";
+    button.style.alignItems = "center";
+    button.style.gap = "8px";
+    if (installWrap) installWrap.style.display = "block";
+
+    if (isIos()) {
+      button.addEventListener("click", function () {
+        setInstallState(false, 'iPhone/iPad: Safari > Paylas > "Ana Ekrana Ekle".');
+      });
+      return;
+    }
+
     window.addEventListener("beforeinstallprompt", (event) => {
       deferredPrompt = event;
-      button.style.display = "inline-flex";
-      button.style.alignItems = "center";
-      button.style.gap = "8px";
-      if (installWrap) installWrap.style.display = "block";
+      setInstallState(false);
+    });
+
+    button.addEventListener("click", function () {
+      if (!deferredPrompt) {
+        setInstallState(false, 'Tarayici menusu > "Ana ekrana ekle" adimini kullanin.');
+      }
     });
 
     window.addEventListener("appinstalled", () => {
       deferredPrompt = null;
-      button.style.display = "none";
-      if (installWrap) installWrap.style.display = "none";
+      try { localStorage.setItem(INSTALLED_FLAG_KEY, "1"); } catch (_) {}
+      setInstallState(true);
     });
   }
 
   function isIos() {
     return /iphone|ipad|ipod/i.test(window.navigator.userAgent);
-  }
-
-  function showIosInstallHint() {
-    if (!isIos() || supportsPwaContext()) return;
-    if (localStorage.getItem(HINT_DISMISS_KEY) === "1") return;
-    if (document.getElementById(IOS_HINT_ID)) return;
-
-    const hint = document.createElement("div");
-    hint.id = IOS_HINT_ID;
-    hint.style.position = "fixed";
-    hint.style.left = "16px";
-    hint.style.right = "16px";
-    hint.style.bottom = "16px";
-    hint.style.zIndex = "9998";
-    hint.style.padding = "12px 14px";
-    hint.style.borderRadius = "12px";
-    hint.style.background = "#0f172a";
-    hint.style.color = "#fff";
-    hint.style.fontSize = "14px";
-    hint.style.lineHeight = "1.35";
-    hint.style.boxShadow = "0 12px 30px rgba(2,6,23,.35)";
-    hint.innerHTML = 'iPhone/iPad icin: Safari menusu > Paylas > "Ana Ekrana Ekle". <button id="pwa-ios-hint-close" style="margin-left:8px;border:0;background:#1d4ed8;color:#fff;border-radius:8px;padding:6px 8px;cursor:pointer;">Tamam</button>';
-
-    document.body.appendChild(hint);
-    const closeBtn = document.getElementById("pwa-ios-hint-close");
-    if (closeBtn) {
-      closeBtn.addEventListener("click", function () {
-        localStorage.setItem(HINT_DISMISS_KEY, "1");
-        hint.remove();
-      });
-    }
   }
 
   function supportsPwaContext() {
@@ -175,15 +195,11 @@
 
   registerServiceWorker();
 
-  if (!supportsPwaContext()) {
-    if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", function () {
-        setupInstallPrompt();
-        showIosInstallHint();
-      });
-    } else {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function () {
       setupInstallPrompt();
-      showIosInstallHint();
-    }
+    });
+  } else {
+    setupInstallPrompt();
   }
 })();
