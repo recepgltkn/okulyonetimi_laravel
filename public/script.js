@@ -1012,10 +1012,10 @@ window.openBlockRunner = async function(userId, options = {}){
   setBlockRunnerHeaderByRole();
   // set src to app path
   const runnerRole = userRole === "teacher" ? "teacher" : "student";
-  iframe.src = appUrl(`block-grid-runner/index.html?role=${runnerRole}`);
+  iframe.src = appUrl(`index.php/block-grid-runner?role=${runnerRole}`);
   modal.style.display = 'flex';
   document.getElementById('activity-title').innerText = options?.title || 'Blok Kodlama - Grid Runner';
-  document.getElementById('activity-link').innerText = appUrl("block-grid-runner/index.html");
+  document.getElementById('activity-link').innerText = appUrl("index.php/block-grid-runner");
   const closeBtn = document.getElementById("btn-close-activity");
   if (closeBtn) closeBtn.innerText = "Ã—";
   const topTitle = document.querySelector("#activity-modal .modal-header h2");
@@ -1973,7 +1973,7 @@ window.addEventListener('message', async function(e){
 });
 
 // Button hooks for opening block runner
-document.addEventListener('DOMContentLoaded', function(){
+function bindAppsHubAndRunnerButtons() {
   const btnStudent = document.getElementById('btn-open-block-runner-student');
   if(btnStudent){ btnStudent.addEventListener('click', ()=> openBlockRunner(currentUserId)); }
   const btnTeacher = document.getElementById('btn-open-block-reports');
@@ -2054,7 +2054,13 @@ document.addEventListener('DOMContentLoaded', function(){
     });
   }
   // Keyboard race report button removed from apps hub card by design.
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', bindAppsHubAndRunnerButtons, { once: true });
+} else {
+  bindAppsHubAndRunnerButtons();
+}
 
 function buildKeyboardRaceReportHtml(report) {
   const rows = Array.isArray(report?.participants) ? report.participants : [];
@@ -2300,8 +2306,25 @@ function setupIframeFallback(iframe, link, options = {}) {
   }
   let loaded = false;
   let fallbackOpened = false;
+  const isInternalLink = (() => {
+    try {
+      if (!link) return false;
+      const parsed = new URL(link, window.location.href);
+      return parsed.origin === window.location.origin;
+    } catch (_) {
+      return false;
+    }
+  })();
   const openInNewTabNow = () => {
     if (fallbackOpened || !link) return;
+    if (isInternalLink) {
+      // Same-origin uygulamalarda otomatik popup/overlay açma:
+      // yükleme gecikse bile kullanıcıyı modal kilidine sokmayalım.
+      if (iframe.id === "activity-iframe") {
+        setActivityFrameStatus("Uygulama yükleniyor... Lütfen birkaç saniye bekleyin.", "warn");
+      }
+      return;
+    }
     fallbackOpened = true;
     if (iframe.id === "activity-iframe") {
       setActivityFrameStatus("Site iframe içinde açılamadı. Yeni sekmede açılıyor...", "warn");
@@ -7812,9 +7835,9 @@ window.openComputeItRunner = async function(userId, options = {}){
   setComputeTeacherHeaderMode(userRole === "teacher");
   modal.classList.remove("fullscreen");
   modal.style.display = "flex";
-  iframe.src = appUrl(`compute-it-runner/index.html?role=${runnerRole}&uid=${encodeURIComponent(activeComputeRunnerUserId || "")}`);
+  iframe.src = appUrl(`index.php/compute-it-runner?role=${runnerRole}&uid=${encodeURIComponent(activeComputeRunnerUserId || "")}`);
   document.getElementById('activity-title').innerText = options?.title || 'Compute It';
-  document.getElementById('activity-link').innerText = appUrl("compute-it-runner/index.html");
+  document.getElementById('activity-link').innerText = appUrl("index.php/compute-it-runner");
   const topTitle = document.querySelector("#activity-modal .modal-header h2");
   if (topTitle) topTitle.innerText = "Compute It";
   const closeBtn = document.getElementById("btn-close-activity");
