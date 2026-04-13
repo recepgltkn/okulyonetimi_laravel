@@ -391,6 +391,7 @@ let studentCompletionsUnsub = null;
 let tasksUnsub = null;
 let studentCompletionsListeningUserId = null;
 let tasksListenerRole = null;
+let lastProfileBootstrapKey = "";
 let profileChangeApprovalsUnsub = null;
 let logoutInProgress = false;
 let contentAssignments = [];
@@ -14464,6 +14465,7 @@ onAuthStateChanged(auth, (user) => {
     setTeacherAssignedClasses([]);
     if (progressUnsub) progressUnsub();
     progressUnsub = null;
+    lastProfileBootstrapKey = "";
     if (studentCompletionsUnsub) studentCompletionsUnsub();
     studentCompletionsUnsub = null;
     studentCompletionsListeningUserId = null;
@@ -14722,6 +14724,14 @@ onAuthStateChanged(auth, (user) => {
         }
       }
     }
+    const nextProfileBootstrapKey = `${String(user.uid)}:${String(userRole || "")}`;
+    const shouldRunFullBootstrap = lastProfileBootstrapKey !== nextProfileBootstrapKey;
+    if (!shouldRunFullBootstrap) {
+      renderHeaderAvatar();
+      if (userRole !== "teacher") updateUserXPDisplay();
+      return;
+    }
+    lastProfileBootstrapKey = nextProfileBootstrapKey;
     if (userRole === "teacher") {
       syncTeacherAssignedClassesFromUserData();
       await refreshTeacherOwnerAliasTokens();

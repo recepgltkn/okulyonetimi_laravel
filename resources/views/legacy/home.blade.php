@@ -18,7 +18,7 @@
     <link rel="dns-prefetch" href="//fonts.googleapis.com">
     <link rel="dns-prefetch" href="//fonts.gstatic.com">
     <link id="app-favicon" rel="icon" type="image/png" href="{{ url('public/logo.png') }}">
-    <link id="app-manifest-link" rel="manifest" href="{{ url('manifest.webmanifest') }}">
+    <link id="app-manifest-link" rel="manifest" href="{{ url('index.php/manifest.webmanifest') }}">
     <link rel="apple-touch-icon" href="{{ url('public/logo192.png') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Poppins:wght@300;400&display=swap" rel="stylesheet">
@@ -7276,6 +7276,17 @@
             justify-content: center;
             text-align: center;
         }
+        .login-install-status-ok {
+            margin-top: 8px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid #86efac;
+            background: #dcfce7;
+            color: #166534;
+            font-size: 0.82rem;
+            font-weight: 700;
+            text-align: center;
+        }
         #btn-login {
             margin-top: 8px;
             height: 50px;
@@ -9970,6 +9981,7 @@
                         <div id="login-install-wrap" class="login-install-wrap">
                             <p class="login-install-title">Mobil Uygulama Olarak Kur</p>
                             <div id="login-install-slot"></div>
+                            <p id="login-install-status" class="login-install-title" style="display:none; margin-top:8px;"></p>
                         </div>
                         <div id="login-mini-game-wrap" style="display:none;"></div>
                     </div>
