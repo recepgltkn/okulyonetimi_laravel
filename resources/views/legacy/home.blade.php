@@ -18,7 +18,7 @@
     <link rel="dns-prefetch" href="//fonts.googleapis.com">
     <link rel="dns-prefetch" href="//fonts.gstatic.com">
     <link id="app-favicon" rel="icon" type="image/png" href="{{ url('public/logo.png') }}">
-    <link id="app-manifest-link" rel="manifest" href="{{ url('public/manifest.json') }}">
+    <link id="app-manifest-link" rel="manifest" href="{{ url('manifest.webmanifest') }}">
     <link rel="apple-touch-icon" href="{{ url('public/logo192.png') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Poppins:wght@300;400&display=swap" rel="stylesheet">
