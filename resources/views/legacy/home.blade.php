@@ -17,9 +17,9 @@
     <link rel="dns-prefetch" href="//cdn.jsdelivr.net">
     <link rel="dns-prefetch" href="//fonts.googleapis.com">
     <link rel="dns-prefetch" href="//fonts.gstatic.com">
-    <link id="app-favicon" rel="icon" type="image/png" href="{{ url('public/logo.png') }}">
-    <link id="app-manifest-link" rel="manifest" href="{{ url('index.php/manifest.webmanifest') }}">
-    <link rel="apple-touch-icon" href="{{ url('public/logo192.png') }}">
+    <link id="app-favicon" rel="icon" type="image/png" href="logo.png">
+    <link id="app-manifest-link" rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="logo192.png">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Poppins:wght@300;400&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&display=swap" rel="stylesheet">
@@ -12556,8 +12556,13 @@ Ayşe, Yılmaz, ayse, 123456, 9, B"></textarea>
       (function () {
         var version = "?v={{ filemtime(public_path('script.js')) }}";
         var pwaVersion = "?v={{ filemtime(public_path('pwa-init.js')) }}";
-        var publicPrefix = "{{ rtrim(url('public'), '/') }}";
-        var rootPrefix = "{{ rtrim(url('/'), '/') }}";
+        var rawBase = "{{ rtrim(request()->getBaseUrl(), '/') }}";
+        var baseNoIndex = String(rawBase || "").replace(/\/index\.php$/i, "");
+        var absoluteOrigin = String(window.location.origin || "");
+        var rootPrefix = normalize(absoluteOrigin + (baseNoIndex ? ("/" + String(baseNoIndex).replace(/^\/+/, "")) : ""));
+        var publicPrefix = normalize(rootPrefix + "/public");
+        var appPathPrefix = "/" + String(baseNoIndex || "").replace(/^\/+|\/+$/g, "");
+        if (appPathPrefix === "/") appPathPrefix = "";
 
         function normalize(url) {
           return String(url || "").replace(/([^:]\/)\/+/g, "$1");
@@ -12570,6 +12575,34 @@ Ayşe, Yılmaz, ayse, 123456, 9, B"></textarea>
             normalize(publicPrefix + "/" + clean + ext),
             normalize(rootPrefix + "/" + clean + ext)
           ];
+        }
+
+        function absolutizeAssetUrl(input) {
+          var src = String(input || "").trim();
+          if (!src) return src;
+          if (/^(?:[a-z]+:)?\/\//i.test(src) || src.startsWith("data:") || src.startsWith("blob:")) return src;
+
+          var normalizedPath = src;
+          normalizedPath = normalizedPath.replace(/^\/index\.php\/public\//i, "/");
+          normalizedPath = normalizedPath.replace(/^\/index\.php\//i, "/");
+          normalizedPath = normalizedPath.replace(/^\/public\//i, "/");
+
+          if (normalizedPath.startsWith("/")) {
+            if (appPathPrefix && !normalizedPath.startsWith(appPathPrefix + "/") && normalizedPath !== appPathPrefix) {
+              normalizedPath = appPathPrefix + normalizedPath;
+            }
+            return normalize(absoluteOrigin + normalizedPath);
+          }
+          return normalize(rootPrefix + "/" + normalizedPath.replace(/^\/+/, ""));
+        }
+
+        function normalizeAssetAttrs() {
+          var nodes = document.querySelectorAll("img[src],script[src],link[href],source[src],video[poster]");
+          nodes.forEach(function (el) {
+            if (el.hasAttribute("src")) el.setAttribute("src", absolutizeAssetUrl(el.getAttribute("src")));
+            if (el.hasAttribute("href")) el.setAttribute("href", absolutizeAssetUrl(el.getAttribute("href")));
+            if (el.hasAttribute("poster")) el.setAttribute("poster", absolutizeAssetUrl(el.getAttribute("poster")));
+          });
         }
 
         function loadScriptWithFallback(list, opts) {
@@ -12596,7 +12629,12 @@ Ayşe, Yılmaz, ayse, 123456, 9, B"></textarea>
         function applyManifestFallback() {
           var manifest = document.getElementById("app-manifest-link");
           if (!manifest) return;
-          var list = candidates("manifest.json", "");
+          var list = [
+            candidates("manifest.webmanifest", "")[0],
+            candidates("manifest.webmanifest", "")[1],
+            candidates("manifest.json", "")[0],
+            candidates("manifest.json", "")[1]
+          ];
           fetch(list[0], { method: "HEAD", cache: "no-store" })
             .then(function (r) {
               if (!r.ok) manifest.href = list[1];
@@ -12608,12 +12646,16 @@ Ayşe, Yılmaz, ayse, 123456, 9, B"></textarea>
 
         document.addEventListener("error", function (event) {
           var target = event && event.target;
-          if (!target || target.tagName !== "IMG") return;
-          var src = String(target.getAttribute("src") || "");
-          if (!src || src.indexOf("/public/") === -1) return;
-          target.setAttribute("src", src.replace("/public/", "/"));
+          if (!target) return;
+          if (target.hasAttribute && target.hasAttribute("src")) {
+            target.setAttribute("src", absolutizeAssetUrl(target.getAttribute("src")));
+          }
+          if (target.hasAttribute && target.hasAttribute("href")) {
+            target.setAttribute("href", absolutizeAssetUrl(target.getAttribute("href")));
+          }
         }, true);
 
+        normalizeAssetAttrs();
         applyManifestFallback();
 
         loadScriptWithFallback(candidates("pwa-init.js", pwaVersion), { defer: true })

@@ -1,7 +1,8 @@
 const META_BASE_URL = String(
   document.querySelector('meta[name="app-base-url"]')?.content || ""
 ).trim().replace(/\/+$/, "");
-const currentDirBase = `${window.location.origin}${String(window.location.pathname || "").replace(/\/+$/, "")}`;
+const sanitizedMetaBase = META_BASE_URL.replace(/\/index\.php$/i, "");
+const currentDirBase = `${window.location.origin}${String(window.location.pathname || "").replace(/\/+$/, "")}`.replace(/\/index\.php$/i, "");
 const inferredPublicBase = (() => {
   const path = String(window.location.pathname || "");
   const idx = path.toLowerCase().indexOf("/public/");
@@ -9,14 +10,13 @@ const inferredPublicBase = (() => {
   if (path.toLowerCase().endsWith("/public")) return `${window.location.origin}${path}`;
   return "";
 })();
-const metaHasPublic = /\/public$/i.test(META_BASE_URL);
-const fallbackPublicBase = /\/public$/i.test(currentDirBase) ? currentDirBase : `${currentDirBase}/public`;
-const APP_BASE_URL = (inferredPublicBase || (metaHasPublic ? META_BASE_URL : "") || fallbackPublicBase || window.location.origin).replace(/\/+$/, "");
+const APP_BASE_URL = (inferredPublicBase || sanitizedMetaBase || currentDirBase || window.location.origin).replace(/\/+$/, "");
 const API_BASE = `${APP_BASE_URL}/api/client`;
 const APP_BASE_URL_NO_PUBLIC = APP_BASE_URL.replace(/\/public$/i, "");
 const API_BASE_CANDIDATES = Array.from(new Set([
   API_BASE,
   `${APP_BASE_URL_NO_PUBLIC}/api/client`,
+  `${APP_BASE_URL}/public/api/client`,
   `${window.location.origin}/api/client`,
   `${window.location.origin}/index.php/api/client`,
 ].map((v) => String(v || "").trim().replace(/\/+$/, "")).filter(Boolean)));
@@ -340,7 +340,7 @@ export function writeBatch(_db) {
 export async function signInWithEmailAndPassword(_auth, email, password) {
   const res = await api("/auth/login", "POST", { identifier: email, password });
   const user = res?.user || null;
-  if (!user) throw new Error("Login failed");
+  if (!user) throw new Error(translateApiErrorMessage(res?.message || "Login failed"));
   if (isPrimaryAuth(_auth)) {
     persistAuthUser(user);
   } else {
