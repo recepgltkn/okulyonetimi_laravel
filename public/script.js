@@ -2170,9 +2170,21 @@ function openKeyboardRaceAnnouncement(roomCode, roomStatus = "active") {
 async function pollKeyboardRaceAnnouncement() {
   if (userRole !== "student") return;
   try {
-    const res = await fetch(appUrl("public/api/race/rooms/active"), { headers: { Accept: "application/json" } });
-    if (!res.ok) return;
-    const data = await res.json();
+    const endpoints = [
+      appUrl("public/api/race/rooms/active"),
+      appUrl("index.php/api/race/rooms/active"),
+      appUrl("api/race/rooms/active")
+    ];
+    let data = null;
+    for (const endpoint of endpoints) {
+      try {
+        const res = await fetch(endpoint, { headers: { Accept: "application/json" } });
+        if (!res.ok) continue;
+        data = await res.json();
+        break;
+      } catch (_) {}
+    }
+    if (!data) return;
     const active = data?.active || null;
     if (!active?.roomCode) return;
     const joinedKey = `keyboard_race_joined_${active.roomCode}`;

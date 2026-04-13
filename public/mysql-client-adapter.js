@@ -13,7 +13,15 @@ const metaHasPublic = /\/public$/i.test(META_BASE_URL);
 const fallbackPublicBase = /\/public$/i.test(currentDirBase) ? currentDirBase : `${currentDirBase}/public`;
 const APP_BASE_URL = (inferredPublicBase || (metaHasPublic ? META_BASE_URL : "") || fallbackPublicBase || window.location.origin).replace(/\/+$/, "");
 const API_BASE = `${APP_BASE_URL}/api/client`;
-window.__MYSQL_CLIENT_API_BASE__ = API_BASE;
+const APP_BASE_URL_NO_PUBLIC = APP_BASE_URL.replace(/\/public$/i, "");
+const API_BASE_CANDIDATES = Array.from(new Set([
+  API_BASE,
+  `${APP_BASE_URL_NO_PUBLIC}/api/client`,
+  `${window.location.origin}/api/client`,
+  `${window.location.origin}/index.php/api/client`,
+].map((v) => String(v || "").trim().replace(/\/+$/, "")).filter(Boolean)));
+let activeApiBase = API_BASE_CANDIDATES[0] || API_BASE;
+window.__MYSQL_CLIENT_API_BASE__ = activeApiBase;
 const AUTH_KEY = "mysql_auth_user";
 const WATCH_INTERVAL_MS = 1000;
 const WATCH_INTERVAL_HIDDEN_MS = 5000;
@@ -101,13 +109,30 @@ async function api(path, method = "GET", body = null) {
     headers["X-Client-Token"] = token;
     headers["Authorization"] = `Bearer ${token}`;
   }
-  const res = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : null,
-  });
-  const json = await res.json().catch(() => ({}));
-  if (res.status === 401 && needsAuth) {
+  const bases = [activeApiBase, ...API_BASE_CANDIDATES.filter((b) => b !== activeApiBase)];
+  let res = null;
+  let json = {};
+  let chosenBase = activeApiBase;
+  for (let i = 0; i < bases.length; i++) {
+    const base = bases[i];
+    const tryRes = await fetch(`${base}${path}`, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : null,
+    });
+    const tryJson = await tryRes.json().catch(() => ({}));
+    res = tryRes;
+    json = tryJson;
+    chosenBase = base;
+    if (tryRes.ok) break;
+    const retryableBaseError = [403, 404, 419].includes(Number(tryRes.status || 0));
+    if (!retryableBaseError || i === bases.length - 1) break;
+  }
+  if (res?.ok && chosenBase && chosenBase !== activeApiBase) {
+    activeApiBase = chosenBase;
+    window.__MYSQL_CLIENT_API_BASE__ = chosenBase;
+  }
+  if (res?.status === 401 && needsAuth) {
     console.warn("API 401 unauthenticated", {
       path,
       uid: uid || null,
@@ -120,7 +145,7 @@ async function api(path, method = "GET", body = null) {
       persistAuthUser(null);
     }
   }
-  if (!res.ok) throw new Error(translateApiErrorMessage(json?.message || `HTTP ${res.status}`, res.status));
+  if (!res?.ok) throw new Error(translateApiErrorMessage(json?.message || `HTTP ${res?.status || 0}`, res?.status || 0));
   return json;
 }
 
