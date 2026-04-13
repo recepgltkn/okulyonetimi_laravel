@@ -387,6 +387,10 @@ let contentProgressMap = new Map();
 let contentUnsub = null;
 let progressUnsub = null;
 let userProfileUnsub = null;
+let studentCompletionsUnsub = null;
+let tasksUnsub = null;
+let studentCompletionsListeningUserId = null;
+let tasksListenerRole = null;
 let profileChangeApprovalsUnsub = null;
 let logoutInProgress = false;
 let contentAssignments = [];
@@ -14448,6 +14452,12 @@ onAuthStateChanged(auth, (user) => {
     setTeacherAssignedClasses([]);
     if (progressUnsub) progressUnsub();
     progressUnsub = null;
+    if (studentCompletionsUnsub) studentCompletionsUnsub();
+    studentCompletionsUnsub = null;
+    studentCompletionsListeningUserId = null;
+    if (tasksUnsub) tasksUnsub();
+    tasksUnsub = null;
+    tasksListenerRole = null;
     if (contentUnsub) contentUnsub();
     contentUnsub = null;
     if (assignmentUnsub) assignmentUnsub();
@@ -14985,6 +14995,11 @@ onAuthStateChanged(auth, (user) => {
       startStudentLiveQuizListener();
       refreshStudentQuizPointsStat();
     } else {
+      if (studentCompletionsUnsub) {
+        try { studentCompletionsUnsub(); } catch (e) {}
+      }
+      studentCompletionsUnsub = null;
+      studentCompletionsListeningUserId = null;
       if (studentLiveSessionUnsub) studentLiveSessionUnsub();
       studentLiveSessionUnsub = null;
       stopStudentLiveScoresListener();
@@ -15068,12 +15083,21 @@ onAuthStateChanged(auth, (user) => {
 
 /* ================= ÖÄRENCİ TAMAMLANAN ÖDEVLERİ ================= */
 function loadStudentCompletions(userId) {
+  const normalizedUserId = String(userId || "");
+  if (studentCompletionsUnsub && studentCompletionsListeningUserId === normalizedUserId) {
+    return;
+  }
+  if (studentCompletionsUnsub) {
+    try { studentCompletionsUnsub(); } catch (e) {}
+    studentCompletionsUnsub = null;
+  }
+  studentCompletionsListeningUserId = normalizedUserId;
   console.log("Öğrenci completions dinleniyor:", userId);
   
   isCompletionsLoaded = false;
-  const q = query(collection(db, "completions"), where("userId", "==", userId));
+  const q = query(collection(db, "completions"), where("userId", "==", normalizedUserId));
   
-  onSnapshot(q, (snap) => {
+  studentCompletionsUnsub = onSnapshot(q, (snap) => {
     console.log("Completions güncellendi, sayı:", snap.size);
     
     completedTasks.clear();
@@ -15109,12 +15133,21 @@ function loadStudentCompletions(userId) {
 
 /* ================= ÖDEVLERİ YÜKLE ================= */
 function loadTasks() {
+  const roleKey = String(userRole || "");
+  if (tasksUnsub && tasksListenerRole === roleKey) {
+    return;
+  }
+  if (tasksUnsub) {
+    try { tasksUnsub(); } catch (e) {}
+    tasksUnsub = null;
+  }
+  tasksListenerRole = roleKey;
   console.log("Tasks yükleniyor...");
   
   isTasksLoaded = false;
   const q = query(collection(db, "activities"));
 
-  onSnapshot(q, (snap) => {
+  tasksUnsub = onSnapshot(q, (snap) => {
     console.log("Tasks güncellendi, sayı:", snap.size);
     
     allTasks = [];
