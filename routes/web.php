@@ -32,8 +32,10 @@ Route::view('/block-builder-studio', 'block-builder.index');
 
 Route::get('/manifest.webmanifest', function (Request $request) {
     $base = rtrim($request->getBaseUrl(), '/');
+    $assetBase = preg_replace('#/index\.php$#i', '', $base);
+    $assetBase = rtrim((string) $assetBase, '/');
     $appRoot = ($base !== '' ? $base : '') . '/';
-    $publicBase = ($base !== '' ? $base : '') . '/public';
+    $publicBase = ($assetBase !== '' ? $assetBase : '') . '/public';
 
     $manifestPath = public_path('manifest.json');
     $manifest = [];
