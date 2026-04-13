@@ -34,8 +34,8 @@ class AppServiceProvider extends ServiceProvider
             $uid = (string) ($request->header('X-Client-Uid') ?: $request->input('uid') ?: $request->query('uid') ?: '');
             $key = $uid !== '' ? "uid:{$uid}" : "ip:{$request->ip()}";
             return [
-                Limit::perMinute(240)->by($key),
-                Limit::perMinute(600)->by($request->ip()),
+                Limit::perMinute(300)->by($key),
+                Limit::perMinute(6000)->by($request->ip()),
             ];
         });
     }

@@ -6,6 +6,7 @@ use App\Models\RaceResult;
 use App\Models\Room;
 use App\Models\StudentReport;
 use App\Models\UserProfile;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -35,6 +36,9 @@ class RaceController extends Controller
             'status' => 'active',
             'started_at' => now(),
         ]);
+        Cache::forget('race:active_room');
+        Cache::forget("race:leaderboard:{$room->id}");
+        Cache::forget("race:report:{$room->id}");
 
         $participants = RaceResult::query()
             ->where('room_id', $room->id)
@@ -125,6 +129,9 @@ class RaceController extends Controller
                 ]);
             }
         });
+        Cache::forget('race:active_room');
+        Cache::forget("race:leaderboard:{$room->id}");
+        Cache::forget("race:report:{$room->id}");
 
         $leaderboard = $this->buildLeaderboard($room);
 
@@ -163,6 +170,9 @@ class RaceController extends Controller
             'status' => 'finished',
             'finished_at' => now(),
         ]);
+        Cache::forget('race:active_room');
+        Cache::forget("race:leaderboard:{$room->id}");
+        Cache::forget("race:report:{$room->id}");
 
         $leaderboard = $this->buildLeaderboard($room);
         $report = $this->buildRoomReport($room);
@@ -185,19 +195,25 @@ class RaceController extends Controller
 
     public function leaderboard(Room $room): JsonResponse
     {
+        $cacheKey = "race:leaderboard:{$room->id}";
+        $leaderboard = Cache::remember($cacheKey, now()->addSeconds(5), function () use ($room) {
+            return $this->buildLeaderboard($room);
+        });
         return response()->json([
-            'leaderboard' => $this->buildLeaderboard($room),
+            'leaderboard' => $leaderboard,
         ]);
     }
 
     public function active(): JsonResponse
     {
-        $room = Room::query()
-            ->where('status', 'active')
-            ->whereNotNull('started_at')
-            ->where('started_at', '>=', now()->subHours(3))
-            ->orderByDesc('started_at')
-            ->first(['code', 'name', 'status', 'started_at', 'created_at']);
+        $room = Cache::remember('race:active_room', now()->addSeconds(5), function () {
+            return Room::query()
+                ->where('status', 'active')
+                ->whereNotNull('started_at')
+                ->where('started_at', '>=', now()->subHours(3))
+                ->orderByDesc('started_at')
+                ->first(['id', 'code', 'name', 'status', 'started_at', 'created_at']);
+        });
 
         return response()->json([
             'active' => $room ? [
@@ -275,8 +291,12 @@ class RaceController extends Controller
 
     public function report(Room $room): JsonResponse
     {
+        $cacheKey = "race:report:{$room->id}";
+        $report = Cache::remember($cacheKey, now()->addSeconds(5), function () use ($room) {
+            return $this->buildRoomReport($room);
+        });
         return response()->json([
-            'report' => $this->buildRoomReport($room),
+            'report' => $report,
         ]);
     }
 

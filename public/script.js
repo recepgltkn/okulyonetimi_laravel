@@ -5074,7 +5074,7 @@ function listenTeacherLiveSession() {
     }
   };
   poll();
-  window.__teacherLivePollTimer = setInterval(poll, 2000);
+  window.__teacherLivePollTimer = setInterval(poll, 5000);
 }
 
 async function teacherNextLiveQuestion() {
@@ -5341,7 +5341,7 @@ function startStudentLiveQuizListener() {
     } catch (e) {}
   };
   poll();
-  window.__studentLivePollTimer = setInterval(poll, 2000);
+  window.__studentLivePollTimer = setInterval(poll, 5000);
 }
 
 function stopStudentLiveSessionPolling({ clearInvite = true, closePlayer = true } = {}) {
@@ -5881,7 +5881,7 @@ function startStudentLiveScoresListener(sessionId) {
     } catch (e) {}
   };
   poll();
-  window.__studentLiveScorePollTimer = setInterval(poll, 2000);
+  window.__studentLiveScorePollTimer = setInterval(poll, 5000);
 }
 
 function updateLivePlayerTimer(leftSeconds) {
@@ -29077,3 +29077,4 @@ async function loadMyStatsModal() {
     showNotice("İstatistikler yüklenemedi. Lütfen tekrar deneyin.", "#e74c3c");
   }
 }
+

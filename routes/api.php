@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 use App\Http\Controllers\ClientDataController;
 use App\Http\Controllers\ClientLiveQuizController;
@@ -8,14 +8,14 @@ use App\Http\Controllers\RoomController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('client')->group(function () {
-    // Okul gibi tek IP'den toplu girişlerde 429 riskini azalt.
-    Route::middleware('throttle:1000,1')->group(function () {
+    // Okul gibi tek IP'den toplu giriÅŸlerde 429 riskini azalt.
+    Route::middleware('throttle:client-auth')->group(function () {
         Route::post('/auth/login', [ClientDataController::class, 'login']);
         Route::post('/auth/register', [ClientDataController::class, 'register']);
     });
 
-    // Auth sonrası yoğun polling trafiği için daha yüksek tavan.
-    Route::middleware(['client.auth', 'throttle:12000,1'])->group(function () {
+    // Auth sonrasÄ± yoÄŸun polling trafiÄŸi iÃ§in daha yÃ¼ksek tavan.
+    Route::middleware(['client.auth', 'throttle:client-api'])->group(function () {
         Route::post('/auth/logout', [ClientDataController::class, 'logout']);
         Route::post('/auth/update-password', [ClientDataController::class, 'updatePassword']);
         Route::post('/auth/delete-user', [ClientDataController::class, 'deleteUser']);
@@ -67,3 +67,4 @@ Route::prefix('race')->group(function () {
     Route::get('/rooms/{room:code}/leaderboard', [RaceController::class, 'leaderboard']);
     Route::get('/rooms/{room:code}/report', [RaceController::class, 'report']);
 });
+

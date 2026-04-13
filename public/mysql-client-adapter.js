@@ -23,8 +23,8 @@ const API_BASE_CANDIDATES = Array.from(new Set([
 let activeApiBase = API_BASE_CANDIDATES[0] || API_BASE;
 window.__MYSQL_CLIENT_API_BASE__ = activeApiBase;
 const AUTH_KEY = "mysql_auth_user";
-const WATCH_INTERVAL_MS = 1000;
-const WATCH_INTERVAL_HIDDEN_MS = 5000;
+const WATCH_INTERVAL_MS = 3000;
+const WATCH_INTERVAL_HIDDEN_MS = 12000;
 const WATCH_BACKOFF_MAX_MS = 60000;
 
 let currentUser = null;
