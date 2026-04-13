@@ -54,31 +54,55 @@
   function registerServiceWorker() {
     if (!("serviceWorker" in navigator)) return;
     window.addEventListener("load", () => {
-      const metaBaseUrl = String(
-        document.querySelector('meta[name="app-base-url"]')?.content || ""
-      ).trim().replace(/\/+$/, "");
-      const root = (() => {
-        if (!metaBaseUrl) return window.location.origin;
+      const scriptUrl = (() => {
         try {
-          const parsed = new URL(metaBaseUrl, window.location.origin);
-          const parsedHost = String(parsed.hostname || "").toLowerCase();
-          const currentHost = String(window.location.hostname || "").toLowerCase();
-          const parsedIsLocal = parsedHost === "localhost" || parsedHost === "127.0.0.1";
-          const currentIsLocal = currentHost === "localhost" || currentHost === "127.0.0.1";
-          if (parsedIsLocal && !currentIsLocal) {
-            return `${window.location.origin}${parsed.pathname}`.replace(/\/+$/, "");
+          if (document.currentScript && document.currentScript.src) {
+            return new URL(document.currentScript.src, window.location.href);
           }
-          return `${parsed.origin}${parsed.pathname}`.replace(/\/+$/, "");
-        } catch (_) {
-          return window.location.origin;
-        }
+        } catch (_) {}
+        try {
+          const scripts = Array.from(document.scripts || []);
+          const found = scripts.find((s) => String(s.src || "").includes("/pwa-init.js"));
+          if (found && found.src) return new URL(found.src, window.location.href);
+        } catch (_) {}
+        return null;
       })();
-      const candidates = [
-        `${root}/public/service-worker.js`,
-        `${root}/service-worker.js`,
-      ];
+
+      const candidates = (() => {
+        const list = [];
+        if (scriptUrl) {
+          list.push(new URL("service-worker.js", scriptUrl).toString());
+        }
+        const metaBaseUrl = String(
+          document.querySelector('meta[name="app-base-url"]')?.content || ""
+        ).trim().replace(/\/+$/, "");
+        if (metaBaseUrl) {
+          try {
+            const parsed = new URL(metaBaseUrl, window.location.origin);
+            const root = `${parsed.origin}${parsed.pathname}`.replace(/\/+$/, "");
+            list.push(`${root}/service-worker.js`);
+            list.push(`${root}/public/service-worker.js`);
+          } catch (_) {}
+        }
+        list.push(`${window.location.origin}/service-worker.js`);
+        list.push(`${window.location.origin}/public/service-worker.js`);
+        return Array.from(new Set(list));
+      })();
 
       (async () => {
+        try {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(
+            registrations
+              .filter((registration) => {
+                const scope = String(registration.scope || "");
+                const activeScript = String(registration.active?.scriptURL || registration.waiting?.scriptURL || registration.installing?.scriptURL || "");
+                return scope.includes("/public/") || activeScript.includes("/public/service-worker.js");
+              })
+              .map((registration) => registration.unregister())
+          );
+        } catch (_) {}
+
         for (const swUrl of candidates) {
           try {
             const registration = await navigator.serviceWorker.register(swUrl);

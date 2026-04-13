@@ -1,4 +1,4 @@
-const SW_VERSION = "v1.1.1";
+const SW_VERSION = "v1.2.0";
 const RUNTIME_CACHE = `runtime-${SW_VERSION}`;
 const SHELL_CACHE = `shell-${SW_VERSION}`;
 const SCOPE_PATH = new URL(self.registration.scope).pathname.replace(/\/+$/, "");
@@ -16,6 +16,22 @@ const SHELL_ASSETS = [
   withScope("script.js"),
   withScope("style.css")
 ];
+
+const AUTH_PATH_PREFIXES = [
+  withScope("api/"),
+  withScope("sanctum/"),
+];
+
+const AUTH_EXACT_PATHS = new Set([
+  withScope("login"),
+  withScope("logout"),
+]);
+
+function isAuthRequest(url) {
+  const path = String(url.pathname || "");
+  if (AUTH_EXACT_PATHS.has(path)) return true;
+  return AUTH_PATH_PREFIXES.some((prefix) => path.startsWith(prefix));
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -46,6 +62,10 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+  if (isAuthRequest(url)) {
+    event.respondWith(fetch(request));
+    return;
+  }
 
   if (request.mode === "navigate") {
     event.respondWith(
@@ -54,13 +74,10 @@ self.addEventListener("fetch", (event) => {
           const preload = await event.preloadResponse;
           if (preload) return preload;
 
-          const response = await fetch(request);
-          const copy = response.clone();
-          caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy)).catch(() => {});
-          return response;
+          return await fetch(request);
         } catch (_error) {
-          const cached = await caches.match(request);
-          if (cached) return cached;
+          const cachedShell = await caches.match(withScope(""));
+          if (cachedShell) return cachedShell;
           return caches.match(OFFLINE_URL);
         }
       })()

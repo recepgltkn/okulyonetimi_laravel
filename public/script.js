@@ -497,6 +497,8 @@ let selectedLessonThemeId = "aurora";
 let lessonSlideDragIndex = -1;
 let lessonAnswerFxTimer = null;
 let currentTeacherLessonListFilter = "all";
+const LESSON_CATEGORY_OPTIONS = ["Kodlama", "Tasarım", "Elektrik", "Robotik", "Teorik", "Oyun", "Yapay Zeka"];
+let currentTeacherLessonCategoryFilter = "all";
 let activeHomePanelId = null;
 let classManagerSelectedId = null;
 let classManagerRows = [];
@@ -2516,8 +2518,9 @@ async function ensureWebPushSubscription() {
   if (!support.ok) return { ok: false, reason: support.reason };
   if (getNotificationPermissionState() !== "granted") return { ok: false, reason: "permission-required" };
   try {
-    const readyWithTimeout = new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error("sw-ready-timeout")), 4000);
+    const existingRegistration = await navigator.serviceWorker.getRegistration();
+    const registration = existingRegistration || await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("sw-ready-timeout")), 12000);
       navigator.serviceWorker.ready
         .then((reg) => {
           clearTimeout(timer);
@@ -2528,7 +2531,6 @@ async function ensureWebPushSubscription() {
           reject(err);
         });
     });
-    const registration = await readyWithTimeout;
     let subscription = await registration.pushManager.getSubscription();
     if (!subscription) {
       const options = { userVisibleOnly: true };
@@ -2539,7 +2541,9 @@ async function ensureWebPushSubscription() {
     const saved = await saveWebPushSubscription(subscription);
     return { ok: !!subscription && saved, reason: saved ? "subscribed" : "save-failed" };
   } catch (e) {
-    console.warn("ensureWebPushSubscription failed", e);
+    if (String(e?.message || "") !== "sw-ready-timeout") {
+      console.warn("ensureWebPushSubscription failed", e);
+    }
     return { ok: false, reason: "subscribe-failed", error: e };
   }
 }
@@ -11768,6 +11772,21 @@ function setTeacherLessonFilterUI() {
   });
 }
 
+function normalizeLessonCategory(raw) {
+  const value = String(raw || "").trim();
+  if (!value) return LESSON_CATEGORY_OPTIONS[0];
+  const found = LESSON_CATEGORY_OPTIONS.find((c) => c.toLowerCase() === value.toLowerCase());
+  return found || LESSON_CATEGORY_OPTIONS[0];
+}
+
+function setTeacherLessonCategoryFilterUI() {
+  document.querySelectorAll("#teacher-lessons-category-list .teacher-lessons-category-btn").forEach((btn) => {
+    const key = String(btn.getAttribute("data-category") || "all");
+    const active = key === currentTeacherLessonCategoryFilter;
+    btn.classList.toggle("active", active);
+  });
+}
+
 function buildTeacherQuizSessionLabel(session = {}) {
   const title = String(session.quizTitle || "Quiz");
   const count = Number(session.participantCount || 0);
@@ -11849,6 +11868,28 @@ function bindTeacherQuizSessionSelectorHandlers(sessionMap = new Map()) {
 });
 setTeacherLessonFilterUI();
 
+document.querySelectorAll("#teacher-lessons-category-list .teacher-lessons-category-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const key = String(btn.getAttribute("data-category") || "all");
+    currentTeacherLessonCategoryFilter = key;
+    setTeacherLessonCategoryFilterUI();
+    renderTeacherLessonsModalList();
+  });
+});
+setTeacherLessonCategoryFilterUI();
+
+const lessonCategoryEl = document.getElementById("lesson-category");
+if (lessonCategoryEl) {
+  lessonCategoryEl.addEventListener("change", () => {
+    const selected = normalizeLessonCategory(lessonCategoryEl.value || "");
+    if (lessonCategoryEl.value !== selected) lessonCategoryEl.value = selected;
+    currentTeacherLessonCategoryFilter = selected;
+    setTeacherLessonCategoryFilterUI();
+    const modal = document.getElementById("teacher-lessons-modal");
+    if (modal?.style.display === "flex") renderTeacherLessonsModalList();
+  });
+}
+
 const deleteSlideBtn = document.getElementById("btn-delete-slide");
 if (deleteSlideBtn) {
   deleteSlideBtn.onclick = function () {
@@ -11892,6 +11933,7 @@ if (saveLessonBtn) {
       const payload = {
         title,
         description,
+        category: lessonCategory,
         targetClass,
         targetSection,
         bgImage,
@@ -12244,6 +12286,7 @@ function openTeacherLessonsModalUI() {
     modal.classList.add("fullscreen");
     modal.style.display = "flex";
   }
+  setTeacherLessonCategoryFilterUI();
   renderTeacherLessonsModalList();
   document.getElementById("side-menu").style.width = "0";
 }
@@ -20713,11 +20756,15 @@ function renderTeacherLessonsModalList() {
   } else if (currentTeacherLessonListFilter === "published") {
     items = items.filter((l) => l?.isPublished !== false);
   }
+  if (currentTeacherLessonCategoryFilter !== "all") {
+    items = items.filter((l) => normalizeLessonCategory(l?.category || "") === currentTeacherLessonCategoryFilter);
+  }
 
   if (metaEl) {
     const draftCount = items.filter((l) => l?.isPublished === false).length;
     const publishedCount = items.filter((l) => l?.isPublished !== false).length;
-    metaEl.innerText = `${items.length} ders kartı hazır. Taslak: ${draftCount} • Yayında: ${publishedCount}`;
+    const catLabel = currentTeacherLessonCategoryFilter === "all" ? "Tüm Kategoriler" : currentTeacherLessonCategoryFilter;
+    metaEl.innerText = `${items.length} ders kartı hazır. ${catLabel} • Taslak: ${draftCount} • Yayında: ${publishedCount}`;
   }
 
   if (!items.length) {
@@ -20731,6 +20778,7 @@ function renderTeacherLessonsModalList() {
     li.className = "list-item";
     const slides = Array.isArray(lesson.slides) ? lesson.slides : [];
     const isPublished = lesson.isPublished !== false;
+    const lessonCategory = normalizeLessonCategory(lesson?.category || "");
     const firstTitle = String(slides[0]?.title || "Yeni Slide");
     const assigned = allStudents.filter((s) => assignmentMatchesStudentFor(lesson, s)).length;
     let done = 0;
@@ -20765,6 +20813,7 @@ function renderTeacherLessonsModalList() {
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <span style="display:inline-flex;align-items:center;padding:5px 10px;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-weight:700;font-size:12px;">📑 ${total} slide</span>
           <span style="display:inline-flex;align-items:center;padding:5px 10px;border-radius:999px;background:#ecfeff;color:#0e7490;font-weight:700;font-size:12px;">🎯 ${Math.max(0, completionPercent)}%</span>
+          <span style="display:inline-flex;align-items:center;padding:5px 10px;border-radius:999px;background:#eef2ff;color:#3730a3;font-weight:700;font-size:12px;">🗂️ ${lessonCategory}</span>
           <span style="display:inline-flex;align-items:center;padding:5px 10px;border-radius:999px;background:${isPublished ? "#dcfce7" : "#fff7ed"};color:${isPublished ? "#166534" : "#9a3412"};font-weight:700;font-size:12px;">${isPublished ? "Yayında" : "Taslak"}</span>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -21444,6 +21493,7 @@ function openLessonBuilderModal(lesson = null) {
   lessonDraft = {
     title: lesson?.title || "",
     description: lesson?.description || "",
+    category: normalizeLessonCategory(lesson?.category || ""),
     targetClass: lesson?.targetClass || "",
     targetSection: lesson?.targetSection || "",
     bgImage: lesson?.bgImage || "",
@@ -21477,6 +21527,7 @@ function openLessonBuilderModal(lesson = null) {
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ""; };
   set("lesson-title", lessonDraft.title);
   set("lesson-desc", lessonDraft.description);
+  set("lesson-category", lessonDraft.category);
   set("lesson-class", lessonDraft.targetClass);
   set("lesson-section", lessonDraft.targetSection);
   set("lesson-bg", lessonDraft.bgImage);

@@ -17,8 +17,8 @@
     <link rel="dns-prefetch" href="//cdn.jsdelivr.net">
     <link rel="dns-prefetch" href="//fonts.googleapis.com">
     <link rel="dns-prefetch" href="//fonts.gstatic.com">
-    <link rel="icon" type="image/png" href="{{ url('public/logo.png') }}">
-    <link rel="manifest" href="{{ url('public/manifest.json') }}">
+    <link id="app-favicon" rel="icon" type="image/png" href="{{ url('public/logo.png') }}">
+    <link id="app-manifest-link" rel="manifest" href="{{ url('public/manifest.json') }}">
     <link rel="apple-touch-icon" href="{{ url('public/logo192.png') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Poppins:wght@300;400&display=swap" rel="stylesheet">
@@ -3651,6 +3651,39 @@
             background: linear-gradient(135deg,#0f172a,#1d4ed8 45%,#22d3ee);
             box-shadow: 0 14px 40px rgba(30,64,175,.28);
         }
+        #btn-open-lesson-builder-from-modal,
+        #btn-close-teacher-lessons-modal {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            height: 52px;
+            line-height: 1;
+            padding: 0 20px !important;
+            vertical-align: middle;
+        }
+        .teacher-lessons-category-btn {
+            display: inline-flex;
+            align-items: center;
+            min-height: 40px;
+            border: 1px solid #cbd5e1;
+            background: #fff;
+            color: #334155;
+            font-weight: 700;
+            border-radius: 10px;
+        }
+        .teacher-lessons-category-btn.active {
+            background: #2563eb;
+            color: #fff;
+            border-color: #2563eb;
+        }
+        @media (max-width: 900px) {
+            .teacher-lessons-modal-body {
+                grid-template-columns: 1fr !important;
+            }
+            .teacher-lessons-cats {
+                max-height: 180px;
+            }
+        }
         #reports-list .list-item:hover { transform: none; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
         #reports-list .list-item { padding: 6px 8px; font-size: 0.9rem; }
         #reports-list .list-item small { font-size: 0.75rem; }
@@ -5335,6 +5368,102 @@
             border-radius: 10px;
             background: #f8fafc;
             padding: 8px;
+        }
+        @media (max-width: 1000px) {
+            .lesson-builder-shell {
+                grid-template-rows: auto 1fr;
+            }
+            .lesson-builder-topbar {
+                grid-template-columns: 1fr;
+                gap: 10px;
+                align-items: stretch;
+                padding: 10px;
+            }
+            .lesson-builder-brand {
+                justify-content: center;
+            }
+            .lesson-title-wrap {
+                width: 100%;
+            }
+            .lesson-title-wrap .lesson-main-input {
+                width: 100%;
+                min-width: 0;
+            }
+            .lesson-builder-actions {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+                width: 100%;
+            }
+            .lesson-builder-actions .btn {
+                width: 100%;
+                min-height: 42px;
+                margin: 0;
+                padding: 8px 10px;
+            }
+            .lesson-builder-main {
+                grid-template-columns: 1fr;
+                gap: 10px;
+                padding: 8px;
+                overflow: auto;
+            }
+            .lesson-panel.left,
+            .lesson-panel.center,
+            .lesson-panel.right {
+                min-height: auto;
+            }
+            .lesson-panel.center,
+            .lesson-panel.right {
+                padding: 8px;
+            }
+            .lesson-quick-tools {
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+            .lesson-quick-tools .btn {
+                width: 100%;
+                min-height: 40px;
+            }
+            .lesson-toolbar {
+                display: grid;
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+                gap: 6px;
+            }
+            .lesson-toolbar .btn {
+                width: 100%;
+                min-width: 0;
+            }
+            .lesson-editor-scroll {
+                padding: 8px;
+            }
+            #slide-content-area #slide-media-row {
+                grid-template-columns: 1fr !important;
+            }
+            .lesson-side-block .form-control,
+            .lesson-editor-scroll .form-control,
+            #slide-content-editor,
+            #slide-code-input {
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+            #lesson-slide-preview {
+                min-height: 180px !important;
+            }
+        }
+        @media (max-width: 640px) {
+            .lesson-builder-actions {
+                grid-template-columns: 1fr;
+            }
+            .lesson-toolbar {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+            .lesson-left-top {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .lesson-left-top #btn-add-lesson-slide {
+                width: 100%;
+            }
         }
         .lesson-theme-grid {
             display: grid;
@@ -10555,11 +10684,26 @@
                         <button id="btn-teacher-lessons-filter-draft" class="btn" type="button" style="background:#fff7ed;color:#9a3412;">Taslak</button>
                         <button id="btn-teacher-lessons-filter-published" class="btn" type="button" style="background:#dcfce7;color:#166534;">Yayında</button>
                     </div>
-                    <div style="flex:1;min-height:0;overflow:auto;">
-                        <ul id="teacher-lessons-modal-list" style="padding:0; margin:0; list-style:none; display:flex; flex-direction:column; gap:8px;"></ul>
-                        <div id="teacher-lessons-modal-empty" class="empty-state" style="display:none;">
-                            <div class="empty-state-icon">📌</div>
-                            Ders bulunamadı.
+                    <div class="teacher-lessons-modal-body" style="flex:1; min-height:0; display:grid; grid-template-columns:220px minmax(0,1fr); gap:12px;">
+                        <aside class="teacher-lessons-cats" style="background:#f8fafc; border:1px solid #dbeafe; border-radius:14px; padding:10px; overflow:auto;">
+                            <div style="font-weight:800; color:#334155; margin:2px 0 8px; font-size:13px;">Ders Kategorileri</div>
+                            <div id="teacher-lessons-category-list" style="display:flex; flex-direction:column; gap:6px;">
+                                <button type="button" class="btn teacher-lessons-category-btn active" data-category="all" style="text-align:left; justify-content:flex-start;">Tümü</button>
+                                <button type="button" class="btn teacher-lessons-category-btn" data-category="Kodlama" style="text-align:left; justify-content:flex-start;">Kodlama</button>
+                                <button type="button" class="btn teacher-lessons-category-btn" data-category="Tasarım" style="text-align:left; justify-content:flex-start;">Tasarım</button>
+                                <button type="button" class="btn teacher-lessons-category-btn" data-category="Elektrik" style="text-align:left; justify-content:flex-start;">Elektrik</button>
+                                <button type="button" class="btn teacher-lessons-category-btn" data-category="Robotik" style="text-align:left; justify-content:flex-start;">Robotik</button>
+                                <button type="button" class="btn teacher-lessons-category-btn" data-category="Teorik" style="text-align:left; justify-content:flex-start;">Teorik</button>
+                                <button type="button" class="btn teacher-lessons-category-btn" data-category="Oyun" style="text-align:left; justify-content:flex-start;">Oyun</button>
+                                <button type="button" class="btn teacher-lessons-category-btn" data-category="Yapay Zeka" style="text-align:left; justify-content:flex-start;">Yapay Zeka</button>
+                            </div>
+                        </aside>
+                        <div style="min-height:0; overflow:auto;">
+                            <ul id="teacher-lessons-modal-list" style="padding:0; margin:0; list-style:none; display:flex; flex-direction:column; gap:8px;"></ul>
+                            <div id="teacher-lessons-modal-empty" class="empty-state" style="display:none;">
+                                <div class="empty-state-icon">📌</div>
+                                Ders bulunamadı.
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -11777,6 +11921,15 @@ Ayşe, Yılmaz, ayse, 123456, 9, B"></textarea>
                 <aside class="lesson-panel right">
                     <div class="lesson-side-title">Sayfa Ayarları</div>
                     <div class="lesson-side-block" id="lesson-question-side">
+                        <select id="lesson-category" class="form-control">
+                            <option value="Kodlama">Kodlama</option>
+                            <option value="Tasarım">Tasarım</option>
+                            <option value="Elektrik">Elektrik</option>
+                            <option value="Robotik">Robotik</option>
+                            <option value="Teorik">Teorik</option>
+                            <option value="Oyun">Oyun</option>
+                            <option value="Yapay Zeka">Yapay Zeka</option>
+                        </select>
                         <input id="slide-title" class="form-control" placeholder="Slide başlığı">
                         <select id="slide-type" class="form-control">
                             <option value="content">Konu Anlatım</option>
@@ -12387,7 +12540,76 @@ Ayşe, Yılmaz, ayse, 123456, 9, B"></textarea>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script src="{{ url('public/pwa-init.js') }}?v={{ filemtime(public_path('pwa-init.js')) }}" defer></script>
-    <script type="module" src="{{ url('public/script.js') }}?v={{ filemtime(public_path('script.js')) }}"></script>
+    <script>
+      (function () {
+        var version = "?v={{ filemtime(public_path('script.js')) }}";
+        var pwaVersion = "?v={{ filemtime(public_path('pwa-init.js')) }}";
+        var publicPrefix = "{{ rtrim(url('public'), '/') }}";
+        var rootPrefix = "{{ rtrim(url('/'), '/') }}";
+
+        function normalize(url) {
+          return String(url || "").replace(/([^:]\/)\/+/g, "$1");
+        }
+
+        function candidates(path, suffix) {
+          var clean = String(path || "").replace(/^\/+/, "");
+          var ext = String(suffix || "");
+          return [
+            normalize(publicPrefix + "/" + clean + ext),
+            normalize(rootPrefix + "/" + clean + ext)
+          ];
+        }
+
+        function loadScriptWithFallback(list, opts) {
+          return new Promise(function (resolve, reject) {
+            var i = 0;
+            function tryNext() {
+              if (i >= list.length) {
+                reject(new Error("all-script-candidates-failed"));
+                return;
+              }
+              var src = list[i++];
+              var s = document.createElement("script");
+              if (opts && opts.type) s.type = opts.type;
+              if (opts && opts.defer) s.defer = true;
+              s.src = src;
+              s.onload = function () { resolve(src); };
+              s.onerror = function () { s.remove(); tryNext(); };
+              document.body.appendChild(s);
+            }
+            tryNext();
+          });
+        }
+
+        function applyManifestFallback() {
+          var manifest = document.getElementById("app-manifest-link");
+          if (!manifest) return;
+          var list = candidates("manifest.json", "");
+          fetch(list[0], { method: "HEAD", cache: "no-store" })
+            .then(function (r) {
+              if (!r.ok) manifest.href = list[1];
+            })
+            .catch(function () {
+              manifest.href = list[1];
+            });
+        }
+
+        document.addEventListener("error", function (event) {
+          var target = event && event.target;
+          if (!target || target.tagName !== "IMG") return;
+          var src = String(target.getAttribute("src") || "");
+          if (!src || src.indexOf("/public/") === -1) return;
+          target.setAttribute("src", src.replace("/public/", "/"));
+        }, true);
+
+        applyManifestFallback();
+
+        loadScriptWithFallback(candidates("pwa-init.js", pwaVersion), { defer: true })
+          .catch(function () { console.warn("pwa-init.js yuklenemedi (tum adaylar)."); });
+
+        loadScriptWithFallback(candidates("script.js", version), { type: "module" })
+          .catch(function () { console.error("script.js yuklenemedi (tum adaylar)."); });
+      })();
+    </script>
 </body>
 </html>
